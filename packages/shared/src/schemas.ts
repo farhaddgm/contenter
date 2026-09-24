@@ -1,0 +1,211 @@
+/**
+ * Request DTO schemas — used by the API ZodValidationPipe and by web forms.
+ */
+import { z } from 'zod';
+import {
+  AiEffort,
+  AiJobStatus,
+  AiJobType,
+  ContentFormat,
+  ContentStatus,
+  IdeaStatus,
+  Platform,
+  PrincipleKind,
+  Role,
+  TopicStatus,
+  TraitCategory,
+  TraitStatus,
+} from './enums';
+
+// ---------- common ----------
+export const PaginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().trim().optional(),
+});
+export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
+
+// ---------- auth ----------
+export const LoginSchema = z.object({
+  email: z.email(),
+  password: z.string().min(1),
+});
+export type LoginInput = z.infer<typeof LoginSchema>;
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(128),
+});
+export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
+
+// ---------- users ----------
+export const CreateUserSchema = z.object({
+  email: z.email(),
+  name: z.string().trim().min(2).max(100),
+  password: z.string().min(8).max(128),
+  role: z.enum(Role),
+});
+export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+
+export const UpdateUserSchema = z.object({
+  name: z.string().trim().min(2).max(100).optional(),
+  role: z.enum(Role).optional(),
+  isActive: z.boolean().optional(),
+  password: z.string().min(8).max(128).optional(),
+});
+export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
+
+// ---------- topics ----------
+export const CreateTopicSchema = z.object({
+  title: z.string().trim().min(2).max(200),
+  description: z.string().trim().min(10).max(10_000),
+  audience: z.string().trim().max(1000).optional().default(''),
+  platform: z.enum(Platform).default('INSTAGRAM'),
+  language: z.string().trim().min(2).max(10).default('fa'),
+});
+export type CreateTopicInput = z.input<typeof CreateTopicSchema>;
+
+export const UpdateTopicSchema = CreateTopicSchema.partial().extend({
+  status: z.enum(TopicStatus).optional(),
+});
+export type UpdateTopicInput = z.input<typeof UpdateTopicSchema>;
+
+export const TopicListQuerySchema = PaginationQuerySchema.extend({
+  status: z.enum(TopicStatus).optional(),
+});
+
+// ---------- principles ----------
+export const CreatePrincipleSchema = z.object({
+  kind: z.enum(PrincipleKind),
+  text: z.string().trim().min(3).max(2000),
+  isActive: z.boolean().default(true),
+  order: z.number().int().default(0),
+});
+export type CreatePrincipleInput = z.input<typeof CreatePrincipleSchema>;
+
+export const UpdatePrincipleSchema = CreatePrincipleSchema.partial();
+export type UpdatePrincipleInput = z.input<typeof UpdatePrincipleSchema>;
+
+// ---------- samples ----------
+export const CreateSampleSchema = z.object({
+  url: z.url({ protocol: /^https?$/ }),
+  manualText: z.string().trim().max(50_000).optional().default(''),
+  adminNote: z.string().trim().max(2000).optional().default(''),
+  autoAnalyze: z.boolean().default(true),
+});
+export type CreateSampleInput = z.input<typeof CreateSampleSchema>;
+
+export const UpdateSampleSchema = z.object({
+  manualText: z.string().trim().max(50_000).optional(),
+  adminNote: z.string().trim().max(2000).optional(),
+});
+export type UpdateSampleInput = z.infer<typeof UpdateSampleSchema>;
+
+// ---------- profiles ----------
+export const BuildProfileSchema = z.object({
+  sampleIds: z.array(z.string()).optional(),
+});
+export type BuildProfileInput = z.infer<typeof BuildProfileSchema>;
+
+export const UpdateProfileSchema = z.object({
+  summary: z.string().trim().max(10_000).optional(),
+  styleGuide: z.string().trim().max(50_000).optional(),
+});
+export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
+
+export const CreateTraitSchema = z.object({
+  category: z.enum(TraitCategory),
+  name: z.string().trim().min(2).max(200),
+  description: z.string().trim().min(2).max(5000),
+  evidence: z.string().trim().max(5000).optional().default(''),
+});
+export type CreateTraitInput = z.input<typeof CreateTraitSchema>;
+
+export const UpdateTraitSchema = z.object({
+  category: z.enum(TraitCategory).optional(),
+  name: z.string().trim().min(2).max(200).optional(),
+  description: z.string().trim().min(2).max(5000).optional(),
+  status: z.enum(TraitStatus).optional(),
+});
+export type UpdateTraitInput = z.infer<typeof UpdateTraitSchema>;
+
+// ---------- ideas ----------
+export const IdeateSchema = z.object({
+  count: z.number().int().min(1).max(20).default(5),
+  direction: z.string().trim().max(2000).optional().default(''),
+  format: z.enum(ContentFormat).optional(),
+});
+export type IdeateInput = z.input<typeof IdeateSchema>;
+
+export const UpdateIdeaSchema = z.object({
+  status: z.enum(IdeaStatus).optional(),
+  title: z.string().trim().min(2).max(300).optional(),
+  angle: z.string().trim().max(5000).optional(),
+  hook: z.string().trim().max(2000).optional(),
+});
+export type UpdateIdeaInput = z.infer<typeof UpdateIdeaSchema>;
+
+export const IdeaListQuerySchema = PaginationQuerySchema.extend({
+  status: z.enum(IdeaStatus).optional(),
+});
+
+// ---------- contents ----------
+export const GenerateContentSchema = z
+  .object({
+    ideaId: z.string().optional(),
+    brief: z.string().trim().max(5000).optional().default(''),
+    format: z.enum(ContentFormat).optional(),
+  })
+  .refine((v) => !!v.ideaId || (v.brief ?? '').length >= 10, {
+    message: 'Either ideaId or a brief (min 10 chars) is required',
+    path: ['brief'],
+  });
+export type GenerateContentInput = z.input<typeof GenerateContentSchema>;
+
+export const ReviseContentSchema = z.object({
+  feedback: z.string().trim().min(3).max(5000),
+});
+export type ReviseContentInput = z.infer<typeof ReviseContentSchema>;
+
+export const UpdateContentSchema = z.object({
+  status: z.enum(ContentStatus).optional(),
+  title: z.string().trim().min(1).max(300).optional(),
+});
+export type UpdateContentInput = z.infer<typeof UpdateContentSchema>;
+
+export const EditContentVersionSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  body: z.string().min(1).max(100_000),
+  hashtags: z.array(z.string()).default([]),
+  cta: z.string().max(2000).default(''),
+  notes: z.string().max(10_000).default(''),
+});
+export type EditContentVersionInput = z.input<typeof EditContentVersionSchema>;
+
+export const ContentListQuerySchema = PaginationQuerySchema.extend({
+  status: z.enum(ContentStatus).optional(),
+  topicId: z.string().optional(),
+});
+
+// ---------- jobs ----------
+export const JobListQuerySchema = PaginationQuerySchema.extend({
+  status: z.enum(AiJobStatus).optional(),
+  type: z.enum(AiJobType).optional(),
+});
+
+// ---------- prompts ----------
+export const CreatePromptVersionSchema = z.object({
+  system: z.string().min(10).max(100_000),
+  user: z.string().min(10).max(100_000),
+  notes: z.string().max(2000).optional().default(''),
+  activate: z.boolean().default(false),
+});
+export type CreatePromptVersionInput = z.input<typeof CreatePromptVersionSchema>;
+
+// ---------- settings ----------
+export const AiSettingsSchema = z.object({
+  models: z.record(z.string(), z.string().min(3)),
+  effort: z.record(z.string(), z.enum(AiEffort)),
+  maxSamplesPerProfile: z.number().int().min(1).max(50),
+});
+export type AiSettings = z.infer<typeof AiSettingsSchema>;

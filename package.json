@@ -1,0 +1,33 @@
+{
+  "name": "contenter",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI-assisted content production platform",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run build -w @contenter/shared && concurrently -n shared,api,web -c blue,green,magenta \"npm run dev -w @contenter/shared\" \"npm run dev -w @contenter/api\" \"npm run dev -w @contenter/web\"",
+    "build": "npm run build -w @contenter/shared && npm run build -w @contenter/api && npm run build -w @contenter/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:up": "docker compose up -d postgres redis",
+    "db:migrate": "npm run prisma:migrate -w @contenter/api",
+    "db:seed": "npm run prisma:seed -w @contenter/api",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.1"
+  },
+  "overrides": {
+    "vite": "^8.3.1"
+  }
+}

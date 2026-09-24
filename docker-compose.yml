@@ -1,0 +1,71 @@
+# Local infrastructure (Postgres + Redis). Full stack: docker compose --profile app up --build
+name: contenter
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: contenter
+      POSTGRES_PASSWORD: contenter
+      POSTGRES_DB: contenter
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U contenter']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: [app]
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    env_file: apps/api/.env
+    environment:
+      APP_ROLE: api
+      DATABASE_URL: postgresql://contenter:contenter@postgres:5432/contenter
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: http://localhost:8080
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - '4000:4000'
+
+  worker:
+    profiles: [app]
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    env_file: apps/api/.env
+    environment:
+      APP_ROLE: worker
+      DATABASE_URL: postgresql://contenter:contenter@postgres:5432/contenter
+      REDIS_URL: redis://redis:6379
+    command: ['node', 'apps/api/dist/main.js']
+    depends_on:
+      api: { condition: service_started }
+    deploy:
+      replicas: 1
+
+  web:
+    profiles: [app]
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    depends_on: [api]
+    ports:
+      - '8080:80'
+
+volumes:
+  pgdata:
+  redisdata:

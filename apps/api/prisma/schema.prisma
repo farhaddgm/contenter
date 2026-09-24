@@ -1,0 +1,448 @@
+// Contenter data model — see docs/03-domain-model.md
+// Enums mirror packages/shared/src/enums.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── Identity ───────────────────────────────
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         Role      @default(EDITOR)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  aiJobs        AiJob[]
+  topics        Topic[]
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─────────────────────────────── Topics ───────────────────────────────
+
+enum Platform {
+  INSTAGRAM
+  YOUTUBE
+  TELEGRAM
+  LINKEDIN
+  X
+  TIKTOK
+  BLOG
+  OTHER
+}
+
+enum TopicStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Topic {
+  id              String      @id @default(cuid())
+  title           String
+  description     String
+  audience        String      @default("")
+  platform        Platform    @default(INSTAGRAM)
+  language        String      @default("fa")
+  status          TopicStatus @default(ACTIVE)
+  activeProfileId String?     @unique
+  createdById     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  createdBy     User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  activeProfile ContentProfile?  @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
+  principles    Principle[]
+  samples       SampleContent[]
+  profiles      ContentProfile[] @relation("TopicProfiles")
+  ideationRuns  IdeationRequest[]
+  ideas         Idea[]
+  contents      Content[]
+
+  @@index([status, createdAt])
+}
+
+enum PrincipleKind {
+  MUST
+  AVOID
+  PREFER
+}
+
+/// topicId = null → global principle applied to every topic
+model Principle {
+  id        String        @id @default(cuid())
+  topicId   String?
+  kind      PrincipleKind
+  text      String
+  isActive  Boolean       @default(true)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  topic Topic? @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, order])
+}
+
+// ─────────────────────────────── Samples ───────────────────────────────
+
+enum MediaType {
+  ARTICLE
+  VIDEO
+  IMAGE
+  POST
+  AUDIO
+  UNKNOWN
+}
+
+enum FetchStatus {
+  PENDING
+  FETCHED
+  FAILED
+  SKIPPED
+}
+
+enum AnalysisStatus {
+  NONE
+  QUEUED
+  DONE
+  FAILED
+}
+
+model SampleContent {
+  id             String         @id @default(cuid())
+  topicId        String
+  url            String
+  platform       Platform       @default(OTHER)
+  mediaType      MediaType      @default(UNKNOWN)
+  manualText     String         @default("")
+  adminNote      String         @default("")
+  fetchStatus    FetchStatus    @default(PENDING)
+  fetchError     String?
+  fetched        Json?
+  analysisStatus AnalysisStatus @default(NONE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  topic    Topic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  analysis SampleAnalysis?
+
+  @@index([topicId, createdAt])
+}
+
+model SampleAnalysis {
+  id        String   @id @default(cuid())
+  sampleId  String   @unique
+  summary   String
+  result    Json
+  jobId     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sample SampleContent @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────── Profiles ───────────────────────────────
+
+enum ProfileStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+enum TraitCategory {
+  TONE
+  STRUCTURE
+  HOOK
+  LANGUAGE
+  FORMAT
+  VISUAL
+  CTA
+  AUDIENCE
+  OTHER
+}
+
+enum TraitStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+}
+
+enum TraitSource {
+  AI
+  ADMIN
+}
+
+model ContentProfile {
+  id         String        @id @default(cuid())
+  topicId    String
+  version    Int
+  status     ProfileStatus @default(DRAFT)
+  summary    String        @default("")
+  styleGuide String        @default("")
+  sampleIds  String[]
+  jobId      String?
+  approvedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  topic       Topic          @relation("TopicProfiles", fields: [topicId], references: [id], onDelete: Cascade)
+  activeFor   Topic?         @relation("ActiveProfile")
+  traits      ProfileTrait[]
+  contents    Content[]
+
+  @@unique([topicId, version])
+}
+
+model ProfileTrait {
+  id          String        @id @default(cuid())
+  profileId   String
+  category    TraitCategory
+  name        String
+  description String
+  evidence    String        @default("")
+  confidence  Float         @default(0.5)
+  status      TraitStatus   @default(PROPOSED)
+  source      TraitSource   @default(AI)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  profile ContentProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, category])
+}
+
+// ─────────────────────────────── Ideas ───────────────────────────────
+
+enum ContentFormat {
+  POST
+  CAROUSEL
+  SHORT_VIDEO_SCRIPT
+  LONG_VIDEO_SCRIPT
+  ARTICLE
+  THREAD
+  NEWSLETTER
+  CAPTION
+}
+
+enum IdeaStatus {
+  PROPOSED
+  SHORTLISTED
+  REJECTED
+  USED
+}
+
+model IdeationRequest {
+  id          String         @id @default(cuid())
+  topicId     String
+  count       Int
+  direction   String         @default("")
+  format      ContentFormat?
+  jobId       String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+
+  topic Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  ideas Idea[]
+}
+
+model Idea {
+  id        String        @id @default(cuid())
+  topicId   String
+  requestId String?
+  title     String
+  angle     String        @default("")
+  hook      String        @default("")
+  format    ContentFormat @default(POST)
+  outline   String[]
+  rationale String        @default("")
+  score     Float         @default(0)
+  status    IdeaStatus    @default(PROPOSED)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  topic    Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  request  IdeationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  contents Content[]
+
+  @@index([topicId, status, createdAt])
+}
+
+// ─────────────────────────────── Contents ───────────────────────────────
+
+enum ContentStatus {
+  GENERATING
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  FAILED
+}
+
+enum VersionSource {
+  AI
+  ADMIN
+}
+
+model Content {
+  id               String        @id @default(cuid())
+  topicId          String
+  ideaId           String?
+  profileId        String?
+  title            String
+  brief            String        @default("")
+  format           ContentFormat @default(POST)
+  status           ContentStatus @default(GENERATING)
+  currentVersionId String?       @unique
+  lastJobId        String?
+  createdById      String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  topic          Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  idea           Idea?            @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  profile        ContentProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  currentVersion ContentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       ContentVersion[] @relation("ContentVersions")
+
+  @@index([topicId, status, createdAt])
+  @@index([status, updatedAt])
+}
+
+model ContentVersion {
+  id        String        @id @default(cuid())
+  contentId String
+  version   Int
+  title     String
+  body      String
+  hashtags  String[]
+  cta       String        @default("")
+  notes     String        @default("")
+  selfCheck Json?
+  feedback  String?
+  source    VersionSource @default(AI)
+  jobId     String?
+  createdAt DateTime      @default(now())
+
+  content   Content  @relation("ContentVersions", fields: [contentId], references: [id], onDelete: Cascade)
+  currentOf Content? @relation("CurrentVersion")
+
+  @@unique([contentId, version])
+}
+
+// ─────────────────────────────── AI & Ops ───────────────────────────────
+
+enum AiJobType {
+  ANALYZE_SAMPLE
+  BUILD_PROFILE
+  IDEATE
+  GENERATE_CONTENT
+  REVISE_CONTENT
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+model AiJob {
+  id              String      @id @default(cuid())
+  type            AiJobType
+  status          AiJobStatus @default(QUEUED)
+  targetType      String
+  targetId        String
+  topicId         String?
+  input           Json
+  output          Json?
+  error           String?
+  attempts        Int         @default(0)
+  model           String?
+  inputTokens     Int         @default(0)
+  outputTokens    Int         @default(0)
+  cacheReadTokens Int         @default(0)
+  costUsd         Float       @default(0)
+  promptKey       String?
+  promptVersion   Int?
+  createdById     String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([type, createdAt])
+  @@index([targetType, targetId])
+  @@index([topicId])
+}
+
+model PromptTemplate {
+  id        String   @id @default(cuid())
+  key       String
+  version   Int
+  system    String
+  user      String
+  notes     String   @default("")
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([key, version])
+  @@index([key, isActive])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  meta       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
