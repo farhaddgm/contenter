@@ -10,6 +10,7 @@ import { PageSpinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { useAiSettings, useUpdateAiSettings, type AiSettingsResponse } from '@/features/admin/api';
+import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
 const MODELS = [
   'claude-opus-5',
@@ -141,6 +142,9 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
             ))}
           </div>
         </Card>
+      </div>
+      <div className="mt-6">
+        <SmartSettingsCard />
       </div>
     </>
   );

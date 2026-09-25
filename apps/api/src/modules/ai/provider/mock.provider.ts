@@ -3,6 +3,7 @@ import type {
   IdeationResult,
   ProfileBuildResult,
   SampleAnalysisResult,
+  SmartReply,
 } from '@contenter/shared';
 import {
   NonRetryableAiError,
@@ -158,6 +159,23 @@ export class MockProvider implements AiProvider {
             suggestions: ['می‌توان یک مثال واقعی به نکتهٔ دوم اضافه کرد.'],
           },
         } satisfies ContentDraftResult;
+      case 'SMART_CHAT': {
+        const last =
+          /<message role="admin">\n([\s\S]*?)\n<\/message>(?![\s\S]*<message role="admin">)/.exec(
+            req.user,
+          )?.[1] ?? '';
+        if (/خلاصه|summar/i.test(last)) {
+          return {
+            reply:
+              '# نمونهٔ گزارش آزمایشی برای دفتر خطاهای واکر\n\n## خلاصه\nاین یک پاسخ آزمایشی (mock) است.\n\n## شرح کامل مسئله\nادمین گزارش داد: ' +
+              last.slice(0, 300) +
+              '\n\n## مراحل بازتولید\n1. …\n\n## رفتار فعلی\n…\n\n## رفتار مورد انتظار\n…\n\n## شواهد\nاز کانتکست سرور.\n\n## بخش احتمالی درگیر\nنامشخص (حالت mock)\n\n## پیشنهاد رفع\nبا AI واقعی بررسی شود.\n\n## اولویت\nمتوسط',
+          } satisfies SmartReply;
+        }
+        return {
+          reply: `این یک پاسخ آزمایشی (mock) از اسمارت است. پیام شما: «${last.slice(0, 200)}»\n\n- کانتکست سرور دریافت شد (${req.user.length} کاراکتر).\n- برای پاسخ واقعی، \`AI_PROVIDER=anthropic\` را تنظیم کنید.`,
+        } satisfies SmartReply;
+      }
       default:
         throw new NonRetryableAiError(`No mock fixture for task ${req.task}`);
     }

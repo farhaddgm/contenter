@@ -78,6 +78,18 @@ const router = createBrowserRouter([
             path: paths.app.admin.audit.path,
             lazy: lazyRoute(() => import('./routes/app/admin/audit')),
           },
+          {
+            path: paths.app.admin.smartErrors.path,
+            lazy: lazyRoute(() => import('./routes/app/admin/smart-errors')),
+          },
+          {
+            path: paths.app.admin.smartIssues.path,
+            lazy: lazyRoute(() => import('./routes/app/admin/smart-issues')),
+          },
+          {
+            path: paths.app.admin.smartInteractions.path,
+            lazy: lazyRoute(() => import('./routes/app/admin/smart-interactions')),
+          },
         ],
       },
     ],

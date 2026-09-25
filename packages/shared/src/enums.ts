@@ -86,6 +86,7 @@ export const AiJobType = [
   'IDEATE',
   'GENERATE_CONTENT',
   'REVISE_CONTENT',
+  'SMART_CHAT',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 

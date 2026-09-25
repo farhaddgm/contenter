@@ -12,6 +12,7 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 import { PermanentJobError, QueueService, type AttemptInfo } from '../../infra/queue/queue.service';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
+import { ErrorTrackerService } from '../smart/smart-core.services';
 import { estimateCostUsd } from './pricing';
 import { NonRetryableAiError } from './provider/ai-provider';
 import { AI_RUNNERS, type AiRunner } from './runners/runner';
@@ -37,6 +38,7 @@ export class AiJobsService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
     private readonly audit: AuditService,
+    private readonly errors: ErrorTrackerService,
     @Inject(AI_RUNNERS) runners: AiRunner[],
   ) {
     this.runners = new Map(runners.map((r) => [r.type, r]));
@@ -115,7 +117,24 @@ export class AiJobsService implements OnModuleInit {
           finishedAt: final ? new Date() : null,
         },
       });
-      if (final) await runner.onFailure?.(job, message).catch(() => undefined);
+      if (final) {
+        await runner.onFailure?.(job, message).catch(() => undefined);
+        await this.errors.record({
+          source: 'AI_JOB',
+          message: `${job.type} failed: ${message}`,
+          detail: err instanceof Error ? err.stack : null,
+          errorName: err instanceof Error ? err.name : null,
+          jobId: job.id,
+          userId: job.createdById,
+          context: {
+            type: job.type,
+            targetType: job.targetType,
+            targetId: job.targetId,
+            attempts: attempt.attempt,
+            topicId: job.topicId,
+          },
+        });
+      }
       throw permanent ? new PermanentJobError(message) : err;
     }
   }

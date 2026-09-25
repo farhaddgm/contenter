@@ -1,12 +1,14 @@
 import type { ApiErrorBody, AuthResponse } from '@contenter/shared';
 import { env } from '@/config/env';
 import { useAuthStore } from '@/stores/auth';
+import { smartBus } from './smart-bus';
 
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
     public readonly errors?: ApiErrorBody['errors'],
+    public readonly errorId?: string,
   ) {
     super(message);
   }
@@ -53,17 +55,35 @@ export function refreshSession(): Promise<boolean> {
 
 async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const token = useAuthStore.getState().accessToken;
-  const res = await fetch(buildUrl(path, opts.params), {
-    method,
-    credentials: 'include',
-    signal: opts.signal,
-    headers: {
-      Accept: 'application/json',
-      ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path, opts.params), {
+      method,
+      credentials: 'include',
+      signal: opts.signal,
+      headers: {
+        Accept: 'application/json',
+        // lets the server attach the current page to interaction logs and errors
+        'X-Client-Route': window.location.pathname,
+        ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch (err) {
+    if (
+      !(err instanceof DOMException && err.name === 'AbortError') &&
+      !path.startsWith('/smart/')
+    ) {
+      smartBus.emit({
+        type: 'client-error',
+        kind: 'api',
+        message: `Network error: ${method} ${path}`,
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
+    throw err;
+  }
 
   if (res.status === 401 && !opts.skipRefresh && !path.startsWith('/auth/')) {
     if (await refreshSession()) return request<T>(method, path, { ...opts, skipRefresh: true });
@@ -74,7 +94,16 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const body = data as ApiErrorBody | null;
-    throw new ApiError(res.status, body?.message ?? res.statusText, body?.errors);
+    if (res.status >= 500 && body?.errorId) {
+      smartBus.emit({
+        type: 'server-error',
+        errorId: body.errorId,
+        message: body.message ?? res.statusText,
+        status: res.status,
+        path: `${method} ${path}`,
+      });
+    }
+    throw new ApiError(res.status, body?.message ?? res.statusText, body?.errors, body?.errorId);
   }
   return data as T;
 }

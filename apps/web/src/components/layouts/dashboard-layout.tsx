@@ -2,6 +2,9 @@ import { useEffect, type ReactNode } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router';
 import {
   Activity,
+  Bug,
+  MousePointerClick,
+  NotebookPen,
   Bot,
   FileText,
   FolderKanban,
@@ -26,6 +29,8 @@ import { useAuthorization, useLogout } from '@/lib/auth';
 import { useUi } from '@/stores/ui';
 import { cn } from '@/utils/cn';
 import { Dropdown } from '@/components/ui/misc';
+import { SmartRoot } from '@/features/smart/components/smart-root';
+import { SmartToggle } from '@/features/smart/components/smart-toggle';
 
 interface NavItem {
   to: string;
@@ -38,6 +43,16 @@ const contentNav: NavItem[] = [
   { to: paths.app.dashboard.getHref(), label: 'nav.dashboard', icon: <Gauge />, end: true },
   { to: paths.app.topics.getHref(), label: 'nav.topics', icon: <FolderKanban /> },
   { to: paths.app.contents.getHref(), label: 'nav.contents', icon: <FileText /> },
+];
+
+const smartNav: NavItem[] = [
+  { to: paths.app.admin.smartErrors.getHref(), label: 'smart.nav.errors', icon: <Bug /> },
+  { to: paths.app.admin.smartIssues.getHref(), label: 'smart.nav.issues', icon: <NotebookPen /> },
+  {
+    to: paths.app.admin.smartInteractions.getHref(),
+    label: 'smart.nav.interactions',
+    icon: <MousePointerClick />,
+  },
 ];
 
 const adminNav: NavItem[] = [
@@ -100,6 +115,7 @@ function Sidebar() {
       <nav className="flex-1 space-y-6 overflow-y-auto">
         <NavSection title={t('nav.content')} items={contentNav} />
         {can('backoffice:access') && <NavSection title={t('nav.backoffice')} items={adminNav} />}
+        {can('backoffice:access') && <NavSection title={t('smart.name')} items={smartNav} />}
       </nav>
     </div>
   );
@@ -204,11 +220,13 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             <Menu className="size-5" />
           </button>
           <div className="flex-1" />
+          <SmartToggle />
           <UserMenu />
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
           {children}
         </main>
+        <SmartRoot />
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from './config/config.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -18,14 +18,17 @@ import { SamplesModule } from './modules/samples/samples.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { TopicsModule } from './modules/topics/topics.module';
 import { UsersModule } from './modules/users/users.module';
+import { InteractionInterceptor } from './modules/smart/interaction.interceptor';
+import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
     QueueModule,
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 600 }]),
     AuditModule,
+    SmartCoreModule,
     AuthModule,
     SettingsModule,
     AiModule,
@@ -37,11 +40,13 @@ import { UsersModule } from './modules/users/users.module';
     ContentsModule,
     JobsModule,
     DashboardModule,
+    SmartModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: InteractionInterceptor },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })

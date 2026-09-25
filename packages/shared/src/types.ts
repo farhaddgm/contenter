@@ -35,6 +35,8 @@ export interface ApiErrorBody {
   statusCode: number;
   message: string;
   errors?: { path: string; message: string }[];
+  /** Present on 5xx responses: id of the recorded AppError (Smart error tracker). */
+  errorId?: string;
 }
 
 export interface User {

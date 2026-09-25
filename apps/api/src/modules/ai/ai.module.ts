@@ -13,6 +13,7 @@ import { BuildProfileRunner } from './runners/build-profile.runner';
 import { GenerateContentRunner, ReviseContentRunner } from './runners/content.runners';
 import { IdeateRunner } from './runners/ideate.runner';
 import { AI_RUNNERS } from './runners/runner';
+import { SmartChatRunner } from './runners/smart-chat.runner';
 
 const RUNNERS = [
   AnalyzeSampleRunner,
@@ -20,6 +21,7 @@ const RUNNERS = [
   IdeateRunner,
   GenerateContentRunner,
   ReviseContentRunner,
+  SmartChatRunner,
 ];
 
 @Global()

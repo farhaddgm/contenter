@@ -16,3 +16,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 - Web: features must not import from `app/`; translation keys are typed from `i18n/fa.ts` (en must match); use logical CSS (`ps-`, `start-`) for RTL.
 - Dialogs with local state mount only while open (no reset-in-effect; react-hooks v7 rules).
 - Docs are in Persian under `docs/`; update them with behavior changes.
+
+## Smart (docs/10-smart.md)
+- Walker steps: `WalkerStepKey` in `packages/shared/src/smart.ts`; server progress in `WalkerProgressService`, client routing in `apps/web/src/features/smart/walker-steps.ts`.
+- Errors: 5xx are recorded by `AllExceptionsFilter` → `ErrorTrackerService`; browser errors go through `lib/smart-bus.ts` → `lib/error-reporter.ts`. Don't record 4xx.
+- Detailed interaction logging is opt-in (`SystemSetting` key `smart`); always pass logged payloads through `sanitize()`.
+- Walker issues ("دفتر خطاهای واکر") are the admin's bug reports — read them via `GET /api/smart/issues` or the DB table `WalkerIssue` when asked to fix reported problems.

@@ -29,10 +29,14 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
-  aiJobs        AiJob[]
-  topics        Topic[]
+  refreshTokens      RefreshToken[]
+  auditLogs          AuditLog[]
+  aiJobs             AiJob[]
+  topics             Topic[]
+  interactionLogs    InteractionLog[]
+  appErrors          AppError[]
+  smartConversations SmartConversation[]
+  walkerIssues       WalkerIssue[]
 }
 
 model RefreshToken {
@@ -81,11 +85,11 @@ model Topic {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  createdBy     User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  activeProfile ContentProfile?  @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
+  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  activeProfile ContentProfile?   @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
   principles    Principle[]
   samples       SampleContent[]
-  profiles      ContentProfile[] @relation("TopicProfiles")
+  profiles      ContentProfile[]  @relation("TopicProfiles")
   ideationRuns  IdeationRequest[]
   ideas         Idea[]
   contents      Content[]
@@ -217,10 +221,10 @@ model ContentProfile {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
-  topic       Topic          @relation("TopicProfiles", fields: [topicId], references: [id], onDelete: Cascade)
-  activeFor   Topic?         @relation("ActiveProfile")
-  traits      ProfileTrait[]
-  contents    Content[]
+  topic     Topic          @relation("TopicProfiles", fields: [topicId], references: [id], onDelete: Cascade)
+  activeFor Topic?         @relation("ActiveProfile")
+  traits    ProfileTrait[]
+  contents  Content[]
 
   @@unique([topicId, version])
 }
@@ -369,6 +373,7 @@ enum AiJobType {
   IDEATE
   GENERATE_CONTENT
   REVISE_CONTENT
+  SMART_CHAT
 }
 
 enum AiJobStatus {
@@ -445,4 +450,181 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// ─────────────────────────────── Smart (اسمارت) ───────────────────────────────
+
+enum InteractionSource {
+  CLIENT
+  SERVER
+}
+
+/// Opt-in detailed interaction log (SystemSetting smart.detailedLogging).
+model InteractionLog {
+  id         String            @id @default(cuid())
+  userId     String?
+  sessionId  String?
+  source     InteractionSource
+  type       String
+  route      String?
+  method     String?
+  path       String?
+  statusCode Int?
+  durationMs Int?
+  target     String?
+  meta       Json?
+  createdAt  DateTime          @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([createdAt])
+}
+
+enum ErrorSource {
+  SERVER
+  CLIENT
+  AI_JOB
+}
+
+enum ErrorStatus {
+  NEW
+  SEEN
+  RESOLVED
+  IGNORED
+}
+
+enum ErrorCategory {
+  DATABASE
+  VALIDATION
+  AUTH
+  NETWORK
+  AI
+  NOT_FOUND
+  CLIENT_RUNTIME
+  UNKNOWN
+}
+
+/// Errors raised by the server, the web client or AI jobs. Deduplicated by fingerprint.
+model AppError {
+  id          String        @id @default(cuid())
+  fingerprint String
+  source      ErrorSource
+  category    ErrorCategory @default(UNKNOWN)
+  message     String
+  hint        String?
+  detail      String?
+  statusCode  Int?
+  method      String?
+  path        String?
+  route       String?
+  jobId       String?
+  userId      String?
+  context     Json?
+  count       Int           @default(1)
+  status      ErrorStatus   @default(NEW)
+  firstSeenAt DateTime      @default(now())
+  lastSeenAt  DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user          User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversations SmartConversation[]
+  issues        WalkerIssue[]
+
+  @@index([fingerprint, status])
+  @@index([status, lastSeenAt])
+  @@index([lastSeenAt])
+}
+
+enum ConversationKind {
+  WALKER
+  ERROR
+}
+
+enum SmartMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum SmartMessageStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+model SmartConversation {
+  id        String           @id @default(cuid())
+  userId    String
+  kind      ConversationKind
+  title     String           @default("")
+  errorId   String?
+  topicId   String?
+  route     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  error    AppError?      @relation(fields: [errorId], references: [id], onDelete: SetNull)
+  messages SmartMessage[]
+  issues   WalkerIssue[]
+
+  @@index([userId, updatedAt])
+}
+
+model SmartMessage {
+  id             String             @id @default(cuid())
+  conversationId String
+  role           SmartMessageRole
+  content        String             @default("")
+  status         SmartMessageStatus @default(DONE)
+  /// Context snapshot captured when the admin sent the message (route, topic, walker step).
+  context        Json?
+  jobId          String?
+  createdAt      DateTime           @default(now())
+
+  conversation SmartConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  issues       WalkerIssue[]
+
+  @@index([conversationId, createdAt])
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  WONT_FIX
+}
+
+enum IssueSource {
+  WALKER_CHAT
+  ERROR_CHAT
+}
+
+/// "دفتر خطاهای واکر" — issues saved by the admin from an AI answer, to be fixed later.
+model WalkerIssue {
+  id             String      @id @default(cuid())
+  title          String
+  content        String
+  source         IssueSource
+  status         IssueStatus @default(OPEN)
+  conversationId String?
+  messageId      String?
+  errorId        String?
+  topicId        String?
+  route          String?
+  context        Json?
+  resolutionNote String?
+  resolvedAt     DateTime?
+  createdById    String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  createdBy    User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  conversation SmartConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message      SmartMessage?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  error        AppError?          @relation(fields: [errorId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
 }

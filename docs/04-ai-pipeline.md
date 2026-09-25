@@ -11,6 +11,7 @@
 | ایده‌پردازی | **AI** (`IDEATE`) | خروجی: `IdeationResult` ← کد ایده‌ها را ذخیره می‌کند |
 | تولید محتوا | **AI** (`GENERATE_CONTENT`) | خروجی: `ContentDraftResult` + `selfCheck` |
 | بازنویسی با بازخورد | **AI** (`REVISE_CONTENT`) | نسخهٔ جدید `ContentVersion` |
+| پاسخ دستیار اسمارت | **AI** (`SMART_CHAT`) | فقط پاسخ متنی بر اساس کانتکست فقط‌خواندنی که کد می‌سازد ([10-smart.md](10-smart.md)) |
 | صف‌بندی، retry، ذخیره، هزینه، دسترسی و نسخه‌بندی | **کد** | |
 
 ## مدل و تنظیمات
@@ -40,6 +41,7 @@
 | `ideate` | `topic`، `profile`، `principles`، `existing_ideas`، `count`، `direction`، `format`، `language` |
 | `generate_content` | `topic`، `profile`، `principles`، `idea`، `brief`، `format`، `language` |
 | `revise_content` | `topic`، `profile`، `principles`، `current_draft`، `feedback`، `language` |
+| `smart_chat` | `mode`، `context`، `transcript` |
 
 ## ثبت هزینه
 

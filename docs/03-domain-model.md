@@ -102,8 +102,15 @@ SystemSetting  (key/value JSON)
 ### PromptTemplate
 `key` (مثلاً `analyze_sample`)، `version`، `system`، `user` (قالب با متغیرهای `{{var}}`)، `isActive` و `notes`. در seed نسخهٔ ۱ هر پرامپت ساخته می‌شود.
 
+### موجودیت‌های اسمارت
+- `InteractionLog`: تعاملات ثبت‌شده، وقتی جمع‌آوری کامل روشن باشد. فیلدها: `source` (سرور یا مرورگر)، `type`، `method`/`path`/`statusCode`/`durationMs`، `route`، `target` و `meta` پاک‌سازی‌شده.
+- `AppError`: خطای گروه‌بندی‌شده با `fingerprint`، `source` (`SERVER`، `CLIENT` یا `AI_JOB`)، `category`، `hint`، `detail` (stack)، `count`، `status` (`NEW`، `SEEN`، `RESOLVED` یا `IGNORED`) و `firstSeenAt`/`lastSeenAt`.
+- `SmartConversation` و `SmartMessage`: گفتگوی ادمین با اسمارت. `kind` یکی از `WALKER` یا `ERROR` است. پیام‌ها `PENDING`، `DONE` یا `FAILED` هستند و به `jobId` کار AI وصل‌اند.
+- `WalkerIssue`: دفتر خطاهای واکر. متن عین پیام AI، `source`، `status` (`OPEN`، `IN_PROGRESS`، `RESOLVED` یا `WONT_FIX`)، کانتکست و یادداشت رفع را نگه می‌دارد.
+
 ### SystemSetting
 کلید و مقدار JSON. نمونه‌ها:
 - `ai.models`: مدل هر نوع کار، مثلاً `{ "default": "claude-opus-5" }`
 - `ai.effort`: سطح effort هر نوع کار
 - `ai.maxSamplesPerProfile`
+- `smart`: `{ detailedLogging: false, retentionDays: 30 }`

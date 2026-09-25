@@ -4,6 +4,7 @@ import {
   IdeationResultSchema,
   ProfileBuildResultSchema,
   SampleAnalysisResultSchema,
+  SmartReplySchema,
   type AiJobType,
 } from '@contenter/shared';
 import type { ZodType } from 'zod';
@@ -36,6 +37,7 @@ describe('renderTemplate', () => {
       ],
       generate_content: ['topic', 'profile', 'principles', 'idea', 'brief', 'format', 'language'],
       revise_content: ['topic', 'profile', 'principles', 'current_draft', 'feedback', 'language'],
+      smart_chat: ['mode', 'context', 'transcript'],
     };
     for (const p of DEFAULT_PROMPTS) {
       const used = [...templateVariables(p.system), ...templateVariables(p.user)];
@@ -116,6 +118,7 @@ describe('MockProvider', () => {
     ['IDEATE', IdeationResultSchema],
     ['GENERATE_CONTENT', ContentDraftResultSchema],
     ['REVISE_CONTENT', ContentDraftResultSchema],
+    ['SMART_CHAT', SmartReplySchema],
   ];
   it.each(cases)('returns schema-valid output for %s', async (task, schema) => {
     const res = await provider.generateStructured({
