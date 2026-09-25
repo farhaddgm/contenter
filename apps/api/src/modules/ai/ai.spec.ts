@@ -133,3 +133,39 @@ describe('MockProvider', () => {
     if (task === 'IDEATE') expect((res.data as { ideas: unknown[] }).ideas).toHaveLength(4);
   });
 });
+
+describe('lastAdminMessage', () => {
+  it('returns only the last admin message of a multi-turn transcript', async () => {
+    const { lastAdminMessage } = await import('./provider/mock.provider');
+    const transcript = [
+      '<message role="admin">\nاین مرحله رو توضیح بده\n</message>',
+      '<message role="assistant">\nپاسخ قبلی\n</message>',
+      '<message role="admin">\nسؤال دوم\n</message>',
+    ].join('\n');
+    expect(lastAdminMessage(transcript)).toBe('سؤال دوم');
+    expect(lastAdminMessage('no messages')).toBe('');
+  });
+});
+
+describe('AnthropicProvider without credentials', () => {
+  it('fails fast with a clear, non-retryable error', async () => {
+    const saved = { key: process.env.ANTHROPIC_API_KEY, token: process.env.ANTHROPIC_AUTH_TOKEN };
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    const { AnthropicProvider } = await import('./provider/anthropic.provider');
+    const { NonRetryableAiError } = await import('./provider/ai-provider');
+    const provider = new AnthropicProvider(undefined, true);
+    await expect(
+      provider.generateStructured({
+        task: 'SMART_CHAT',
+        model: 'claude-opus-5',
+        effort: 'low',
+        system: 's',
+        user: 'u',
+        schema: SmartReplySchema,
+      }),
+    ).rejects.toBeInstanceOf(NonRetryableAiError);
+    if (saved.key) process.env.ANTHROPIC_API_KEY = saved.key;
+    if (saved.token) process.env.ANTHROPIC_AUTH_TOKEN = saved.token;
+  });
+});

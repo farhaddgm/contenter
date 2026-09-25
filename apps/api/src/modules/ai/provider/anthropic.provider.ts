@@ -25,14 +25,31 @@ export class AnthropicProvider implements AiProvider {
   private readonly logger = new Logger(AnthropicProvider.name);
   private readonly client: Anthropic;
 
+  private readonly hasCredentials: boolean;
+
   constructor(
     apiKey: string | undefined,
     private readonly refusalFallback: boolean,
   ) {
+    this.hasCredentials = !!(
+      apiKey ||
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.ANTHROPIC_AUTH_TOKEN
+    );
     this.client = new Anthropic(apiKey ? { apiKey } : {});
+    if (!this.hasCredentials) {
+      this.logger.warn(
+        'AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty — AI jobs will fail until it is set.',
+      );
+    }
   }
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
+    if (!this.hasCredentials) {
+      throw new NonRetryableAiError(
+        'ANTHROPIC_API_KEY is not set. Add it to apps/api/.env (or set AI_PROVIDER=mock) and restart the API.',
+      );
+    }
     try {
       return await this.call(req, req.imageUrls ?? []);
     } catch (err) {

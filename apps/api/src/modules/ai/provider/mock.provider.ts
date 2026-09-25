@@ -160,10 +160,7 @@ export class MockProvider implements AiProvider {
           },
         } satisfies ContentDraftResult;
       case 'SMART_CHAT': {
-        const last =
-          /<message role="admin">\n([\s\S]*?)\n<\/message>(?![\s\S]*<message role="admin">)/.exec(
-            req.user,
-          )?.[1] ?? '';
+        const last = lastAdminMessage(req.user);
         if (/خلاصه|summar/i.test(last)) {
           return {
             reply:
@@ -180,4 +177,14 @@ export class MockProvider implements AiProvider {
         throw new NonRetryableAiError(`No mock fixture for task ${req.task}`);
     }
   }
+}
+
+/** Text of the last admin message in a Smart chat transcript. */
+export function lastAdminMessage(user: string): string {
+  const tag = '<message role="admin">\n';
+  const start = user.lastIndexOf(tag);
+  if (start < 0) return '';
+  const body = user.slice(start + tag.length);
+  const end = body.indexOf('\n</message>');
+  return (end < 0 ? body : body.slice(0, end)).trim();
 }
