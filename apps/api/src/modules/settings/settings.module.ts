@@ -2,15 +2,18 @@ import { Body, Controller, Get, Global, Inject, Injectable, Module, Put } from '
 import { Prisma } from '@prisma/client';
 import {
   AiSettingsSchema,
+  normalizeModelRef,
   type AiEffort,
   type AiJobType,
   type AiSettings,
+  type AiSettingsResponse,
 } from '@contenter/shared';
 import { ENV, type Env } from '../../config/env';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
+import { AiProviderRegistry } from '../ai/provider/provider-registry';
 
 const AI_KEY = 'ai';
 
@@ -33,7 +36,7 @@ export class SettingsService {
 
   defaults(): AiSettings {
     return {
-      models: { default: this.env.AI_DEFAULT_MODEL },
+      models: { default: normalizeModelRef(this.env.AI_DEFAULT_MODEL) },
       effort: { ...DEFAULT_EFFORT },
       maxSamplesPerProfile: 20,
     };
@@ -46,13 +49,14 @@ export class SettingsService {
     const parsed = AiSettingsSchema.partial().safeParse(row.value);
     const stored = parsed.success ? parsed.data : {};
     return {
-      models: { ...defaults.models, ...stored.models },
+      models: normalizeModels({ ...defaults.models, ...stored.models }),
       effort: { ...defaults.effort, ...stored.effort },
       maxSamplesPerProfile: stored.maxSamplesPerProfile ?? defaults.maxSamplesPerProfile,
     };
   }
 
-  async updateAi(input: AiSettings, userId: string) {
+  async updateAi(body: AiSettings, userId: string) {
+    const input = { ...body, models: normalizeModels(body.models) };
     await this.prisma.systemSetting.upsert({
       where: { key: AI_KEY },
       create: { key: AI_KEY, value: input as unknown as Prisma.InputJsonValue },
@@ -68,13 +72,18 @@ export class SettingsService {
     return this.getAi();
   }
 
+  /** `model` is a `provider:model` reference, resolved by AiProviderRegistry. */
   async modelFor(task: AiJobType): Promise<{ model: string; effort: AiEffort }> {
     const s = await this.getAi();
     return {
-      model: s.models[task] || s.models.default || this.env.AI_DEFAULT_MODEL,
+      model: s.models[task] || s.models.default || normalizeModelRef(this.env.AI_DEFAULT_MODEL),
       effort: s.effort[task] ?? DEFAULT_EFFORT[task],
     };
   }
+}
+
+function normalizeModels(models: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(models).map(([k, v]) => [k, normalizeModelRef(v)]));
 }
 
 @Controller('admin/settings')
@@ -82,20 +91,24 @@ export class SettingsService {
 export class SettingsController {
   constructor(
     private readonly settings: SettingsService,
-    @Inject(ENV) private readonly env: Env,
+    private readonly providers: AiProviderRegistry,
   ) {}
 
   @Get('ai')
-  async getAi() {
-    return { ...(await this.settings.getAi()), provider: this.env.AI_PROVIDER };
+  async getAi(): Promise<AiSettingsResponse> {
+    return this.withStatus(await this.settings.getAi());
   }
 
   @Put('ai')
-  updateAi(
+  async updateAi(
     @Body(new ZodValidationPipe(AiSettingsSchema)) body: AiSettings,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.settings.updateAi(body, user.id);
+    return this.withStatus(await this.settings.updateAi(body, user.id));
+  }
+
+  private withStatus(settings: AiSettings): AiSettingsResponse {
+    return { ...settings, mock: this.providers.isMock, providers: this.providers.status() };
   }
 }
 

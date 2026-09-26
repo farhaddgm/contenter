@@ -24,7 +24,7 @@ export function categorize(input: ClassifyInput): ErrorCategory {
   }
   if (
     input.source === 'AI_JOB' ||
-    /anthropic|model declined|max_tokens|model output|invalid json/.test(msg)
+    /anthropic|openai|model declined|max_tokens|model output|invalid json/.test(msg)
   ) {
     return 'AI';
   }

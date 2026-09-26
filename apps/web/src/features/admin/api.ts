@@ -2,6 +2,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AiSettings,
+  AiSettingsResponse,
   AuditLog,
   ChangePasswordInput,
   CreatePromptVersionInput,
@@ -99,8 +100,6 @@ export function useActivatePrompt(key: string) {
 }
 
 // ---------- settings ----------
-export type AiSettingsResponse = AiSettings & { provider: 'anthropic' | 'mock' };
-
 export function useAiSettings() {
   return useQuery({
     queryKey: ['settings', 'ai'],
@@ -111,7 +110,7 @@ export function useAiSettings() {
 export function useUpdateAiSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: AiSettings) => api.put<AiSettings>('/admin/settings/ai', data),
+    mutationFn: (data: AiSettings) => api.put<AiSettingsResponse>('/admin/settings/ai', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   });
 }

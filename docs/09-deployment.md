@@ -5,7 +5,7 @@
 ```bash
 cp apps/api/.env.example apps/api/.env
 # حتماً تنظیم کنید: JWT_ACCESS_SECRET، JWT_REFRESH_SECRET (رشتهٔ تصادفی طولانی)،
-# AI_PROVIDER=anthropic، ANTHROPIC_API_KEY، COOKIE_SECURE=true (پشت HTTPS)، SEED_ADMIN_PASSWORD
+# AI_PROVIDER=live، OPENAI_API_KEY و/یا ANTHROPIC_API_KEY، COOKIE_SECURE=true (پشت HTTPS)، SEED_ADMIN_PASSWORD
 docker compose --profile app up -d --build
 docker compose exec api npx -w @contenter/api prisma db seed   # فقط بار اول
 ```

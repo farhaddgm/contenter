@@ -16,6 +16,7 @@ import {
   TraitCategory,
   TraitStatus,
 } from './enums';
+import { AiProviderName, MODEL_REF_PATTERN } from './ai-providers';
 
 // ---------- common ----------
 export const PaginationQuerySchema = z.object({
@@ -204,8 +205,21 @@ export type CreatePromptVersionInput = z.input<typeof CreatePromptVersionSchema>
 
 // ---------- settings ----------
 export const AiSettingsSchema = z.object({
-  models: z.record(z.string(), z.string().min(3)),
+  /** Task type (or `default`) → model reference `provider:model`. */
+  models: z.record(z.string(), z.string().trim().min(3).max(120).regex(MODEL_REF_PATTERN)),
   effort: z.record(z.string(), z.enum(AiEffort)),
   maxSamplesPerProfile: z.number().int().min(1).max(50),
 });
 export type AiSettings = z.infer<typeof AiSettingsSchema>;
+
+export interface AiProviderStatus {
+  name: AiProviderName;
+  /** API key present in the server environment. */
+  configured: boolean;
+}
+
+export type AiSettingsResponse = AiSettings & {
+  /** AI_PROVIDER=mock — every task returns placeholder output, no vendor is called. */
+  mock: boolean;
+  providers: AiProviderStatus[];
+};

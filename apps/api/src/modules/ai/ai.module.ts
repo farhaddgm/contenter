@@ -1,12 +1,9 @@
 import { Global, Module } from '@nestjs/common';
-import { ENV, type Env } from '../../config/env';
 import { SamplesCoreModule } from '../samples/samples-core.module';
 import { AiExecutor } from './ai-executor.service';
 import { AiJobsService } from './ai-jobs.service';
 import { ContextLoader } from './context-loader.service';
-import { AI_PROVIDER, type AiProvider } from './provider/ai-provider';
-import { AnthropicProvider } from './provider/anthropic.provider';
-import { MockProvider } from './provider/mock.provider';
+import { AiProviderRegistry } from './provider/provider-registry';
 import { PromptService } from './prompts/prompt.service';
 import { AnalyzeSampleRunner } from './runners/analyze-sample.runner';
 import { BuildProfileRunner } from './runners/build-profile.runner';
@@ -28,14 +25,7 @@ const RUNNERS = [
 @Module({
   imports: [SamplesCoreModule],
   providers: [
-    {
-      provide: AI_PROVIDER,
-      inject: [ENV],
-      useFactory: (env: Env): AiProvider =>
-        env.AI_PROVIDER === 'mock'
-          ? new MockProvider()
-          : new AnthropicProvider(env.ANTHROPIC_API_KEY, env.AI_REFUSAL_FALLBACK),
-    },
+    AiProviderRegistry,
     PromptService,
     AiExecutor,
     ContextLoader,
@@ -43,6 +33,6 @@ const RUNNERS = [
     ...RUNNERS,
     { provide: AI_RUNNERS, inject: RUNNERS, useFactory: (...runners) => runners },
   ],
-  exports: [AiJobsService, PromptService, ContextLoader],
+  exports: [AiJobsService, PromptService, ContextLoader, AiProviderRegistry],
 })
 export class AiModule {}

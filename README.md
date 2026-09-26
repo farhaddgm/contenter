@@ -27,7 +27,7 @@
 | لایه | انتخاب |
 |---|---|
 | بک‌اند | NestJS 11، Prisma 6 + PostgreSQL، BullMQ + Redis، Zod |
-| AI | Claude (`claude-opus-5`) از طریق Anthropic SDK — Structured Outputs، adaptive thinking، prompt caching؛ ارائه‌دهندهٔ mock برای توسعه |
+| AI | Claude (Anthropic SDK) و GPT (OpenAI SDK) — مدل هر کار از پنل تنظیمات؛ Structured Outputs؛ ارائه‌دهندهٔ mock برای توسعه |
 | فرانت‌اند | React 19، Vite، TanStack Query، React Router 7، Tailwind 4، Radix — معماری [bulletproof-react](https://github.com/alan2207/bulletproof-react)، RTL فارسی + انگلیسی، پوستهٔ روشن/تیره |
 | مشترک | `packages/shared`: اسکیماهای Zod و انواع مشترک |
 
@@ -43,7 +43,7 @@ npm run dev
 
 - وب: http://localhost:5173 — API: http://localhost:4000/api
 - ورود: `admin@contenter.local` / `ChangeMe123!`
-- بدون کلید API با `AI_PROVIDER=mock` کار می‌کند؛ برای AI واقعی `AI_PROVIDER=anthropic` و `ANTHROPIC_API_KEY` را تنظیم کنید.
+- بدون کلید API با `AI_PROVIDER=mock` کار می‌کند؛ برای AI واقعی `AI_PROVIDER=live` و `OPENAI_API_KEY` و/یا `ANTHROPIC_API_KEY` را تنظیم کنید.
 
 ## مستندات
 

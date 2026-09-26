@@ -22,10 +22,14 @@ npm run dev                                 # shared (watch) + API :4000 + Web :
 با `AI_PROVIDER=mock` همهٔ جریان‌ها با خروجی آزمایشی معتبر کار می‌کنند. برای استفادهٔ واقعی:
 
 ```env
-AI_PROVIDER=anthropic
+AI_PROVIDER=live
+# کلید هر ارائه‌دهنده‌ای که استفاده می‌کنید (خالی = غیرفعال)
+OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
-AI_DEFAULT_MODEL=claude-opus-5
+AI_DEFAULT_MODEL=openai:gpt-5.4
 ```
+
+سپس API را ری‌استارت کنید و در **پنل ← تنظیمات** مدل هر کار را انتخاب کنید.
 
 ### بدون Redis
 `QUEUE_DRIVER=inline` کارها را درون همان پروسه (با retry) اجرا می‌کند. برای تولید از `bullmq` استفاده کنید.

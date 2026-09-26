@@ -27,6 +27,10 @@ export class AnthropicProvider implements AiProvider {
 
   private readonly hasCredentials: boolean;
 
+  get configured(): boolean {
+    return this.hasCredentials;
+  }
+
   constructor(
     apiKey: string | undefined,
     private readonly refusalFallback: boolean,
@@ -38,8 +42,8 @@ export class AnthropicProvider implements AiProvider {
     );
     this.client = new Anthropic(apiKey ? { apiKey } : {});
     if (!this.hasCredentials) {
-      this.logger.warn(
-        'AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty — AI jobs will fail until it is set.',
+      this.logger.log(
+        'ANTHROPIC_API_KEY is empty — Claude models are unavailable until it is set.',
       );
     }
   }
@@ -47,7 +51,7 @@ export class AnthropicProvider implements AiProvider {
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     if (!this.hasCredentials) {
       throw new NonRetryableAiError(
-        'ANTHROPIC_API_KEY is not set. Add it to apps/api/.env (or set AI_PROVIDER=mock) and restart the API.',
+        'ANTHROPIC_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
       );
     }
     try {

@@ -5,6 +5,8 @@ import {
   ProfileBuildResultSchema,
   SampleAnalysisResultSchema,
   SmartReplySchema,
+  normalizeModelRef,
+  parseModelRef,
   type AiJobType,
 } from '@contenter/shared';
 import type { ZodType } from 'zod';
@@ -13,6 +15,9 @@ import { estimateCostUsd, priceFor } from './pricing';
 import { DEFAULT_PROMPTS } from './prompts/defaults';
 import { renderTemplate, templateVariables } from './prompts/render';
 import { MockProvider } from './provider/mock.provider';
+import { isReasoningModel, OpenAiProvider, toStrictJsonSchema } from './provider/openai.provider';
+import { AiProviderRegistry } from './provider/provider-registry';
+import type { Env } from '../../config/env';
 
 describe('renderTemplate', () => {
   it('replaces variables and blanks unknown ones', () => {
@@ -63,6 +68,60 @@ describe('pricing', () => {
   });
   it('prefers the most specific model key', () => {
     expect(priceFor('claude-opus-5-5')?.input).toBe(4);
+  });
+  it('prices OpenAI models, snapshots and refs without cache-write charges', () => {
+    expect(priceFor('gpt-5-mini-2025-08-07')?.input).toBe(0.25);
+    expect(priceFor('openai:gpt-5')?.input).toBe(1.25);
+    expect(priceFor('gpt-5.4-mini')).toBeUndefined();
+    const cost = estimateCostUsd('gpt-5', {
+      inputTokens: 1_000_000,
+      outputTokens: 0,
+      cacheReadTokens: 1_000_000,
+      cacheWriteTokens: 0,
+    });
+    expect(cost).toBeCloseTo(1.25 + 0.125, 5);
+  });
+});
+
+describe('model references', () => {
+  it('parses explicit and legacy references', () => {
+    expect(parseModelRef('openai:gpt-5.4')).toEqual({ provider: 'openai', model: 'gpt-5.4' });
+    expect(parseModelRef('claude-opus-5')).toEqual({
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+    });
+    expect(parseModelRef('o4-mini').provider).toBe('openai');
+    expect(normalizeModelRef('gpt-5')).toBe('openai:gpt-5');
+  });
+  it('routes by provider, or everything to mock', () => {
+    const env = { AI_PROVIDER: 'live', AI_REFUSAL_FALLBACK: false } as Env;
+    const live = new AiProviderRegistry(env);
+    expect(live.resolve('openai:gpt-5').provider.name).toBe('openai');
+    expect(live.resolve('claude-sonnet-5').provider.name).toBe('anthropic');
+    const mock = new AiProviderRegistry({ ...env, AI_PROVIDER: 'mock' });
+    expect(mock.resolve('openai:gpt-5')).toMatchObject({ model: 'gpt-5' });
+    expect(mock.resolve('openai:gpt-5').provider.name).toBe('mock');
+  });
+});
+
+describe('OpenAI structured output schema', () => {
+  it('closes every object and requires every property', () => {
+    const json = toStrictJsonSchema(ContentDraftResultSchema) as {
+      additionalProperties: boolean;
+      required: string[];
+      properties: { selfCheck: { additionalProperties: boolean; required: string[] } };
+    };
+    expect(json.additionalProperties).toBe(false);
+    expect(json.required).toContain('selfCheck');
+    expect(json.properties.selfCheck.additionalProperties).toBe(false);
+    expect(json.properties.selfCheck.required).toEqual(['score', 'principles', 'suggestions']);
+    expect(JSON.stringify(json)).not.toContain('$schema');
+  });
+  it('knows which models take a reasoning effort', () => {
+    expect(isReasoningModel('gpt-5.4-mini')).toBe(true);
+    expect(isReasoningModel('o4-mini')).toBe(true);
+    expect(isReasoningModel('gpt-4.1')).toBe(false);
+    expect(isReasoningModel('gpt-5-chat-latest')).toBe(false);
   });
 });
 
@@ -167,5 +226,26 @@ describe('AnthropicProvider without credentials', () => {
     ).rejects.toBeInstanceOf(NonRetryableAiError);
     if (saved.key) process.env.ANTHROPIC_API_KEY = saved.key;
     if (saved.token) process.env.ANTHROPIC_AUTH_TOKEN = saved.token;
+  });
+});
+
+describe('OpenAiProvider without credentials', () => {
+  it('fails fast with a clear, non-retryable error', async () => {
+    const saved = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    const { NonRetryableAiError } = await import('./provider/ai-provider');
+    const provider = new OpenAiProvider(undefined);
+    expect(provider.configured).toBe(false);
+    await expect(
+      provider.generateStructured({
+        task: 'SMART_CHAT',
+        model: 'gpt-5',
+        effort: 'low',
+        system: 's',
+        user: 'u',
+        schema: SmartReplySchema,
+      }),
+    ).rejects.toBeInstanceOf(NonRetryableAiError);
+    if (saved) process.env.OPENAI_API_KEY = saved;
   });
 });

@@ -13,7 +13,7 @@
                                     │        ▼                      ▼                │
                                     │  ┌──────────┐   ┌──────────────────────────┐  │
                                     │  │  Redis   │   │ AI Layer                  │  │
-                                    │  │ (queue)  │   │  AiProvider ◄─ Anthropic  │  │
+                                    │  │ (queue)  │   │  AiProvider ◄─ Claude/GPT │  │
                                     │  └──────────┘   │             ◄─ Mock       │  │
                                     │                 │  PromptService (DB)       │  │
                                     │                 │  Zod-validated outputs    │  │
@@ -95,6 +95,6 @@ Contenter/
 | Prisma + PostgreSQL | اسکیمای تایپ‌شده، مایگریشن، JSONB برای داده‌های AI |
 | BullMQ + Redis | صف پایدار، retry و backoff، مقیاس افقی ورکرها |
 | Zod (مشترک) | یک قرارداد برای اعتبارسنجی API، فرم‌ها و خروجی AI |
-| Claude (Anthropic SDK) | خروجی ساختاریافته (Structured Outputs)، کیفیت تحلیل و نگارش فارسی |
+| Claude (Anthropic SDK) و OpenAI SDK | خروجی ساختاریافته (Structured Outputs)، کیفیت تحلیل و نگارش فارسی؛ انتخاب مدل برای هر کار از پنل |
 | React + Vite + TanStack Query | الگوی bulletproof-react: feature-based، کش سرور و poll ساده |
 | Tailwind + Radix | کامپوننت‌های قابل‌دسترس با پشتیبانی RTL |

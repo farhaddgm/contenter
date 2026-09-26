@@ -42,5 +42,3 @@ export interface AiProvider {
   readonly name: string;
   generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>>;
 }
-
-export const AI_PROVIDER = Symbol('AI_PROVIDER');

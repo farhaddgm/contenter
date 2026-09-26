@@ -170,7 +170,7 @@ export class MockProvider implements AiProvider {
           } satisfies SmartReply;
         }
         return {
-          reply: `این یک پاسخ آزمایشی (mock) از اسمارت است. پیام شما: «${last.slice(0, 200)}»\n\n- کانتکست سرور دریافت شد (${req.user.length} کاراکتر).\n- برای پاسخ واقعی، \`AI_PROVIDER=anthropic\` را تنظیم کنید.`,
+          reply: `این یک پاسخ آزمایشی (mock) از اسمارت است. پیام شما: «${last.slice(0, 200)}»\n\n- کانتکست سرور دریافت شد (${req.user.length} کاراکتر).\n- برای پاسخ واقعی، \`AI_PROVIDER=live\` را تنظیم و در تنظیمات یک مدل انتخاب کنید.`,
         } satisfies SmartReply;
       }
       default:

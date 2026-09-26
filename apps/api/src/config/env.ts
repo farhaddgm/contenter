@@ -21,8 +21,20 @@ const EnvSchema = z.object({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().default(900),
   REFRESH_TTL_DAYS: z.coerce.number().int().default(30),
   COOKIE_SECURE: bool('false'),
-  AI_PROVIDER: z.enum(['anthropic', 'mock']).default('anthropic'),
+  /**
+   * mock = placeholder output, no vendor calls. Any other value = live: each task goes to the
+   * vendor of the model chosen in the back office (`anthropic`/`openai` are kept as aliases).
+   */
+  AI_PROVIDER: z.enum(['live', 'anthropic', 'openai', 'mock']).default('live'),
   ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  /** Optional OpenAI-compatible endpoint (proxy / gateway). */
+  OPENAI_BASE_URL: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** Used when no default model is saved in settings. `provider:model` or a bare id. */
   AI_DEFAULT_MODEL: z.string().default('claude-opus-5'),
   /** Server-side refusal fallback (beta `server-side-fallback-2026-07-01`). */
   AI_REFUSAL_FALLBACK: bool('true'),
