@@ -438,7 +438,7 @@ export class WalkerProgressService {
     // A step is blocked while a hard prerequisite is missing.
     const prerequisite: Partial<Record<WalkerStepKey, WalkerStepKey>> = {
       analyze_samples: 'add_samples',
-      build_profile: 'analyze_samples',
+      // build_profile has no hard prerequisite: a profile can also be created manually.
       approve_profile: 'build_profile',
       review_content: 'generate_content',
       approve_content: 'generate_content',
@@ -449,7 +449,7 @@ export class WalkerProgressService {
       return {
         key,
         done: done[key],
-        blocked: key === 'build_profile' ? analyzed === 0 : pre ? !done[pre] : false,
+        blocked: pre ? !done[pre] : false,
         ...(c ? { current: c[0], target: c[1] } : {}),
       };
     });

@@ -24,6 +24,8 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.use(helmet());
   app.use(cookieParser());
+  // Brand documents and pasted sample text can exceed the 100kb default (Persian is 2 bytes/char).
+  app.useBodyParser('json', { limit: '1mb' });
   app.enableCors({
     origin: env.CORS_ORIGINS.split(',').map((o) => o.trim()),
     credentials: true,

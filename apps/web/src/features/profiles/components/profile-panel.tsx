@@ -1,6 +1,24 @@
 import { useMemo, useState } from 'react';
-import { Archive, Check, CheckCircle2, Layers, Pencil, Plus, Trash2, Wand2, X } from 'lucide-react';
-import { TraitCategory, type ProfileTrait, type TraitStatus } from '@contenter/shared';
+import {
+  Archive,
+  Check,
+  CheckCircle2,
+  Copy,
+  FilePlus2,
+  Layers,
+  Lock,
+  Pencil,
+  Plus,
+  Trash2,
+  Wand2,
+  X,
+} from 'lucide-react';
+import {
+  TraitCategory,
+  type ContentProfile,
+  type ProfileTrait,
+  type TraitStatus,
+} from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -19,24 +37,50 @@ import { formatDate, formatNumber } from '@/utils/format';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { useTrackJob } from '@/features/jobs/api/jobs';
 import { useSamples } from '@/features/samples/api/samples';
+import { useBrandDocs, useTopicAiContext } from '@/features/brand-docs/api/brand-docs';
 import {
   profileKeys,
   useAddTrait,
   useApproveProfile,
   useArchiveProfile,
   useBuildProfile,
+  useCreateProfile,
   useDeleteTrait,
+  useDuplicateProfile,
   useProfile,
   useProfiles,
   useUpdateProfile,
   useUpdateTrait,
 } from '../api/profiles';
 
-function TraitRow({ trait, editable }: { trait: ProfileTrait; editable: boolean }) {
+/** How a version came to be: AI build, manual creation, or a copy of another version. */
+function useOrigin() {
+  const t = useT();
+  return (p: Pick<ContentProfile, 'jobId' | 'basedOnVersion'>) =>
+    p.jobId
+      ? t('profiles.origin.AI')
+      : p.basedOnVersion
+        ? t('profiles.origin.COPY', { version: formatNumber(p.basedOnVersion) })
+        : t('profiles.origin.MANUAL');
+}
+
+function TraitRow({
+  trait,
+  editable,
+  onEdit,
+}: {
+  trait: ProfileTrait;
+  editable: boolean;
+  onEdit: () => void;
+}) {
   const t = useT();
   const update = useUpdateTrait();
   const remove = useDeleteTrait();
-  const setStatus = (status: TraitStatus) => update.mutate({ id: trait.id, data: { status } });
+  const setStatus = (status: TraitStatus) =>
+    update.mutate(
+      { id: trait.id, data: { status } },
+      { onError: (e) => notify.error(t('common.error'), e.message) },
+    );
   return (
     <li
       className={cn(
@@ -68,6 +112,14 @@ function TraitRow({ trait, editable }: { trait: ProfileTrait; editable: boolean 
             >
               <X />
             </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={t('profiles.editTrait')}
+              onClick={onEdit}
+            >
+              <Pencil className="text-muted-foreground" />
+            </Button>
             <ConfirmationDialog
               trigger={
                 <Button size="icon-sm" variant="ghost" aria-label={t('common.delete')}>
@@ -97,44 +149,50 @@ function TraitRow({ trait, editable }: { trait: ProfileTrait; editable: boolean 
   );
 }
 
-function AddTraitDialog({
+/** Adds a trait, or edits one when `trait` is given. Mounted only while open. */
+function TraitDialog({
   profileId,
-  open,
+  trait,
   onOpenChange,
 }: {
   profileId: string;
-  open: boolean;
+  trait?: ProfileTrait;
   onOpenChange: (v: boolean) => void;
 }) {
   const t = useT();
   const add = useAddTrait(profileId);
-  const [category, setCategory] = useState<(typeof TraitCategory)[number]>('TONE');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const update = useUpdateTrait();
+  const [category, setCategory] = useState<(typeof TraitCategory)[number]>(
+    trait?.category ?? 'TONE',
+  );
+  const [name, setName] = useState(trait?.name ?? '');
+  const [description, setDescription] = useState(trait?.description ?? '');
+  const [evidence, setEvidence] = useState(trait?.evidence ?? '');
+  const opts = {
+    onSuccess: () => onOpenChange(false),
+    onError: (e: Error) => notify.error(t('common.error'), e.message),
+  };
+  const save = () => {
+    const data = { category, name, description, evidence };
+    if (trait) update.mutate({ id: trait.id, data }, opts);
+    else add.mutate(data, opts);
+  };
   return (
     <Dialog
-      open={open}
+      open
       onOpenChange={onOpenChange}
-      title={t('profiles.addTrait')}
+      title={trait ? t('profiles.editTrait') : t('profiles.addTrait')}
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
           <Button
-            isLoading={add.isPending}
+            isLoading={add.isPending || update.isPending}
             disabled={name.trim().length < 2 || description.trim().length < 2}
-            onClick={() =>
-              add.mutate(
-                { category, name, description },
-                {
-                  onSuccess: () => onOpenChange(false),
-                  onError: (e) => notify.error(t('common.error'), e.message),
-                },
-              )
-            }
+            onClick={save}
           >
-            {t('common.create')}
+            {trait ? t('common.save') : t('common.create')}
           </Button>
         </>
       }
@@ -166,57 +224,105 @@ function AddTraitDialog({
             />
           )}
         </Field>
+        <Field label={t('profiles.evidence')} optional={t('common.optional')}>
+          {(id) => (
+            <Textarea
+              id={id}
+              rows={2}
+              value={evidence}
+              onChange={(e) => setEvidence(e.target.value)}
+            />
+          )}
+        </Field>
       </div>
     </Dialog>
   );
 }
 
-function StyleGuideEditor({
-  profileId,
-  value,
-  open,
+/**
+ * Summary + style guide form. With `profile` it edits that draft; without it, it creates a
+ * new manual draft version for the topic. Mounted only while open.
+ */
+function ProfileTextDialog({
+  topicId,
+  profile,
   onOpenChange,
+  onCreated,
 }: {
-  profileId: string;
-  value: string;
-  open: boolean;
+  topicId: string;
+  profile?: Pick<ContentProfile, 'id' | 'summary' | 'styleGuide'>;
   onOpenChange: (v: boolean) => void;
+  onCreated?: (id: string) => void;
 }) {
   const t = useT();
   const update = useUpdateProfile();
-  const [text, setText] = useState(value);
+  const create = useCreateProfile(topicId);
+  const [summary, setSummary] = useState(profile?.summary ?? '');
+  const [styleGuide, setStyleGuide] = useState(profile?.styleGuide ?? '');
+  const onError = (e: Error) => notify.error(t('common.error'), e.message);
+  const save = () => {
+    if (profile) {
+      update.mutate(
+        { id: profile.id, data: { summary, styleGuide } },
+        { onSuccess: () => onOpenChange(false), onError },
+      );
+    } else {
+      create.mutate(
+        { summary, styleGuide },
+        {
+          onSuccess: (p) => {
+            notify.success(t('profiles.created'));
+            onCreated?.(p.id);
+            onOpenChange(false);
+          },
+          onError,
+        },
+      );
+    }
+  };
   return (
     <Dialog
-      open={open}
+      open
       onOpenChange={onOpenChange}
-      title={t('profiles.editGuide')}
+      title={profile ? t('profiles.editProfile') : t('profiles.createTitle')}
+      description={profile ? undefined : t('profiles.createHint')}
       className="max-w-3xl"
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
-          <Button
-            isLoading={update.isPending}
-            onClick={() =>
-              update.mutate(
-                { id: profileId, data: { styleGuide: text } },
-                { onSuccess: () => onOpenChange(false) },
-              )
-            }
-          >
-            {t('common.save')}
+          <Button isLoading={update.isPending || create.isPending} onClick={save}>
+            {profile ? t('common.save') : t('common.create')}
           </Button>
         </>
       }
     >
-      <Textarea
-        rows={18}
-        dir="auto"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        className="font-mono text-xs"
-      />
+      <div className="space-y-4">
+        <Field label={t('profiles.summary')} hint={t('profiles.summaryHint')}>
+          {(id) => (
+            <Textarea
+              id={id}
+              rows={3}
+              dir="auto"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t('profiles.styleGuide')} hint={t('profiles.styleGuideHint')}>
+          {(id) => (
+            <Textarea
+              id={id}
+              rows={16}
+              dir="auto"
+              value={styleGuide}
+              onChange={(e) => setStyleGuide(e.target.value)}
+              className="font-mono text-xs"
+            />
+          )}
+        </Field>
+      </div>
     </Dialog>
   );
 }
@@ -229,17 +335,23 @@ export function ProfilePanel({
   activeProfileId: string | null;
 }) {
   const t = useT();
+  const origin = useOrigin();
   const { can } = useAuthorization();
-  const editable = can('content:write');
+  const canWrite = can('content:write');
   const profiles = useProfiles(topicId);
   const samples = useSamples(topicId);
+  const brandDocs = useBrandDocs(topicId);
+  const aiContext = useTopicAiContext(topicId);
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [jobId, setJobId] = useState<string | null>(null);
+  const [editingTrait, setEditingTrait] = useState<ProfileTrait | null>(null);
   const build = useBuildProfile(topicId);
   const approve = useApproveProfile();
   const archive = useArchiveProfile();
+  const duplicate = useDuplicateProfile();
   const traitDialog = useDisclosure();
-  const guideDialog = useDisclosure();
+  const textDialog = useDisclosure();
+  const createDialog = useDisclosure();
 
   const { isRunning } = useTrackJob(jobId, {
     invalidate: [profileKeys.all, ['topics']],
@@ -253,6 +365,12 @@ export function ProfilePanel({
   const currentId = selectedId ?? activeProfileId ?? profiles.data?.[0]?.id;
   const profile = useProfile(currentId);
   const analyzedCount = samples.data?.filter((s) => s.analysisStatus === 'DONE').length ?? 0;
+  const activeDocs = brandDocs.data?.filter((d) => d.isActive).length ?? 0;
+  const businessSections = aiContext.data?.business?.filledSections ?? 0;
+  const canBuild = analyzedCount > 0 || activeDocs > 0 || businessSections > 0;
+  // Approved and archived versions are locked; changes go through a new version.
+  const isDraft = profile.data?.status === 'DRAFT';
+  const editable = canWrite && isDraft;
 
   const grouped = useMemo(() => {
     const traits = profile.data?.traits ?? [];
@@ -271,17 +389,31 @@ export function ProfilePanel({
       onError: (e) => notify.error(t('common.error'), e.message),
     });
 
+  const startDuplicate = (id: string) =>
+    duplicate.mutate(id, {
+      onSuccess: (p) => {
+        setSelectedId(p.id);
+        notify.success(t('profiles.duplicated', { version: formatNumber(p.version) }));
+      },
+      onError: (e) => notify.error(t('common.error'), e.message),
+    });
+
   if (profiles.isLoading) return <PageSpinner />;
 
-  const buildButton = editable && (
-    <Button
-      icon={<Wand2 />}
-      onClick={startBuild}
-      isLoading={build.isPending}
-      disabled={isRunning || analyzedCount === 0}
-    >
-      {profiles.data?.length ? t('profiles.rebuild') : t('profiles.build')}
-    </Button>
+  const headerActions = canWrite && (
+    <div className="flex flex-wrap gap-2">
+      <Button variant="outline" icon={<FilePlus2 />} onClick={createDialog.open}>
+        {t('profiles.createManual')}
+      </Button>
+      <Button
+        icon={<Wand2 />}
+        onClick={startBuild}
+        isLoading={build.isPending}
+        disabled={isRunning || !canBuild}
+      >
+        {profiles.data?.length ? t('profiles.rebuild') : t('profiles.build')}
+      </Button>
+    </div>
   );
 
   return (
@@ -291,9 +423,15 @@ export function ProfilePanel({
           <h2 className="text-lg font-semibold">{t('profiles.title')}</h2>
           <p className="text-sm text-muted-foreground">{t('profiles.subtitle')}</p>
         </div>
-        {buildButton}
+        {headerActions}
       </div>
-      {analyzedCount === 0 && <p className="text-sm text-warning">{t('profiles.needsAnalysis')}</p>}
+      {canWrite &&
+        !canBuild &&
+        !samples.isLoading &&
+        !brandDocs.isLoading &&
+        !aiContext.isLoading && (
+          <p className="text-sm text-warning">{t('profiles.needsAnalysis')}</p>
+        )}
       {isRunning && <AiWorkingBanner hint={t('enums.jobType.BUILD_PROFILE')} />}
 
       {!profiles.data?.length ? (
@@ -302,7 +440,7 @@ export function ProfilePanel({
             icon={<Layers />}
             title={t('profiles.empty')}
             description={t('profiles.emptyHint')}
-            action={buildButton}
+            action={headerActions}
           />
         </Card>
       ) : (
@@ -324,11 +462,11 @@ export function ProfilePanel({
                         {t('profiles.version', { version: formatNumber(p.version) })}
                       </span>
                       <span className="block text-xs text-muted-foreground">
-                        {formatDate(p.createdAt, false)}
+                        {origin(p)} · {formatDate(p.createdAt, false)}
                       </span>
                     </span>
                     {p.isActive ? (
-                      <CheckCircle2 className="size-4 text-success" />
+                      <CheckCircle2 className="size-4 shrink-0 text-success" />
                     ) : (
                       <Badge tone={statusTone[p.status]}>
                         {t(`enums.profileStatus.${p.status}`)}
@@ -357,13 +495,19 @@ export function ProfilePanel({
                       )}
                     </span>
                   }
-                  description={t('profiles.samplesUsed', {
-                    count: formatNumber(profile.data.sampleIds.length),
-                  })}
+                  description={[
+                    origin(profile.data),
+                    t('profiles.samplesUsed', {
+                      count: formatNumber(profile.data.sampleIds.length),
+                    }),
+                    t('profiles.brandDocsUsed', {
+                      count: formatNumber(profile.data.brandDocIds?.length ?? 0),
+                    }),
+                  ].join(' · ')}
                   actions={
-                    editable && (
+                    canWrite && (
                       <>
-                        {profile.data.status !== 'APPROVED' && (
+                        {isDraft && (
                           <Button
                             variant="success"
                             icon={<CheckCircle2 />}
@@ -371,12 +515,21 @@ export function ProfilePanel({
                             onClick={() =>
                               approve.mutate(profile.data!.id, {
                                 onSuccess: () => notify.success(t('profiles.approved')),
+                                onError: (e) => notify.error(t('common.error'), e.message),
                               })
                             }
                           >
                             {t('profiles.approve')}
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          icon={<Copy />}
+                          isLoading={duplicate.isPending}
+                          onClick={() => startDuplicate(profile.data!.id)}
+                        >
+                          {t('profiles.duplicate')}
+                        </Button>
                         {profile.data.status !== 'ARCHIVED' && (
                           <ConfirmationDialog
                             tone="default"
@@ -395,15 +548,34 @@ export function ProfilePanel({
                   }
                 />
                 <CardBody className="space-y-4">
-                  {profile.data.status === 'DRAFT' && (
+                  {isDraft ? (
                     <p className="rounded-md bg-warning/10 px-3 py-2 text-sm">
                       {t('profiles.draftNotice')}
                     </p>
+                  ) : (
+                    canWrite && (
+                      <p className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                        <Lock className="mt-0.5 size-4 shrink-0" />
+                        {t('profiles.lockedNotice')}
+                      </p>
+                    )
                   )}
                   <div>
-                    <h4 className="mb-1 text-sm font-semibold">{t('profiles.summary')}</h4>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold">{t('profiles.summary')}</h4>
+                      {editable && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Pencil />}
+                          onClick={textDialog.open}
+                        >
+                          {t('profiles.editProfile')}
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-sm leading-7 text-muted-foreground">
-                      {profile.data.summary}
+                      {profile.data.summary || '—'}
                     </p>
                   </div>
                 </CardBody>
@@ -433,11 +605,19 @@ export function ProfilePanel({
                       </h4>
                       <ul className="space-y-2">
                         {g.traits.map((tr) => (
-                          <TraitRow key={tr.id} trait={tr} editable={editable} />
+                          <TraitRow
+                            key={tr.id}
+                            trait={tr}
+                            editable={editable}
+                            onEdit={() => setEditingTrait(tr)}
+                          />
                         ))}
                       </ul>
                     </section>
                   ))}
+                  {!grouped.length && (
+                    <p className="text-sm text-muted-foreground">{t('common.noData')}</p>
+                  )}
                 </CardBody>
               </Card>
 
@@ -450,7 +630,7 @@ export function ProfilePanel({
                         size="sm"
                         variant="outline"
                         icon={<Pencil />}
-                        onClick={guideDialog.open}
+                        onClick={textDialog.open}
                       >
                         {t('profiles.editGuide')}
                       </Button>
@@ -458,28 +638,41 @@ export function ProfilePanel({
                   }
                 />
                 <CardBody>
-                  <MarkdownView>{profile.data.styleGuide}</MarkdownView>
+                  {profile.data.styleGuide ? (
+                    <MarkdownView>{profile.data.styleGuide}</MarkdownView>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">—</p>
+                  )}
                 </CardBody>
               </Card>
 
               {traitDialog.isOpen && (
-                <AddTraitDialog
+                <TraitDialog profileId={profile.data.id} onOpenChange={traitDialog.setIsOpen} />
+              )}
+              {editingTrait && (
+                <TraitDialog
                   profileId={profile.data.id}
-                  open
-                  onOpenChange={traitDialog.setIsOpen}
+                  trait={editingTrait}
+                  onOpenChange={(open) => !open && setEditingTrait(null)}
                 />
               )}
-              {guideDialog.isOpen && (
-                <StyleGuideEditor
-                  profileId={profile.data.id}
-                  value={profile.data.styleGuide}
-                  open
-                  onOpenChange={guideDialog.setIsOpen}
+              {textDialog.isOpen && (
+                <ProfileTextDialog
+                  topicId={topicId}
+                  profile={profile.data}
+                  onOpenChange={textDialog.setIsOpen}
                 />
               )}
             </div>
           )}
         </div>
+      )}
+      {createDialog.isOpen && (
+        <ProfileTextDialog
+          topicId={topicId}
+          onOpenChange={createDialog.setIsOpen}
+          onCreated={setSelectedId}
+        />
       )}
     </div>
   );

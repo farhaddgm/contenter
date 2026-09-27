@@ -24,6 +24,9 @@ const DEFAULT_EFFORT: Record<AiJobType, AiEffort> = {
   GENERATE_CONTENT: 'high',
   REVISE_CONTENT: 'medium',
   SMART_CHAT: 'medium',
+  BUSINESS_DISCOVER: 'medium',
+  BUSINESS_BUILD: 'high',
+  BUSINESS_SUGGEST: 'medium',
 };
 
 @Injectable()

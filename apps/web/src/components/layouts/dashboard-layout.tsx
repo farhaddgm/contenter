@@ -6,6 +6,7 @@ import {
   MousePointerClick,
   NotebookPen,
   Bot,
+  Building2,
   FileText,
   FolderKanban,
   Gauge,
@@ -41,6 +42,7 @@ interface NavItem {
 
 const contentNav: NavItem[] = [
   { to: paths.app.dashboard.getHref(), label: 'nav.dashboard', icon: <Gauge />, end: true },
+  { to: paths.app.businesses.getHref(), label: 'nav.businesses', icon: <Building2 /> },
   { to: paths.app.topics.getHref(), label: 'nav.topics', icon: <FolderKanban /> },
   { to: paths.app.contents.getHref(), label: 'nav.contents', icon: <FileText /> },
 ];

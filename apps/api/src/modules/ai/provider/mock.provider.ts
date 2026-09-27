@@ -1,16 +1,49 @@
-import type {
-  ContentDraftResult,
-  IdeationResult,
-  ProfileBuildResult,
-  SampleAnalysisResult,
-  SmartReply,
+import {
+  BusinessSectionKey,
+  type BusinessBuildResult,
+  type BusinessDiscoveryResult,
+  type BusinessSuggestResult,
+  type ContentDraftResult,
+  type IdeationResult,
+  type ProfileBuildResult,
+  type SampleAnalysisResult,
+  type SmartReply,
 } from '@contenter/shared';
 import {
   NonRetryableAiError,
   type AiProvider,
+  type ResearchRequest,
+  type ResearchResult,
   type StructuredRequest,
   type StructuredResult,
 } from './ai-provider';
+
+/** Placeholder Persian text per business section. */
+const MOCK_SECTION: Record<BusinessSectionKey, string> = {
+  OVERVIEW: 'یک کسب‌وکار نمونه (داده‌ی آزمایشی mock) که خدمات تخصصی به مشتریان شهری ارائه می‌دهد.',
+  SERVICES:
+    '- **خدمت اصلی**: توضیح کوتاه\n- **خدمت دوم**: توضیح کوتاه\n- **پشتیبانی**: پاسخ‌گویی ۲۴ ساعته',
+  TARGET_MARKET: 'خانواده‌ها و کسب‌وکارهای کوچک در شهرهای بزرگ ایران؛ تصمیم خرید آنلاین.',
+  PERSONAS:
+    '### مریم، ۳۲ ساله، مدیر داخلی\n- هدف: صرفه‌جویی در زمان\n- درد: نبود اعتماد به ارائه‌دهنده‌ها\n- کانال: اینستاگرام\n\n### علی، ۴۵ ساله، صاحب کسب‌وکار\n- هدف: کیفیت پایدار\n- درد: قیمت‌های نامشخص\n- کانال: لینکدین',
+  VALUE_PROPOSITION: 'کیفیت تضمینی، قیمت شفاف و پاسخ‌گویی سریع.',
+  COMPETITORS: 'رقبای محلی و پلتفرم‌های آنلاین؛ تمایز در ضمانت و خدمات پس از فروش.',
+  BRAND_VOICE: 'صمیمی، مطمئن و محترمانه؛ مخاطب با «شما» خطاب می‌شود.',
+  BRAND_BOOK:
+    '- نام برند همیشه به همین شکل نوشته شود.\n- حداکثر ۲ ایموجی در هر پست.\n- رنگ اصلی: آبی.',
+  KEY_MESSAGES: '- «کیفیتی که می‌شود رویش حساب کرد»\n- «قیمت شفاف، بدون هزینهٔ پنهان»',
+  CONTENT_PILLARS: '1. آموزش و نکات کاربردی\n2. پشت صحنه و تیم\n3. نظر مشتریان\n4. پیشنهادهای ویژه',
+  GUIDELINES:
+    '- ادعای «بهترین» یا «ارزان‌ترین» بدون مستند ممنوع است.\n- از مقایسهٔ مستقیم با نام رقبا پرهیز شود.',
+  CHANNELS: '- وب‌سایت رسمی\n- اینستاگرام\n- CTA اصلی: «همین حالا مشاوره رایگان بگیرید»',
+};
+
+/** Section keys named in `<requested_sections>` of a suggestion prompt. */
+function requestedKeys(user: string): BusinessSectionKey[] {
+  const raw = /<requested_sections>([\s\S]*?)<\/requested_sections>/.exec(user)?.[1] ?? '';
+  const keys = BusinessSectionKey.filter((k) => new RegExp(`\\b${k}\\b`).test(raw));
+  return keys.length ? keys : ['OVERVIEW'];
+}
 
 /**
  * Deterministic provider for local development, demos and tests (AI_PROVIDER=mock).
@@ -37,8 +70,69 @@ export class MockProvider implements AiProvider {
     };
   }
 
+  async research(req: ResearchRequest): Promise<ResearchResult> {
+    await new Promise((r) => setTimeout(r, 300));
+    const text = [
+      '## یافته‌های تحقیق (mock)',
+      'این یادداشت‌ها آزمایشی هستند؛ هیچ جست‌وجوی واقعی انجام نشده است.',
+      '- «نمونه‌کالا» یک فروشگاه آنلاین در تهران است (https://example.com).',
+      '- «نمونه‌خدمات» یک شرکت خدماتی در اصفهان است (https://example.org).',
+    ].join('\n');
+    return {
+      text,
+      sources: [
+        { url: 'https://example.com', title: 'نمونه‌کالا' },
+        { url: 'https://example.org', title: 'نمونه‌خدمات' },
+      ],
+      model: `mock/${req.model}`,
+      usage: {
+        inputTokens: Math.ceil((req.system.length + req.user.length) / 4),
+        outputTokens: Math.ceil(text.length / 4),
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        webSearches: 0,
+      },
+    };
+  }
+
   private fixture(req: StructuredRequest<unknown>): unknown {
     switch (req.task) {
+      case 'BUSINESS_DISCOVER': {
+        const count = Number(/<count>(\d+)<\/count>/.exec(req.user)?.[1] ?? 3);
+        const names = ['نمونه‌کالا', 'نمونه‌خدمات', 'نمونه‌آموزش', 'نمونه‌سلامت', 'نمونه‌سفر'];
+        return {
+          summary: 'نتیجهٔ آزمایشی (mock): چند کسب‌وکار نمونه مرتبط با کلیدواژه پیدا شد.',
+          candidates: Array.from({ length: Math.min(count, names.length) }, (_, i) => ({
+            name: names[i]!,
+            website: i === 0 ? 'https://example.com' : 'https://example.org',
+            location: i % 2 ? 'اصفهان، ایران' : 'تهران، ایران',
+            industry: 'خدمات',
+            description: 'کسب‌وکار نمونه برای آزمایش جریان ساخت خودکار پروفایل.',
+            relevance: 'نام و خدمات آن با کلیدواژه هم‌خوان است.',
+            confidence: 0.9 - i * 0.1,
+            sourceUrls: ['https://example.com'],
+          })),
+        } satisfies BusinessDiscoveryResult;
+      }
+      case 'BUSINESS_BUILD':
+        return {
+          name:
+            /<business_name>([^<]*)<\/business_name>/.exec(req.user)?.[1]?.trim() || 'نمونه‌کالا',
+          tagline: 'کیفیتی که می‌شود رویش حساب کرد',
+          industry: 'خدمات',
+          website: 'https://example.com',
+          location: 'تهران، ایران',
+          sections: BusinessSectionKey.map((key) => ({ key, content: MOCK_SECTION[key] })),
+          gaps: ['قیمت‌ها از منابع عمومی تأیید نشد (mock).'],
+        } satisfies BusinessBuildResult;
+      case 'BUSINESS_SUGGEST':
+        return {
+          suggestions: requestedKeys(req.user).map((key) => ({
+            key,
+            content: MOCK_SECTION[key],
+            rationale: 'پیشنهاد آزمایشی (mock) بر اساس اطلاعات فعلی کسب‌وکار.',
+          })),
+        } satisfies BusinessSuggestResult;
       case 'ANALYZE_SAMPLE':
         return {
           summary: 'نمونه یک پست آموزشی کوتاه است که یک مفهوم را با مثال روزمره توضیح می‌دهد.',

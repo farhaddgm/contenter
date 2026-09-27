@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   ContentProfile,
+  CreateProfileInput,
   CreateTraitInput,
   JobAccepted,
   ProfileTrait,
@@ -94,6 +95,24 @@ export function useDeleteTrait() {
   const invalidate = useInvalidateProfiles();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/traits/${id}`),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateProfile(topicId: string) {
+  const invalidate = useInvalidateProfiles();
+  return useMutation({
+    mutationFn: (data: CreateProfileInput) =>
+      api.post<ContentProfile>(`/topics/${topicId}/profiles`, data),
+    onSuccess: invalidate,
+  });
+}
+
+/** "New version from this one": copies a version into a new editable DRAFT. */
+export function useDuplicateProfile() {
+  const invalidate = useInvalidateProfiles();
+  return useMutation({
+    mutationFn: (id: string) => api.post<ContentProfile>(`/profiles/${id}/duplicate`),
     onSuccess: invalidate,
   });
 }

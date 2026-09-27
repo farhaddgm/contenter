@@ -7,6 +7,11 @@ import { AiProviderRegistry } from './provider/provider-registry';
 import { PromptService } from './prompts/prompt.service';
 import { AnalyzeSampleRunner } from './runners/analyze-sample.runner';
 import { BuildProfileRunner } from './runners/build-profile.runner';
+import {
+  BusinessBuildRunner,
+  BusinessDiscoverRunner,
+  BusinessSuggestRunner,
+} from './runners/business.runners';
 import { GenerateContentRunner, ReviseContentRunner } from './runners/content.runners';
 import { IdeateRunner } from './runners/ideate.runner';
 import { AI_RUNNERS } from './runners/runner';
@@ -19,6 +24,9 @@ const RUNNERS = [
   GenerateContentRunner,
   ReviseContentRunner,
   SmartChatRunner,
+  BusinessDiscoverRunner,
+  BusinessBuildRunner,
+  BusinessSuggestRunner,
 ];
 
 @Global()

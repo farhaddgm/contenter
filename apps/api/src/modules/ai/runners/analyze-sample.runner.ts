@@ -4,11 +4,16 @@ import { SampleAnalysisResultSchema, type FetchedMedia } from '@contenter/shared
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { MediaFetcherService } from '../../samples/media-fetcher.service';
 import { AiExecutor } from '../ai-executor.service';
-import { formatSample, formatTopic } from '../context';
+import { formatBusiness, formatSample, formatTopic } from '../context';
 import { NonRetryableAiError } from '../provider/ai-provider';
 import type { AiRunner, RunnerResult } from './runner';
 
 const MAX_IMAGES = 4;
+const WITH_TOPIC = {
+  topic: {
+    include: { business: { include: { sections: { select: { key: true, content: true } } } } },
+  },
+} as const;
 
 @Injectable()
 export class AnalyzeSampleRunner implements AiRunner {
@@ -23,7 +28,7 @@ export class AnalyzeSampleRunner implements AiRunner {
   async run(job: AiJob): Promise<RunnerResult> {
     let sample = await this.prisma.sampleContent.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { topic: true },
+      include: WITH_TOPIC,
     });
 
     // Code step: make sure the link has been fetched before the AI step.
@@ -31,7 +36,7 @@ export class AnalyzeSampleRunner implements AiRunner {
       await this.fetcher.fetchAndStore(sample.id);
       sample = await this.prisma.sampleContent.findUniqueOrThrow({
         where: { id: sample.id },
-        include: { topic: true },
+        include: WITH_TOPIC,
       });
     }
 
@@ -50,6 +55,7 @@ export class AnalyzeSampleRunner implements AiRunner {
       vars: {
         language: 'fa',
         topic: formatTopic(sample.topic),
+        business: formatBusiness(sample.topic.business),
         sample: formatSample(sample),
       },
     });

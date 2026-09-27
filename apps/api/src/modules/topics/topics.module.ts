@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -34,6 +35,7 @@ import { AuditService } from '../audit/audit.service';
 
 const COUNTS = {
   _count: { select: { samples: true, ideas: true, contents: true, profiles: true } },
+  business: { select: { id: true, name: true } },
 };
 
 @Injectable()
@@ -46,6 +48,7 @@ export class TopicsService {
   async list(query: z.infer<typeof TopicListQuerySchema>) {
     const where: Prisma.TopicWhereInput = {
       ...(query.status ? { status: query.status } : {}),
+      ...(query.businessId ? { businessId: query.businessId } : {}),
       ...(query.q
         ? {
             OR: [
@@ -73,8 +76,16 @@ export class TopicsService {
     return topic;
   }
 
+  /** A topic may only be linked to an existing business. */
+  private async assertBusiness(businessId: string | null | undefined) {
+    if (!businessId) return;
+    const exists = await this.prisma.business.count({ where: { id: businessId } });
+    if (!exists) throw new BadRequestException('Business not found');
+  }
+
   async create(input: CreateTopicInput, user: AuthUser) {
     const data = CreateTopicSchema.parse(input);
+    await this.assertBusiness(data.businessId);
     const topic = await this.prisma.topic.create({ data: { ...data, createdById: user.id } });
     this.audit.log({
       userId: user.id,
@@ -86,10 +97,9 @@ export class TopicsService {
   }
 
   async update(id: string, input: UpdateTopicInput, user: AuthUser) {
-    const topic = await this.prisma.topic.update({
-      where: { id },
-      data: UpdateTopicSchema.parse(input),
-    });
+    const data = UpdateTopicSchema.parse(input);
+    await this.assertBusiness(data.businessId);
+    const topic = await this.prisma.topic.update({ where: { id }, data });
     this.audit.log({
       userId: user.id,
       action: 'topic.update',

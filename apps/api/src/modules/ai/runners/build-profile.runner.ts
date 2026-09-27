@@ -4,7 +4,15 @@ import { ProfileBuildResultSchema, type SampleAnalysisResult } from '@contenter/
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { AiExecutor } from '../ai-executor.service';
 import { ContextLoader } from '../context-loader.service';
-import { clamp, formatAnalyses, formatPrinciples, formatProfile, formatTopic } from '../context';
+import {
+  clamp,
+  formatAnalyses,
+  formatBrandDocs,
+  formatBusiness,
+  formatPrinciples,
+  formatProfile,
+  formatTopic,
+} from '../context';
 import { NonRetryableAiError } from '../provider/ai-provider';
 import type { AiRunner, RunnerResult } from './runner';
 
@@ -33,16 +41,18 @@ export class BuildProfileRunner implements AiRunner {
       orderBy: { createdAt: 'asc' },
     });
     const analyzed = samples.filter((s) => s.analysis);
-    if (!analyzed.length) {
-      throw new NonRetryableAiError(
-        'No analyzed samples available. Analyze at least one sample first.',
-      );
-    }
-
-    const [principles, previous] = await Promise.all([
+    const [business, principles, previous, brandDocs] = await Promise.all([
+      this.ctx.business(topicId),
       this.ctx.principles(topicId),
       this.ctx.activeProfile(topicId),
+      this.ctx.brandDocs(topicId),
     ]);
+    const businessHasContent = !!business?.sections.some((s) => s.content.trim());
+    if (!analyzed.length && !brandDocs.length && !businessHasContent) {
+      throw new NonRetryableAiError(
+        'Nothing to build from. Analyze at least one sample, add an active brand document, or link a business with a filled profile first.',
+      );
+    }
 
     const result = await this.ai.execute({
       task: this.type,
@@ -50,15 +60,19 @@ export class BuildProfileRunner implements AiRunner {
       schema: ProfileBuildResultSchema,
       vars: {
         language: 'fa',
-        topic: formatTopic(topic),
+        topic: formatTopic({ ...topic, business }),
+        business: formatBusiness(business),
         principles: formatPrinciples(principles),
+        brand_docs: formatBrandDocs(brandDocs),
         previous_profile: previous ? formatProfile(previous) : '(none)',
-        analyses: formatAnalyses(
-          analyzed.map((s) => ({
-            url: s.url,
-            result: s.analysis!.result as unknown as SampleAnalysisResult,
-          })),
-        ),
+        analyses: analyzed.length
+          ? formatAnalyses(
+              analyzed.map((s) => ({
+                url: s.url,
+                result: s.analysis!.result as unknown as SampleAnalysisResult,
+              })),
+            )
+          : '(none — build the profile from the brand guidelines and the business profile)',
       },
     });
 
@@ -75,6 +89,7 @@ export class BuildProfileRunner implements AiRunner {
           summary: result.data.summary,
           styleGuide: result.data.styleGuide,
           sampleIds: analyzed.map((s) => s.id),
+          brandDocIds: brandDocs.map((d) => d.id),
           jobId: job.id,
           traits: {
             create: result.data.traits.map((t) => ({

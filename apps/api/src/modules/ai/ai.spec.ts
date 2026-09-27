@@ -10,7 +10,8 @@ import {
   type AiJobType,
 } from '@contenter/shared';
 import type { ZodType } from 'zod';
-import { clamp, formatPrinciples, formatProfile, formatSample } from './context';
+import { appendMissingBlocks } from './ai-executor.service';
+import { clamp, formatBrandDocs, formatPrinciples, formatProfile, formatSample } from './context';
 import { estimateCostUsd, priceFor } from './pricing';
 import { DEFAULT_PROMPTS } from './prompts/defaults';
 import { renderTemplate, templateVariables } from './prompts/render';
@@ -28,26 +29,86 @@ describe('renderTemplate', () => {
   });
   it('every default prompt only uses documented variables', () => {
     const allowed: Record<string, string[]> = {
-      analyze_sample: ['topic', 'sample', 'language'],
-      build_profile: ['topic', 'analyses', 'principles', 'previous_profile', 'language'],
+      analyze_sample: ['topic', 'business', 'sample', 'language'],
+      build_profile: [
+        'topic',
+        'business',
+        'analyses',
+        'principles',
+        'brand_docs',
+        'previous_profile',
+        'language',
+      ],
       ideate: [
         'topic',
+        'business',
         'profile',
         'principles',
+        'brand_docs',
         'existing_ideas',
         'count',
         'direction',
         'format',
         'language',
       ],
-      generate_content: ['topic', 'profile', 'principles', 'idea', 'brief', 'format', 'language'],
-      revise_content: ['topic', 'profile', 'principles', 'current_draft', 'feedback', 'language'],
+      generate_content: [
+        'topic',
+        'business',
+        'profile',
+        'principles',
+        'brand_docs',
+        'idea',
+        'brief',
+        'format',
+        'language',
+      ],
+      revise_content: [
+        'topic',
+        'business',
+        'profile',
+        'principles',
+        'brand_docs',
+        'current_draft',
+        'feedback',
+        'language',
+      ],
       smart_chat: ['mode', 'context', 'transcript'],
+      business_research: ['language', 'goal', 'business'],
+      business_discover: ['language', 'count', 'keyword', 'location', 'notes', 'research'],
+      business_build: [
+        'language',
+        'business_name',
+        'sections_spec',
+        'business',
+        'instruction',
+        'research',
+      ],
+      business_suggest: ['language', 'business', 'requested_sections', 'instruction', 'research'],
     };
+    expect(Object.keys(allowed).sort()).toEqual(DEFAULT_PROMPTS.map((p) => p.key).sort());
     for (const p of DEFAULT_PROMPTS) {
       const used = [...templateVariables(p.system), ...templateVariables(p.user)];
       for (const v of used) expect(allowed[p.key]).toContain(v);
     }
+  });
+  it('brand documents reach every generative prompt', () => {
+    for (const key of ['build_profile', 'ideate', 'generate_content', 'revise_content']) {
+      const p = DEFAULT_PROMPTS.find((d) => d.key === key)!;
+      expect(templateVariables(p.user)).toContain('brand_docs');
+    }
+  });
+});
+
+describe('appendMissingBlocks', () => {
+  const vars = { brand_docs: '### Book (BRAND_BOOK)\nSay "ویپاد".' };
+  it('prepends brand docs when an edited prompt lacks the placeholder', () => {
+    const out = appendMissingBlocks('<topic>x</topic>', '<topic>x</topic>', vars);
+    expect(out.startsWith('<brand_guidelines>\n### Book')).toBe(true);
+    expect(out.endsWith('<topic>x</topic>')).toBe(true);
+  });
+  it('leaves templates that already use it, or empty context, untouched', () => {
+    expect(appendMissingBlocks('{{brand_docs}}', 'R', vars)).toBe('R');
+    expect(appendMissingBlocks('x', 'R', { brand_docs: '(none)' })).toBe('R');
   });
 });
 
@@ -160,6 +221,22 @@ describe('context formatters', () => {
     });
     expect(out).toContain('MANUAL');
     expect(out.length).toBeLessThan(13_000);
+  });
+
+  it('formats brand documents within a total budget', () => {
+    expect(formatBrandDocs([])).toBe('(none)');
+    const out = formatBrandDocs(
+      [
+        { kind: 'BRAND_BOOK', title: 'A', content: 'a'.repeat(80) },
+        { kind: 'WRITING_GUIDE', title: 'B', content: 'b'.repeat(80) },
+        { kind: 'OTHER', title: 'C', content: 'c'.repeat(80) },
+      ],
+      100,
+    );
+    expect(out).toContain('### A (BRAND_BOOK)\n' + 'a'.repeat(80));
+    expect(out).toContain('b'.repeat(20) + '\n[truncated]');
+    expect(out).not.toContain('b'.repeat(21));
+    expect(out).toContain('### C (OTHER)\n[omitted');
   });
 
   it('clamps', () => {

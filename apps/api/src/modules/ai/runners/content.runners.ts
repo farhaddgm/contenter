@@ -4,7 +4,15 @@ import { ContentDraftResultSchema, type ContentDraftResult } from '@contenter/sh
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { AiExecutor } from '../ai-executor.service';
 import { ContextLoader } from '../context-loader.service';
-import { clamp, formatIdea, formatPrinciples, formatProfile, formatTopic } from '../context';
+import {
+  clamp,
+  formatBrandDocs,
+  formatBusiness,
+  formatIdea,
+  formatPrinciples,
+  formatProfile,
+  formatTopic,
+} from '../context';
 import { NonRetryableAiError } from '../provider/ai-provider';
 import type { AiRunner, RunnerResult } from './runner';
 
@@ -37,9 +45,11 @@ export class GenerateContentRunner implements AiRunner {
       where: { id: job.targetId },
       include: { topic: true, idea: true },
     });
-    const [principles, profile] = await Promise.all([
+    const [business, principles, profile, brandDocs] = await Promise.all([
+      this.ctx.business(content.topicId),
       this.ctx.principles(content.topicId),
       this.ctx.activeProfile(content.topicId),
+      this.ctx.brandDocs(content.topicId),
     ]);
 
     const result = await this.ai.execute({
@@ -49,9 +59,11 @@ export class GenerateContentRunner implements AiRunner {
       vars: {
         language: content.topic.language,
         format: content.format,
-        topic: formatTopic(content.topic),
+        topic: formatTopic({ ...content.topic, business }),
+        business: formatBusiness(business),
         profile: formatProfile(profile),
         principles: formatPrinciples(principles),
+        brand_docs: formatBrandDocs(brandDocs),
         idea: formatIdea(content.idea),
         brief: content.brief || '(none)',
       },
@@ -135,9 +147,11 @@ export class ReviseContentRunner implements AiRunner {
     if (!content.currentVersion) throw new NonRetryableAiError('Content has no draft to revise');
     if (!feedback) throw new NonRetryableAiError('Feedback is required');
 
-    const [principles, profile] = await Promise.all([
+    const [business, principles, profile, brandDocs] = await Promise.all([
+      this.ctx.business(content.topicId),
       this.ctx.principles(content.topicId),
       this.ctx.activeProfile(content.topicId),
+      this.ctx.brandDocs(content.topicId),
     ]);
     const cur = content.currentVersion;
 
@@ -147,9 +161,11 @@ export class ReviseContentRunner implements AiRunner {
       schema: ContentDraftResultSchema,
       vars: {
         language: content.topic.language,
-        topic: formatTopic(content.topic),
+        topic: formatTopic({ ...content.topic, business }),
+        business: formatBusiness(business),
         profile: formatProfile(profile),
         principles: formatPrinciples(principles),
+        brand_docs: formatBrandDocs(brandDocs),
         current_draft: [
           `Title: ${cur.title}`,
           `Body:\n${cur.body}`,

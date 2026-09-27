@@ -52,4 +52,9 @@ export const statusTone: Record<string, BadgeTone> = {
   REJECTED: 'danger',
   FAILED: 'danger',
   CANCELED: 'neutral',
+  BUILDING: 'primary',
+  RESEARCHING: 'primary',
+  READY: 'success',
+  ACCEPTED: 'success',
+  DISMISSED: 'neutral',
 };

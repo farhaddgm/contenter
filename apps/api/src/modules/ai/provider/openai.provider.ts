@@ -2,8 +2,11 @@ import { Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import {
+  mergeSources,
   NonRetryableAiError,
   type AiProvider,
+  type ResearchRequest,
+  type ResearchResult,
   type StructuredRequest,
   type StructuredResult,
 } from './ai-provider';
@@ -61,17 +64,80 @@ export class OpenAiProvider implements AiProvider {
           return this.call(this.client, req, [], effort);
         }
       }
-      if (
-        err instanceof OpenAI.BadRequestError ||
-        err instanceof OpenAI.AuthenticationError ||
-        err instanceof OpenAI.PermissionDeniedError ||
-        err instanceof OpenAI.NotFoundError ||
-        (err instanceof OpenAI.RateLimitError && err.code === 'insufficient_quota')
-      ) {
-        throw new NonRetryableAiError(`OpenAI: ${err.message}`);
-      }
-      throw err;
+      throw permanentOrRaw(err);
     }
+  }
+
+  /** Web research with the Responses API `web_search` tool (runs on OpenAI's side). */
+  async research(req: ResearchRequest): Promise<ResearchResult> {
+    if (!this.client) {
+      throw new NonRetryableAiError(
+        'OPENAI_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
+      );
+    }
+    const effort: OpenAiEffort =
+      req.effort === 'xhigh' || req.effort === 'max' ? 'high' : req.effort;
+    let response: OpenAI.Responses.Response;
+    try {
+      response = await this.client.responses
+        .stream({
+          stream: true,
+          model: req.model,
+          instructions: req.system,
+          input: [{ role: 'user', content: [{ type: 'input_text', text: req.user }] }],
+          tools: [{ type: 'web_search', search_context_size: 'high' }],
+          include: ['web_search_call.action.sources'],
+          max_tool_calls: req.maxSearches,
+          max_output_tokens: req.maxTokens ?? 32_000,
+          store: false,
+          ...(isReasoningModel(req.model) ? { reasoning: { effort } } : {}),
+        })
+        .finalResponse();
+    } catch (err) {
+      throw permanentOrRaw(err);
+    }
+    if (response.status === 'incomplete') {
+      throw new NonRetryableAiError(
+        `Research was cut off (${response.incomplete_details?.reason ?? 'incomplete'})`,
+      );
+    }
+
+    const cited: { url: string; title: string }[] = [];
+    const found: { url: string; title: string }[] = [];
+    let searches = 0;
+    for (const item of response.output) {
+      if (item.type === 'web_search_call') {
+        searches++;
+        if (item.action.type === 'search') {
+          for (const s of item.action.sources ?? []) found.push({ url: s.url, title: s.url });
+        }
+      }
+      if (item.type === 'message') {
+        for (const c of item.content) {
+          if (c.type !== 'output_text') continue;
+          for (const a of c.annotations) {
+            if (a.type === 'url_citation') cited.push({ url: a.url, title: a.title });
+          }
+        }
+      }
+    }
+    const text = response.output_text.trim();
+    if (!text) throw new NonRetryableAiError('Web research returned no findings');
+
+    const u = response.usage;
+    const cached = u?.input_tokens_details?.cached_tokens ?? 0;
+    return {
+      text,
+      sources: mergeSources(cited, found),
+      model: response.model,
+      usage: {
+        inputTokens: Math.max(0, (u?.input_tokens ?? 0) - cached),
+        outputTokens: u?.output_tokens ?? 0,
+        cacheReadTokens: cached,
+        cacheWriteTokens: 0,
+        webSearches: searches,
+      },
+    };
   }
 
   private async call<T>(
@@ -152,6 +218,20 @@ export class OpenAiProvider implements AiProvider {
       },
     };
   }
+}
+
+/** Failures that retrying will not fix become NonRetryableAiError; others are rethrown. */
+function permanentOrRaw(err: unknown): unknown {
+  if (
+    err instanceof OpenAI.BadRequestError ||
+    err instanceof OpenAI.AuthenticationError ||
+    err instanceof OpenAI.PermissionDeniedError ||
+    err instanceof OpenAI.NotFoundError ||
+    (err instanceof OpenAI.RateLimitError && err.code === 'insufficient_quota')
+  ) {
+    return new NonRetryableAiError(`OpenAI: ${err.message}`);
+  }
+  return err;
 }
 
 /**

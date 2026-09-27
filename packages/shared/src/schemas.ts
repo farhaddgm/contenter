@@ -6,6 +6,7 @@ import {
   AiEffort,
   AiJobStatus,
   AiJobType,
+  BrandDocKind,
   ContentFormat,
   ContentStatus,
   IdeaStatus,
@@ -116,6 +117,8 @@ export const CreateTopicSchema = z.object({
   audience: z.string().trim().max(1000).optional().default(''),
   platform: z.enum(Platform).default('INSTAGRAM'),
   language: z.string().trim().min(2).max(10).default('fa'),
+  /** Business this project produces content for (null = none). */
+  businessId: z.string().trim().min(1).nullish(),
 });
 export type CreateTopicInput = z.input<typeof CreateTopicSchema>;
 
@@ -126,6 +129,7 @@ export type UpdateTopicInput = z.input<typeof UpdateTopicSchema>;
 
 export const TopicListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(TopicStatus).optional(),
+  businessId: z.string().optional(),
 });
 
 // ---------- principles ----------
@@ -175,13 +179,45 @@ export const CreateTraitSchema = z.object({
 });
 export type CreateTraitInput = z.input<typeof CreateTraitSchema>;
 
+/** Manual (non-AI) profile version. Traits are admin-authored and start APPROVED. */
+export const CreateProfileSchema = z.object({
+  summary: z.string().trim().max(10_000).optional().default(''),
+  styleGuide: z.string().trim().max(50_000).optional().default(''),
+  traits: z.array(CreateTraitSchema).max(60).optional().default([]),
+});
+export type CreateProfileInput = z.input<typeof CreateProfileSchema>;
+
 export const UpdateTraitSchema = z.object({
   category: z.enum(TraitCategory).optional(),
   name: z.string().trim().min(2).max(200).optional(),
   description: z.string().trim().min(2).max(5000).optional(),
+  evidence: z.string().trim().max(5000).optional(),
   status: z.enum(TraitStatus).optional(),
 });
 export type UpdateTraitInput = z.infer<typeof UpdateTraitSchema>;
+
+// ---------- brand documents ----------
+export const BRAND_DOC_MAX_CHARS = 100_000;
+/** Total brand-document text sent to the model per AI job; later documents are truncated first. */
+export const BRAND_DOCS_PROMPT_CHARS = 40_000;
+
+export const CreateBrandDocSchema = z.object({
+  kind: z.enum(BrandDocKind).default('BRAND_BOOK'),
+  title: z.string().trim().min(2).max(200),
+  content: z.string().trim().min(20).max(BRAND_DOC_MAX_CHARS),
+  fileName: z.string().trim().max(255).nullish(),
+  isActive: z.boolean().default(true),
+});
+export type CreateBrandDocInput = z.input<typeof CreateBrandDocSchema>;
+
+export const UpdateBrandDocSchema = z.object({
+  kind: z.enum(BrandDocKind).optional(),
+  title: z.string().trim().min(2).max(200).optional(),
+  content: z.string().trim().min(20).max(BRAND_DOC_MAX_CHARS).optional(),
+  fileName: z.string().trim().max(255).nullish(),
+  isActive: z.boolean().optional(),
+});
+export type UpdateBrandDocInput = z.input<typeof UpdateBrandDocSchema>;
 
 // ---------- ideas ----------
 export const IdeateSchema = z.object({

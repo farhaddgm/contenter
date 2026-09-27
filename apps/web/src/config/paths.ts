@@ -15,6 +15,15 @@ export const paths = {
       path: 'topics/:topicId/:tab?',
       getHref: (id: string, tab?: string) => `/app/topics/${id}${tab ? `/${tab}` : ''}`,
     },
+    businesses: { path: 'businesses', getHref: () => '/app/businesses' },
+    business: {
+      path: 'businesses/:businessId',
+      getHref: (id: string) => `/app/businesses/${id}`,
+    },
+    discovery: {
+      path: 'businesses/discover/:discoveryId',
+      getHref: (id: string) => `/app/businesses/discover/${id}`,
+    },
     contents: { path: 'contents', getHref: () => '/app/contents' },
     content: { path: 'contents/:contentId', getHref: (id: string) => `/app/contents/${id}` },
     account: { path: 'account', getHref: () => '/app/account' },

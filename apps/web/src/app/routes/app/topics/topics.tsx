@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { FolderKanban, Plus, Search } from 'lucide-react';
+import { Building2, FolderKanban, Plus, Search } from 'lucide-react';
 import type { TopicStatus } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ export default function TopicsRoute() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const drawer = useDisclosure(params.get('new') === '1');
+  // Captured once: the URL params are cleared right after the drawer opens.
+  const [newForBusiness] = useState(() => params.get('business'));
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<TopicStatus | ''>('ACTIVE');
@@ -32,6 +34,7 @@ export default function TopicsRoute() {
   useEffect(() => {
     if (params.get('new') === '1') {
       params.delete('new');
+      params.delete('business');
       setParams(params, { replace: true });
     }
   }, [params, setParams]);
@@ -116,6 +119,12 @@ export default function TopicsRoute() {
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <Badge tone="primary">{t(`enums.platform.${topic.platform}`)}</Badge>
+                  {topic.business && (
+                    <Badge tone="outline">
+                      <Building2 />
+                      {topic.business.name}
+                    </Badge>
+                  )}
                   {topic.activeProfileId ? (
                     <Badge tone="success">{t('topics.activeProfile')}</Badge>
                   ) : (
@@ -149,6 +158,7 @@ export default function TopicsRoute() {
       <TopicFormDrawer
         open={drawer.isOpen}
         onOpenChange={drawer.setIsOpen}
+        defaultBusinessId={newForBusiness}
         onCreated={(topic) => navigate(paths.app.topic.getHref(topic.id, 'samples'))}
       />
     </>

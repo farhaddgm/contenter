@@ -5,6 +5,7 @@ import type {
   AiJobStatus,
   AiJobType,
   AnalysisStatus,
+  BrandDocKind,
   ContentFormat,
   ContentStatus,
   FetchStatus,
@@ -73,6 +74,8 @@ export interface Topic {
   language: string;
   status: TopicStatus;
   activeProfileId: string | null;
+  businessId: string | null;
+  business?: { id: string; name: string } | null;
   createdAt: ISODate;
   updatedAt: ISODate;
   _count?: { samples: number; ideas: number; contents: number; profiles: number };
@@ -146,11 +149,40 @@ export interface ContentProfile {
   summary: string;
   styleGuide: string;
   sampleIds: string[];
+  brandDocIds: string[];
+  /** Set when the version was copied from another one. */
+  basedOnVersion: number | null;
+  /** Null for manual and copied versions. */
   jobId: string | null;
   approvedAt: ISODate | null;
   createdAt: ISODate;
   traits?: ProfileTrait[];
   isActive?: boolean;
+}
+
+export interface BrandDocument {
+  id: string;
+  topicId: string;
+  kind: BrandDocKind;
+  title: string;
+  fileName: string | null;
+  isActive: boolean;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** Full text; list responses omit it and send `chars` instead. */
+  content?: string;
+  chars: number;
+}
+
+/** What the generative AI jobs of a topic will receive as context. */
+export interface TopicAiContext {
+  analyzedSamples: number;
+  topicPrinciples: number;
+  globalPrinciples: number;
+  brandDocs: { id: string; title: string; kind: BrandDocKind; chars: number }[];
+  activeProfile: { id: string; version: number; approvedTraits: number } | null;
+  /** Linked business; its filled profile sections reach every AI job of the topic. */
+  business: { id: string; name: string; filledSections: number } | null;
 }
 
 export interface Idea {

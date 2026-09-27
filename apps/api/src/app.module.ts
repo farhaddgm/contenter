@@ -9,6 +9,8 @@ import { QueueModule } from './infra/queue/queue.service';
 import { AiModule } from './modules/ai/ai.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BrandDocsModule } from './modules/brand-docs/brand-docs.module';
+import { BusinessesModule } from './modules/businesses/businesses.module';
 import { ContentsModule } from './modules/contents/contents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IdeasModule } from './modules/ideas/ideas.module';
@@ -35,9 +37,11 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     AiModule,
     UsersModule,
     GoogleAccessModule,
+    BusinessesModule,
     TopicsModule,
     SamplesModule,
     ProfilesModule,
+    BrandDocsModule,
     IdeasModule,
     ContentsModule,
     JobsModule,

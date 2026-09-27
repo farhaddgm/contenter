@@ -1,5 +1,13 @@
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
-import { Archive, ArchiveRestore, ChevronLeft, Pencil, PenLine, Trash2 } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  Building2,
+  ChevronLeft,
+  Pencil,
+  PenLine,
+  Trash2,
+} from 'lucide-react';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -16,6 +24,8 @@ import { TopicOverview } from '@/features/topics/components/topic-overview';
 import { PrinciplesList } from '@/features/principles/components/principles-list';
 import { SamplesPanel } from '@/features/samples/components/samples-panel';
 import { ProfilePanel } from '@/features/profiles/components/profile-panel';
+import { BrandDocsPanel } from '@/features/brand-docs/components/brand-docs-panel';
+import { AiContextCard } from '@/features/brand-docs/components/ai-context-card';
 import { IdeasPanel } from '@/features/ideas/components/ideas-panel';
 import { ContentsTable } from '@/features/contents/components/contents-table';
 import { GenerateContentDialog } from '@/features/contents/components/generate-content';
@@ -61,6 +71,14 @@ export default function TopicRoute() {
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={statusTone[topic.status]}>{t(`enums.topicStatus.${topic.status}`)}</Badge>
             <Badge tone="primary">{t(`enums.platform.${topic.platform}`)}</Badge>
+            {topic.business && (
+              <Link to={paths.app.business.getHref(topic.business.id)}>
+                <Badge tone="outline" className="hover:border-primary hover:text-primary">
+                  <Building2 />
+                  {topic.business.name}
+                </Badge>
+              </Link>
+            )}
             <Badge tone={topic.activeProfileId ? 'success' : 'neutral'}>
               {topic.activeProfileId ? t('topics.activeProfile') : t('topics.noActiveProfile')}
             </Badge>
@@ -150,13 +168,22 @@ export default function TopicRoute() {
               </Link>
             </Authorization>
           </p>
+          <BrandDocsPanel topicId={topic.id} />
         </div>
       )}
       {tab === 'samples' && <SamplesPanel topicId={topic.id} />}
       {tab === 'profile' && (
-        <ProfilePanel topicId={topic.id} activeProfileId={topic.activeProfileId} />
+        <div className="space-y-4">
+          <AiContextCard topicId={topic.id} />
+          <ProfilePanel topicId={topic.id} activeProfileId={topic.activeProfileId} />
+        </div>
       )}
-      {tab === 'ideas' && <IdeasPanel topicId={topic.id} hasProfile={!!topic.activeProfileId} />}
+      {tab === 'ideas' && (
+        <div className="space-y-4">
+          <AiContextCard topicId={topic.id} />
+          <IdeasPanel topicId={topic.id} hasProfile={!!topic.activeProfileId} />
+        </div>
+      )}
       {tab === 'contents' && <ContentsTable topicId={topic.id} />}
 
       <TopicFormDrawer open={editDrawer.isOpen} onOpenChange={editDrawer.setIsOpen} topic={topic} />

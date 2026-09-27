@@ -63,6 +63,9 @@ export type TraitStatus = (typeof TraitStatus)[number];
 export const TraitSource = ['AI', 'ADMIN'] as const;
 export type TraitSource = (typeof TraitSource)[number];
 
+export const BrandDocKind = ['BRAND_BOOK', 'WRITING_GUIDE', 'OTHER'] as const;
+export type BrandDocKind = (typeof BrandDocKind)[number];
+
 export const IdeaStatus = ['PROPOSED', 'SHORTLISTED', 'REJECTED', 'USED'] as const;
 export type IdeaStatus = (typeof IdeaStatus)[number];
 
@@ -95,6 +98,9 @@ export const AiJobType = [
   'GENERATE_CONTENT',
   'REVISE_CONTENT',
   'SMART_CHAT',
+  'BUSINESS_DISCOVER',
+  'BUSINESS_BUILD',
+  'BUSINESS_SUGGEST',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 

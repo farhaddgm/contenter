@@ -4,7 +4,14 @@ import { IdeationResultSchema } from '@contenter/shared';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { AiExecutor } from '../ai-executor.service';
 import { ContextLoader } from '../context-loader.service';
-import { clamp, formatPrinciples, formatProfile, formatTopic } from '../context';
+import {
+  clamp,
+  formatBrandDocs,
+  formatBusiness,
+  formatPrinciples,
+  formatProfile,
+  formatTopic,
+} from '../context';
 import type { AiRunner, RunnerResult } from './runner';
 
 const EXISTING_IDEAS_LIMIT = 150;
@@ -24,9 +31,11 @@ export class IdeateRunner implements AiRunner {
       where: { id: job.targetId },
       include: { topic: true },
     });
-    const [principles, profile, existing] = await Promise.all([
+    const [business, principles, profile, brandDocs, existing] = await Promise.all([
+      this.ctx.business(request.topicId),
       this.ctx.principles(request.topicId),
       this.ctx.activeProfile(request.topicId),
+      this.ctx.brandDocs(request.topicId),
       this.prisma.idea.findMany({
         where: { topicId: request.topicId, status: { not: 'REJECTED' } },
         select: { title: true },
@@ -44,9 +53,11 @@ export class IdeateRunner implements AiRunner {
         count: request.count,
         format: request.format ?? 'any (choose the best)',
         direction: request.direction || '(no specific direction)',
-        topic: formatTopic(request.topic),
+        topic: formatTopic({ ...request.topic, business }),
+        business: formatBusiness(business),
         profile: formatProfile(profile),
         principles: formatPrinciples(principles),
+        brand_docs: formatBrandDocs(brandDocs),
         existing_ideas: existing.length ? existing.map((i) => `- ${i.title}`).join('\n') : '(none)',
       },
     });

@@ -8,9 +8,15 @@
 User ──< AuditLog
 User ──< RefreshToken
 
+Business ──< Topic             (کسب‌وکاری که پروژه برایش محتوا تولید می‌کند؛ اختیاری)
+Business ──< BusinessSection ──< BusinessSectionRevision
+Business ──< BusinessSuggestion
+BusinessDiscovery ──? Business (تحقیق کلیدواژه و کسب‌وکار ساخته‌شده از آن)
+
 Topic ──< Principle            (اصول اختصاصی موضوع؛ topicId=null یعنی اصل سراسری)
 Topic ──< SampleContent ──1 SampleAnalysis
 Topic ──< ContentProfile ──< ProfileTrait
+Topic ──< BrandDocument      (برندبوک / راهنمای نگارش موضوع؛ متن ساده)
 Topic ──< IdeationRequest ──< Idea
 Topic ──< Content ──< ContentVersion
 Idea  ──< Content
@@ -43,6 +49,10 @@ SystemSetting  (key/value JSON)
 | `language` | زبان تولید (پیش‌فرض `fa`) |
 | `status` | `ACTIVE` یا `ARCHIVED` |
 | `activeProfileId` | پروفایل تأییدشدهٔ فعلی که برای ایده‌پردازی و تولید استفاده می‌شود |
+| `businessId` | کسب‌وکار متصل (اختیاری)؛ پروفایلش به همهٔ کارهای AI موضوع داده می‌شود |
+
+### Business و موجودیت‌های وابسته (کسب‌وکار)
+کسب‌وکار با مشخصات پایه (نام، شعار، حوزه، وب‌سایت، موقعیت، زبان) و ۱۲ بخش پروفایل (`BusinessSection`: معرفی، خدمات، بازار هدف، پرسونا، ارزش پیشنهادی، رقبا، لحن برند، برندبوک، پیام‌های کلیدی، ستون‌های محتوایی، قواعد، کانال‌ها). هر جایگزینی متن بخش در `BusinessSectionRevision` تاریخچه می‌سازد؛ پیشنهادهای AI در `BusinessSuggestion` تا تأیید ادمین منتظر می‌مانند؛ تحقیق کلیدواژه در `BusinessDiscovery` ثبت می‌شود. جزئیات کامل: [12-businesses.md](12-businesses.md).
 
 ### Principle (اصل)
 | فیلد | توضیح |
@@ -73,10 +83,15 @@ SystemSetting  (key/value JSON)
 | فیلد | توضیح |
 |---|---|
 | `version` | شمارهٔ نسخه در موضوع |
-| `status` | `DRAFT` (ساختهٔ AI، در انتظار بازبینی)، `APPROVED` یا `ARCHIVED` |
+| `status` | `DRAFT` (پیش‌نویس و قابل ویرایش)، `APPROVED` یا `ARCHIVED` (قفل؛ برای تغییر باید نسخهٔ جدیدی از روی آن ساخت) |
 | `summary` | جمع‌بندی سبک |
 | `styleGuide` | راهنمای سبک متنی که AI نوشته و ادمین ویرایش می‌کند |
 | `sampleIds` | نمونه‌هایی که در ساخت این نسخه استفاده شده‌اند |
+| `brandDocIds` | اسناد برندی که هنگام ساخت با AI در context بوده‌اند |
+| `jobId` | کار `BUILD_PROFILE` سازنده؛ برای نسخه‌های دستی و کپی `null` است |
+| `basedOnVersion` | اگر نسخه با «نسخهٔ جدید از روی این نسخه» ساخته شده باشد، شمارهٔ نسخهٔ مبدأ |
+
+سه راه ساخت نسخه: **ساخت با AI** (از نمونه‌های تحلیل‌شده و/یا اسناد برند فعال)، **ایجاد دستی** (بدون AI؛ مشخصه‌های ادمین با وضعیت `APPROVED` و اطمینان ۱) و **کپی از نسخهٔ دیگر** (مشخصه‌های ردشده کپی نمی‌شوند). همهٔ نسخه‌های جدید `DRAFT` هستند؛ فقط `DRAFT` قابل ویرایش است (خلاصه، راهنما، افزودن/ویرایش/حذف و تأیید/رد مشخصه) و سرور ویرایش نسخهٔ قفل را با ۴۰۹ رد می‌کند.
 
 ### ProfileTrait (مشخصهٔ پروفایل)
 | فیلد | توضیح |
@@ -89,6 +104,16 @@ SystemSetting  (key/value JSON)
 | `source` | `AI` یا `ADMIN` (ادمین می‌تواند مشخصهٔ دستی اضافه کند) |
 
 فقط مشخصه‌های `APPROVED` از پروفایل `APPROVED` فعال در تولید استفاده می‌شوند.
+
+### BrandDocument (سند برند)
+| فیلد | توضیح |
+|---|---|
+| `kind` | `BRAND_BOOK`، `WRITING_GUIDE` یا `OTHER` |
+| `title`، `content` | عنوان و متن سند (حداکثر ۱۰۰٬۰۰۰ نویسه) |
+| `fileName` | نام فایل متنی بارگذاری‌شده (اختیاری) |
+| `isActive` | فقط اسناد فعال به AI داده می‌شوند |
+
+اسناد فعال با تگ `<brand_guidelines>` به `BUILD_PROFILE`، `IDEATE`، `GENERATE_CONTENT` و `REVISE_CONTENT` داده می‌شوند (مجموعاً حداکثر ۴۰٬۰۰۰ نویسه در هر درخواست؛ اسناد بعدی کوتاه می‌شوند). فعلاً فقط سطح موضوع وجود دارد و سند سراسری نداریم.
 
 ### IdeationRequest و Idea
 - `IdeationRequest`: `count`، `direction`، `format` و `jobId`

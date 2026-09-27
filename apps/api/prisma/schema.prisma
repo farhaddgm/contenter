@@ -48,6 +48,11 @@ model User {
   appErrors          AppError[]
   smartConversations SmartConversation[]
   walkerIssues       WalkerIssue[]
+  brandDocuments     BrandDocument[]
+  businesses         Business[]
+  businessSections   BusinessSection[]
+  sectionRevisions   BusinessSectionRevision[]
+  businessDiscovery  BusinessDiscovery[]
 }
 
 model RefreshToken {
@@ -63,6 +68,169 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ─────────────────────────────── Businesses ───────────────────────────────
+// See docs/12-businesses.md. Enums mirror packages/shared/src/business.ts.
+
+enum BusinessStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum BusinessOrigin {
+  MANUAL
+  RESEARCH
+}
+
+enum BusinessBuildState {
+  NONE
+  BUILDING
+  READY
+  FAILED
+}
+
+enum BusinessSectionKey {
+  OVERVIEW
+  SERVICES
+  TARGET_MARKET
+  PERSONAS
+  VALUE_PROPOSITION
+  COMPETITORS
+  BRAND_VOICE
+  BRAND_BOOK
+  KEY_MESSAGES
+  CONTENT_PILLARS
+  GUIDELINES
+  CHANNELS
+}
+
+enum SectionSource {
+  ADMIN
+  AI
+}
+
+enum SuggestionStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+}
+
+enum DiscoveryStatus {
+  RESEARCHING
+  READY
+  FAILED
+  USED
+}
+
+/// The company a project (topic) produces content for.
+model Business {
+  id           String             @id @default(cuid())
+  name         String
+  tagline      String             @default("")
+  industry     String             @default("")
+  website      String             @default("")
+  location     String             @default("")
+  language     String             @default("fa")
+  /// Keyword of the discovery this business was built from
+  keyword      String?
+  status       BusinessStatus     @default(ACTIVE)
+  origin       BusinessOrigin     @default(MANUAL)
+  buildState   BusinessBuildState @default(NONE)
+  buildError   String?
+  lastJobId    String?
+  /// Web sources ({url,title}[]) collected by research builds
+  sources      Json               @default("[]")
+  /// Unverified facts / gaps reported by the last research build
+  gaps         String[]
+  researchedAt DateTime?
+  createdById  String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  createdBy   User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  topics      Topic[]
+  sections    BusinessSection[]
+  suggestions BusinessSuggestion[]
+  discoveries BusinessDiscovery[]
+
+  @@index([status, updatedAt])
+}
+
+/// One profile section of a business (services, personas, brand book, …). Markdown text.
+model BusinessSection {
+  id          String             @id @default(cuid())
+  businessId  String
+  key         BusinessSectionKey
+  content     String             @default("")
+  source      SectionSource      @default(ADMIN)
+  updatedById String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  business  Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User?                     @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  revisions BusinessSectionRevision[]
+
+  @@unique([businessId, key])
+}
+
+/// Previous content of a section, stored whenever it is overwritten (restorable).
+model BusinessSectionRevision {
+  id          String        @id @default(cuid())
+  sectionId   String
+  content     String
+  source      SectionSource
+  createdById String?
+  createdAt   DateTime      @default(now())
+
+  section   BusinessSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  createdBy User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([sectionId, createdAt])
+}
+
+/// AI proposal for a section; applied only when the admin accepts it.
+model BusinessSuggestion {
+  id         String             @id @default(cuid())
+  businessId String
+  key        BusinessSectionKey
+  content    String
+  rationale  String             @default("")
+  status     SuggestionStatus   @default(PENDING)
+  jobId      String?
+  decidedAt  DateTime?
+  createdAt  DateTime           @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
+}
+
+/// Keyword research run: AI searches the web and proposes real businesses for the keyword.
+model BusinessDiscovery {
+  id            String          @id @default(cuid())
+  keyword       String
+  location      String          @default("")
+  language      String          @default("fa")
+  count         Int             @default(5)
+  notes         String          @default("")
+  status        DiscoveryStatus @default(RESEARCHING)
+  summary       String          @default("")
+  candidates    Json            @default("[]")
+  sources       Json            @default("[]")
+  selectedIndex Int?
+  businessId    String?
+  jobId         String?
+  error         String?
+  createdById   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  business  Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
 }
 
 // ─────────────────────────────── Topics ───────────────────────────────
@@ -92,11 +260,14 @@ model Topic {
   language        String      @default("fa")
   status          TopicStatus @default(ACTIVE)
   activeProfileId String?     @unique
+  /// Business this project produces content for; its profile is sent to every AI job of the topic
+  businessId      String?
   createdById     String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  business      Business?         @relation(fields: [businessId], references: [id], onDelete: SetNull)
   activeProfile ContentProfile?   @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
   principles    Principle[]
   samples       SampleContent[]
@@ -104,8 +275,10 @@ model Topic {
   ideationRuns  IdeationRequest[]
   ideas         Idea[]
   contents      Content[]
+  brandDocs     BrandDocument[]
 
   @@index([status, createdAt])
+  @@index([businessId])
 }
 
 enum PrincipleKind {
@@ -188,6 +361,34 @@ model SampleAnalysis {
   sample SampleContent @relation(fields: [sampleId], references: [id], onDelete: Cascade)
 }
 
+// ─────────────────────────────── Brand documents ───────────────────────────────
+
+enum BrandDocKind {
+  BRAND_BOOK
+  WRITING_GUIDE
+  OTHER
+}
+
+/// Topic-level brand book / writing rules (plain text). Active ones are injected into the
+/// context of BUILD_PROFILE, IDEATE, GENERATE_CONTENT and REVISE_CONTENT.
+model BrandDocument {
+  id          String       @id @default(cuid())
+  topicId     String
+  kind        BrandDocKind @default(BRAND_BOOK)
+  title       String
+  content     String
+  fileName    String?
+  isActive    Boolean      @default(true)
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  topic     Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([topicId, isActive])
+}
+
 // ─────────────────────────────── Profiles ───────────────────────────────
 
 enum ProfileStatus {
@@ -220,17 +421,21 @@ enum TraitSource {
 }
 
 model ContentProfile {
-  id         String        @id @default(cuid())
-  topicId    String
-  version    Int
-  status     ProfileStatus @default(DRAFT)
-  summary    String        @default("")
-  styleGuide String        @default("")
-  sampleIds  String[]
-  jobId      String?
-  approvedAt DateTime?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  topicId        String
+  version        Int
+  status         ProfileStatus @default(DRAFT)
+  summary        String        @default("")
+  styleGuide     String        @default("")
+  sampleIds      String[]
+  /// Brand documents that were in the AI context when this version was built
+  brandDocIds    String[]
+  /// Version this one was copied from ("new version from this one"); null for AI/manual builds
+  basedOnVersion Int?
+  jobId          String?
+  approvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   topic     Topic          @relation("TopicProfiles", fields: [topicId], references: [id], onDelete: Cascade)
   activeFor Topic?         @relation("ActiveProfile")
@@ -385,6 +590,9 @@ enum AiJobType {
   GENERATE_CONTENT
   REVISE_CONTENT
   SMART_CHAT
+  BUSINESS_DISCOVER
+  BUSINESS_BUILD
+  BUSINESS_SUGGEST
 }
 
 enum AiJobStatus {

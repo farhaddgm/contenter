@@ -43,6 +43,18 @@ const router = createBrowserRouter([
       { path: paths.app.topics.path, lazy: lazyRoute(() => import('./routes/app/topics/topics')) },
       { path: paths.app.topic.path, lazy: lazyRoute(() => import('./routes/app/topics/topic')) },
       {
+        path: paths.app.businesses.path,
+        lazy: lazyRoute(() => import('./routes/app/businesses/businesses')),
+      },
+      {
+        path: paths.app.discovery.path,
+        lazy: lazyRoute(() => import('./routes/app/businesses/discovery')),
+      },
+      {
+        path: paths.app.business.path,
+        lazy: lazyRoute(() => import('./routes/app/businesses/business')),
+      },
+      {
         path: paths.app.contents.path,
         lazy: lazyRoute(() => import('./routes/app/contents/contents')),
       },

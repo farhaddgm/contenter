@@ -24,13 +24,29 @@
 ## موضوع‌ها و اصول
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET | `/topics?page&pageSize&q&status` | فهرست صفحه‌بندی‌شده با شمارنده‌ها |
-| POST | `/topics` | ایجاد |
+| GET | `/topics?page&pageSize&q&status&businessId` | فهرست صفحه‌بندی‌شده با شمارنده‌ها و `business` |
+| POST | `/topics` | ایجاد (`businessId` اختیاری؛ `null` = بدون کسب‌وکار) |
 | GET / PATCH | `/topics/:id` | مشاهده / ویرایش (از جمله `status`) |
 | DELETE | `/topics/:id` | حذف (فقط ADMIN) |
 | GET / POST | `/topics/:id/principles` | اصول موضوع |
 | GET / POST | `/principles/global` | اصول سراسری (ایجاد فقط توسط ADMIN) |
 | PATCH / DELETE | `/principles/:id` | ویرایش / حذف (اصول سراسری فقط توسط ADMIN) |
+
+## کسب‌وکارها
+| متد | مسیر | توضیح |
+|---|---|---|
+| GET / POST | `/businesses` | فهرست / ایجاد دستی |
+| GET | `/businesses/options` | فهرست سبک برای انتخاب |
+| GET / PATCH / DELETE | `/businesses/:id` | پروفایل کامل / ویرایش / حذف (فقط ADMIN) |
+| PUT | `/businesses/:id/sections/:key` | نوشتن یک بخش پروفایل |
+| GET | `/businesses/:id/sections/:key/revisions`، POST `/business-revisions/:id/restore` | تاریخچه و بازگردانی |
+| GET | `/businesses/:id/suggestions` | پیشنهادهای AI در انتظار |
+| POST | `/businesses/:id/suggest`، `/businesses/:id/build` | کار `BUSINESS_SUGGEST` / `BUSINESS_BUILD` ← `{ jobId }` |
+| POST | `/business-suggestions/:id/accept`، `/business-suggestions/:id/dismiss` | پذیرش (با ویرایش اختیاری) / رد |
+| GET / POST | `/business-discoveries`، GET `/business-discoveries/:id` | تحقیق کلیدواژه (`BUSINESS_DISCOVER`) |
+| POST | `/business-discoveries/:id/select` | `{ index }` — تأیید کاندیدا، ساخت کسب‌وکار و شروع `BUSINESS_BUILD` |
+
+جزئیات بدنه‌ها و پاسخ‌ها: [12-businesses.md](12-businesses.md).
 
 ## نمونه‌ها
 | متد | مسیر | توضیح |
@@ -46,12 +62,22 @@
 | متد | مسیر | توضیح |
 |---|---|---|
 | GET | `/topics/:id/profiles` | نسخه‌ها (`isActive`) |
-| POST | `/topics/:id/profiles/build` | **۲۰۲** — `{ sampleIds? }` ← کار `BUILD_PROFILE` |
-| GET / PATCH | `/profiles/:id` | مشاهده همراه مشخصه‌ها / ویرایش `summary` و `styleGuide` |
+| POST | `/topics/:id/profiles/build` | **۲۰۲** — `{ sampleIds? }` ← کار `BUILD_PROFILE`. به حداقل یک نمونهٔ تحلیل‌شده **یا** یک سند برند فعال نیاز دارد. |
+| POST | `/topics/:id/profiles` | ایجاد دستی نسخهٔ `DRAFT` بدون AI — `{ summary?, styleGuide?, traits?[] }` |
+| POST | `/profiles/:id/duplicate` | «نسخهٔ جدید از روی این نسخه»: کپی به یک `DRAFT` جدید (با `basedOnVersion`) |
+| GET / PATCH | `/profiles/:id` | مشاهده همراه مشخصه‌ها / ویرایش `summary` و `styleGuide` (فقط `DRAFT`، وگرنه ۴۰۹) |
 | POST | `/profiles/:id/approve` | تأیید و فعال‌سازی. مشخصه‌های پیشنهادی هم تأیید می‌شوند و نسخهٔ تأییدشدهٔ قبلی بایگانی می‌شود. |
 | POST | `/profiles/:id/archive` | بایگانی |
-| POST | `/profiles/:id/traits` | افزودن مشخصهٔ دستی |
-| PATCH / DELETE | `/traits/:id` | تأیید، رد، ویرایش یا حذف مشخصه |
+| POST | `/profiles/:id/traits` | افزودن مشخصهٔ دستی (فقط `DRAFT`) |
+| PATCH / DELETE | `/traits/:id` | تأیید، رد، ویرایش (`category`، `name`، `description`، `evidence`) یا حذف مشخصه (فقط در نسخهٔ `DRAFT`) |
+
+## اسناد برند
+| متد | مسیر | توضیح |
+|---|---|---|
+| GET | `/topics/:id/brand-docs` | فهرست بدون متن (با `chars`) |
+| POST | `/topics/:id/brand-docs` | `{ kind, title, content, fileName?, isActive? }` |
+| GET / PATCH / DELETE | `/brand-docs/:id` | مشاهده با متن کامل / ویرایش / حذف |
+| GET | `/topics/:id/ai-context` | خلاصهٔ ورودی‌های AI موضوع: نمونه‌های تحلیل‌شده، تعداد اصول، اسناد برند فعال، پروفایل فعال |
 
 ## ایده‌ها
 | متد | مسیر | توضیح |

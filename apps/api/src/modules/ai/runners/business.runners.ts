@@ -1,0 +1,364 @@
+import { Injectable } from '@nestjs/common';
+import type { AiJob, Prisma } from '@prisma/client';
+import {
+  BusinessBuildResultSchema,
+  BusinessDiscoveryResultSchema,
+  BusinessSectionKey,
+  BusinessSuggestResultSchema,
+  type WebSource,
+} from '@contenter/shared';
+import { PrismaService } from '../../../infra/prisma/prisma.service';
+import { cleanUrl, writeSection } from '../../businesses/section-writer';
+import { AiExecutor } from '../ai-executor.service';
+import { clamp, formatBusiness, formatSectionSpec } from '../context';
+import { mergeSources, NonRetryableAiError, sumUsage } from '../provider/ai-provider';
+import type { AiRunner, RunnerResult } from './runner';
+
+/** Web searches allowed per research step. */
+const SEARCHES = { discover: 10, build: 12, suggest: 6 } as const;
+const NO_RESEARCH = '(no web research for this request — rely on the business profile)';
+/** Rationale of a build suggestion that sits next to admin-written text, in the business language. */
+const BUILD_KEPT_NOTE: Record<string, string> = {
+  fa: 'ساخته‌شده از تحقیق وب. متن خودتان حفظ شد؛ مقایسه کنید و تصمیم بگیرید.',
+  en: 'Built from web research. Your own text was kept; compare and decide.',
+};
+
+const asJson = (v: unknown) => v as Prisma.InputJsonValue;
+
+/**
+ * Keyword → web research → real business candidates. The admin then picks one
+ * (BusinessesService.selectCandidate), which creates the business and queues BUSINESS_BUILD.
+ */
+@Injectable()
+export class BusinessDiscoverRunner implements AiRunner {
+  readonly type = 'BUSINESS_DISCOVER' as const;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiExecutor,
+  ) {}
+
+  async run(job: AiJob): Promise<RunnerResult> {
+    const d = await this.prisma.businessDiscovery.findUniqueOrThrow({
+      where: { id: job.targetId },
+    });
+    const where = d.location ? ` in or serving "${d.location}"` : '';
+
+    const research = await this.ai.research({
+      task: this.type,
+      promptKey: 'business_research',
+      maxSearches: SEARCHES.discover,
+      vars: {
+        language: d.language,
+        goal: [
+          `Find real, currently operating businesses that match the keyword "${d.keyword}"${where}.`,
+          `Identify up to ${d.count * 2} of the most relevant and best-documented ones. For each: official name, official website, location, what it does, and why it matches the keyword.`,
+          d.notes ? `Admin notes: ${d.notes}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        business: '(none yet — this research looks for businesses matching the keyword)',
+      },
+    });
+
+    const result = await this.ai.execute({
+      task: this.type,
+      promptKey: 'business_discover',
+      schema: BusinessDiscoveryResultSchema,
+      vars: {
+        language: d.language,
+        count: d.count,
+        keyword: d.keyword,
+        location: d.location || '(any)',
+        notes: d.notes || '(none)',
+        research: research.text,
+      },
+    });
+
+    const candidates = result.data.candidates
+      .filter((c) => c.name.trim())
+      .slice(0, d.count)
+      .map((c) => ({
+        ...c,
+        name: c.name.trim(),
+        website: cleanUrl(c.website),
+        confidence: clamp(c.confidence, 0, 1),
+        sourceUrls: c.sourceUrls.map(cleanUrl).filter(Boolean),
+      }));
+
+    await this.prisma.businessDiscovery.update({
+      where: { id: d.id },
+      data: {
+        status: 'READY',
+        summary: result.data.summary,
+        candidates: asJson(candidates),
+        sources: asJson(research.sources),
+        error: null,
+      },
+    });
+
+    return {
+      output: {
+        discoveryId: d.id,
+        candidates: candidates.length,
+        sources: research.sources.length,
+      },
+      model: result.model,
+      usage: sumUsage(research.usage, result.usage),
+      prompt: result.prompt,
+    };
+  }
+
+  async onFailure(job: AiJob, error: string) {
+    await this.prisma.businessDiscovery.updateMany({
+      where: { id: job.targetId },
+      data: { status: 'FAILED', error: error.slice(0, 2000) },
+    });
+  }
+
+  async onRetry(job: AiJob) {
+    await this.prisma.businessDiscovery.updateMany({
+      where: { id: job.targetId },
+      data: { status: 'RESEARCHING', error: null },
+    });
+  }
+}
+
+/**
+ * Researches one real business on the web and writes its whole profile. Sections the admin
+ * wrote by hand are never overwritten — the AI version becomes a suggestion instead.
+ */
+@Injectable()
+export class BusinessBuildRunner implements AiRunner {
+  readonly type = 'BUSINESS_BUILD' as const;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiExecutor,
+  ) {}
+
+  async run(job: AiJob): Promise<RunnerResult> {
+    const { instruction = '' } = (job.input ?? {}) as { instruction?: string };
+    const b = await this.prisma.business.findUniqueOrThrow({
+      where: { id: job.targetId },
+      include: { sections: true },
+    });
+    const known = formatBusiness(b);
+    const identity = [
+      `"${b.name}"`,
+      b.website ? `(website: ${b.website})` : null,
+      b.location ? `located in ${b.location}` : null,
+      b.keyword ? `— found for the keyword "${b.keyword}"` : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const research = await this.ai.research({
+      task: this.type,
+      promptKey: 'business_research',
+      maxSearches: SEARCHES.build,
+      vars: {
+        language: b.language,
+        goal: [
+          `Research the real business ${identity} in depth, for a complete business profile covering:`,
+          formatSectionSpec(),
+          'Make sure you are researching this exact business, not a namesake.',
+          instruction ? `Admin instruction: ${instruction}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        business: known,
+      },
+    });
+
+    const result = await this.ai.execute({
+      task: this.type,
+      promptKey: 'business_build',
+      schema: BusinessBuildResultSchema,
+      vars: {
+        language: b.language,
+        business_name: b.name,
+        sections_spec: formatSectionSpec(),
+        business: known,
+        instruction: instruction || '(none)',
+        research: research.text,
+      },
+    });
+    const data = result.data;
+
+    const byKey = new Map(b.sections.map((s) => [s.key, s]));
+    const seen = new Set<string>();
+    let written = 0;
+    let suggested = 0;
+    await this.prisma.$transaction(async (tx) => {
+      for (const s of data.sections) {
+        const content = s.content.trim();
+        if (!content || seen.has(s.key)) continue;
+        seen.add(s.key);
+        const existing = byKey.get(s.key);
+        if (existing?.content.trim() && existing.source === 'ADMIN') {
+          if (existing.content.trim() === content) continue;
+          await tx.businessSuggestion.updateMany({
+            where: { businessId: b.id, key: s.key, status: 'PENDING' },
+            data: { status: 'DISMISSED', decidedAt: new Date() },
+          });
+          await tx.businessSuggestion.create({
+            data: {
+              businessId: b.id,
+              key: s.key,
+              content,
+              rationale: BUILD_KEPT_NOTE[b.language] ?? BUILD_KEPT_NOTE.en!,
+              jobId: job.id,
+            },
+          });
+          suggested++;
+        } else {
+          await writeSection(tx, {
+            businessId: b.id,
+            key: s.key,
+            content,
+            source: 'AI',
+            userId: null,
+          });
+          written++;
+        }
+      }
+      await tx.business.update({
+        where: { id: b.id },
+        data: {
+          // Core fields the admin already filled win over research.
+          tagline: b.tagline || data.tagline.trim(),
+          industry: b.industry || data.industry.trim(),
+          website: b.website || cleanUrl(data.website),
+          location: b.location || data.location.trim(),
+          sources: asJson(mergeSources(b.sources as unknown as WebSource[], research.sources)),
+          gaps: data.gaps.map((g) => g.trim()).filter(Boolean),
+          buildState: 'READY',
+          buildError: null,
+          researchedAt: new Date(),
+        },
+      });
+    });
+
+    return {
+      output: {
+        businessId: b.id,
+        sectionsWritten: written,
+        suggestions: suggested,
+        sources: research.sources.length,
+      },
+      model: result.model,
+      usage: sumUsage(research.usage, result.usage),
+      prompt: result.prompt,
+    };
+  }
+
+  async onFailure(job: AiJob, error: string) {
+    await this.prisma.business.updateMany({
+      where: { id: job.targetId },
+      data: { buildState: 'FAILED', buildError: error.slice(0, 2000) },
+    });
+  }
+
+  async onRetry(job: AiJob) {
+    await this.prisma.business.updateMany({
+      where: { id: job.targetId },
+      data: { buildState: 'BUILDING', buildError: null },
+    });
+  }
+}
+
+/** Proposes content for selected sections from everything already written (± web research). */
+@Injectable()
+export class BusinessSuggestRunner implements AiRunner {
+  readonly type = 'BUSINESS_SUGGEST' as const;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiExecutor,
+  ) {}
+
+  async run(job: AiJob): Promise<RunnerResult> {
+    const input = (job.input ?? {}) as {
+      keys?: string[];
+      instruction?: string;
+      useWebSearch?: boolean;
+    };
+    const keys = BusinessSectionKey.filter((k) => input.keys?.includes(k));
+    if (!keys.length) throw new NonRetryableAiError('No sections were requested');
+    const b = await this.prisma.business.findUniqueOrThrow({
+      where: { id: job.targetId },
+      include: { sections: true },
+    });
+
+    const research = input.useWebSearch
+      ? await this.ai.research({
+          task: this.type,
+          promptKey: 'business_research',
+          maxSearches: SEARCHES.suggest,
+          vars: {
+            language: b.language,
+            goal: [
+              `Research the real business "${b.name}"${b.website ? ` (website: ${b.website})` : ''} to write these profile sections:`,
+              formatSectionSpec(keys),
+              input.instruction ? `Admin instruction: ${input.instruction}` : null,
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            business: formatBusiness(b),
+          },
+        })
+      : null;
+
+    const result = await this.ai.execute({
+      task: this.type,
+      promptKey: 'business_suggest',
+      schema: BusinessSuggestResultSchema,
+      vars: {
+        language: b.language,
+        business: formatBusiness(b, { includeEmpty: true }),
+        requested_sections: formatSectionSpec(keys),
+        instruction: input.instruction || '(none)',
+        research: research?.text ?? NO_RESEARCH,
+      },
+    });
+
+    const picked = new Map<
+      string,
+      { key: BusinessSectionKey; content: string; rationale: string }
+    >();
+    for (const s of result.data.suggestions) {
+      if (keys.includes(s.key) && s.content.trim() && !picked.has(s.key)) {
+        picked.set(s.key, { key: s.key, content: s.content.trim(), rationale: s.rationale.trim() });
+      }
+    }
+    await this.prisma.$transaction([
+      this.prisma.businessSuggestion.updateMany({
+        where: {
+          businessId: b.id,
+          key: { in: [...picked.keys()] as BusinessSectionKey[] },
+          status: 'PENDING',
+        },
+        data: { status: 'DISMISSED', decidedAt: new Date() },
+      }),
+      this.prisma.businessSuggestion.createMany({
+        data: [...picked.values()].map((s) => ({ ...s, businessId: b.id, jobId: job.id })),
+      }),
+    ]);
+    if (research?.sources.length) {
+      await this.prisma.business.update({
+        where: { id: b.id },
+        data: {
+          sources: asJson(mergeSources(b.sources as unknown as WebSource[], research.sources)),
+        },
+      });
+    }
+
+    return {
+      output: { businessId: b.id, suggestions: picked.size, webSearch: !!research },
+      model: result.model,
+      usage: research ? sumUsage(research.usage, result.usage) : result.usage,
+      prompt: result.prompt,
+    };
+  }
+}

@@ -3,6 +3,9 @@
  * Pure functions — easy to unit test and to keep prompt prefixes stable.
  */
 import type {
+  BrandDocument,
+  Business,
+  BusinessSection,
   ContentProfile,
   Idea,
   Principle,
@@ -10,15 +13,25 @@ import type {
   SampleContent,
   Topic,
 } from '@prisma/client';
-import type { FetchedMedia, SampleAnalysisResult } from '@contenter/shared';
+import {
+  BRAND_DOCS_PROMPT_CHARS,
+  BUSINESS_SECTION_SPEC,
+  BusinessSectionKey,
+  type FetchedMedia,
+  type SampleAnalysisResult,
+} from '@contenter/shared';
 
 const MAX_SAMPLE_TEXT = 12_000;
+export const NO_BRAND_DOCS = '(none)';
 
 export function formatTopic(
-  t: Pick<Topic, 'title' | 'description' | 'audience' | 'platform' | 'language'>,
+  t: Pick<Topic, 'title' | 'description' | 'audience' | 'platform' | 'language'> & {
+    business?: { name: string } | null;
+  },
 ): string {
   return [
     `Title: ${t.title}`,
+    t.business ? `Business: ${t.business.name} (profile in <business>)` : null,
     `Platform: ${t.platform}`,
     `Language: ${t.language}`,
     t.audience ? `Audience: ${t.audience}` : null,
@@ -57,6 +70,96 @@ export function formatProfile(
     `Traits:\n${traits.map((t) => `- (${t.category}) ${t.name}: ${t.description}`).join('\n') || '(none)'}`,
     `Style guide:\n${p.styleGuide}`,
   ].join('\n\n');
+}
+
+export function formatBrandDocs(
+  docs: Pick<BrandDocument, 'kind' | 'title' | 'content'>[],
+  budget = BRAND_DOCS_PROMPT_CHARS,
+): string {
+  if (!docs.length) return NO_BRAND_DOCS;
+  let left = budget;
+  const blocks: string[] = [];
+  for (const d of docs) {
+    if (left <= 0) {
+      blocks.push(`### ${d.title} (${d.kind})\n[omitted — brand document budget exhausted]`);
+      continue;
+    }
+    const text = d.content.length > left ? `${d.content.slice(0, left)}\n[truncated]` : d.content;
+    left -= d.content.length;
+    blocks.push(`### ${d.title} (${d.kind})\n${text}`);
+  }
+  return blocks.join('\n\n');
+}
+
+/** Total business-profile text sent per job; each section is capped separately first. */
+export const MAX_BUSINESS_TEXT = 30_000;
+const MAX_BUSINESS_SECTION = 6_000;
+export const NO_BUSINESS = '(no business linked to this project)';
+
+const SECTION_TITLE: Record<BusinessSectionKey, string> = {
+  OVERVIEW: 'Overview',
+  SERVICES: 'Products & services',
+  TARGET_MARKET: 'Target market',
+  PERSONAS: 'Audience personas',
+  VALUE_PROPOSITION: 'Value proposition & differentiators',
+  COMPETITORS: 'Competitors & positioning',
+  BRAND_VOICE: 'Brand voice',
+  BRAND_BOOK: 'Brand book',
+  KEY_MESSAGES: 'Key messages',
+  CONTENT_PILLARS: 'Content pillars',
+  GUIDELINES: 'Rules & constraints',
+  CHANNELS: 'Channels & CTA',
+};
+
+export type BusinessForPrompt = Pick<
+  Business,
+  'name' | 'tagline' | 'industry' | 'website' | 'location' | 'language'
+> & { sections: Pick<BusinessSection, 'key' | 'content'>[] };
+
+/**
+ * The business profile block. With `includeEmpty`, empty sections are listed as "(empty)" so a
+ * model proposing content knows what is missing; generative jobs only get filled sections.
+ */
+export function formatBusiness(
+  b: BusinessForPrompt | null,
+  { includeEmpty = false, budget = MAX_BUSINESS_TEXT } = {},
+): string {
+  if (!b) return NO_BUSINESS;
+  const head = [
+    `Name: ${b.name}`,
+    b.tagline ? `Tagline: ${b.tagline}` : null,
+    b.industry ? `Industry: ${b.industry}` : null,
+    b.location ? `Location: ${b.location}` : null,
+    b.website ? `Website: ${b.website}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const byKey = new Map(b.sections.map((s) => [s.key, s.content.trim()]));
+  let left = budget - head.length;
+  const blocks: string[] = [];
+  for (const key of BusinessSectionKey) {
+    const text = byKey.get(key) ?? '';
+    const title = `### ${SECTION_TITLE[key]} [${key}]`;
+    if (!text) {
+      if (includeEmpty) blocks.push(`${title}\n(empty)`);
+      continue;
+    }
+    if (left <= 0) {
+      blocks.push(`${title}\n[omitted — business profile budget exhausted]`);
+      continue;
+    }
+    const cap = Math.min(MAX_BUSINESS_SECTION, left);
+    blocks.push(`${title}\n${text.length > cap ? `${text.slice(0, cap)}\n[truncated]` : text}`);
+    left -= Math.min(text.length, cap);
+  }
+  return [head, ...blocks].join('\n\n');
+}
+
+/** Section keys with what each must contain, for prompts that write sections. */
+export function formatSectionSpec(
+  keys: readonly BusinessSectionKey[] = BusinessSectionKey,
+): string {
+  return keys.map((k) => `- ${k} (${SECTION_TITLE[k]}): ${BUSINESS_SECTION_SPEC[k]}`).join('\n');
 }
 
 export function formatSample(

@@ -63,6 +63,7 @@ export const POLICIES = {
   'content:write': (role: Role) => role === 'ADMIN' || role === 'EDITOR',
   'backoffice:access': (role: Role) => role === 'ADMIN',
   'topic:delete': (role: Role) => role === 'ADMIN',
+  'business:delete': (role: Role) => role === 'ADMIN',
 } as const;
 
 export type Policy = keyof typeof POLICIES;

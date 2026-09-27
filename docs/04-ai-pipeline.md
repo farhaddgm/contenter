@@ -12,6 +12,9 @@
 | تولید محتوا | **AI** (`GENERATE_CONTENT`) | خروجی: `ContentDraftResult` + `selfCheck` |
 | بازنویسی با بازخورد | **AI** (`REVISE_CONTENT`) | نسخهٔ جدید `ContentVersion` |
 | پاسخ دستیار اسمارت | **AI** (`SMART_CHAT`) | فقط پاسخ متنی بر اساس کانتکست فقط‌خواندنی که کد می‌سازد ([10-smart.md](10-smart.md)) |
+| یافتن کسب‌وکارهای واقعی برای کلیدواژه | **AI** (`BUSINESS_DISCOVER`) | تحقیق وب ← `BusinessDiscoveryResult`؛ ادمین کاندیدا را تأیید می‌کند ([12-businesses.md](12-businesses.md)) |
+| ساخت پروفایل کامل کسب‌وکار از وب | **AI** (`BUSINESS_BUILD`) | تحقیق وب ← `BusinessBuildResult` ← کد بخش‌ها را می‌نویسد (متن ادمین را بازنویسی نمی‌کند) |
+| پیشنهاد متن بخش‌های کسب‌وکار | **AI** (`BUSINESS_SUGGEST`) | `BusinessSuggestResult` ← پیشنهاد در انتظار تأیید ادمین |
 | صف‌بندی، retry، ذخیره، هزینه، دسترسی و نسخه‌بندی | **کد** | |
 
 ## مدل و تنظیمات
@@ -30,7 +33,7 @@
 
 ## ایمنی در برابر Prompt Injection
 
-محتوای دریافتی از لینک‌ها داخل تگ‌های `<sample_content>` قرار می‌گیرد. در پرامپت سیستم صریحاً آمده است که این محتوا **داده** است و دستورهای داخل آن نباید اجرا شوند. خروجی هم فقط در قالب اسکیما پذیرفته می‌شود، پس مدل نمی‌تواند کاری خارج از آن انجام دهد.
+محتوای دریافتی از لینک‌ها داخل تگ‌های `<sample_content>` قرار می‌گیرد (و یادداشت‌های تحقیق وب داخل `<research_notes>`). در پرامپت سیستم صریحاً آمده است که این محتوا **داده** است و دستورهای داخل آن نباید اجرا شوند. خروجی هم فقط در قالب اسکیما پذیرفته می‌شود، پس مدل نمی‌تواند کاری خارج از آن انجام دهد.
 
 ## پرامپت‌ها
 
@@ -40,12 +43,22 @@
 
 | پرامپت | متغیرها |
 |---|---|
-| `analyze_sample` | `topic`، `sample`، `language` |
-| `build_profile` | `topic`، `analyses`، `principles`، `previous_profile`، `language` |
-| `ideate` | `topic`، `profile`، `principles`، `existing_ideas`، `count`، `direction`، `format`، `language` |
-| `generate_content` | `topic`، `profile`، `principles`، `idea`، `brief`، `format`، `language` |
-| `revise_content` | `topic`، `profile`، `principles`، `current_draft`، `feedback`، `language` |
+| `analyze_sample` | `topic`، `business`، `sample`، `language` |
+| `build_profile` | `topic`، `business`، `analyses`، `principles`، `brand_docs`، `previous_profile`، `language` |
+| `ideate` | `topic`، `business`، `profile`، `principles`، `brand_docs`، `existing_ideas`، `count`، `direction`، `format`، `language` |
+| `generate_content` | `topic`، `business`، `profile`، `principles`، `brand_docs`، `idea`، `brief`، `format`، `language` |
+| `revise_content` | `topic`، `business`، `profile`، `principles`، `brand_docs`، `current_draft`، `feedback`، `language` |
 | `smart_chat` | `mode`، `context`، `transcript` |
+| `business_research` | `language`، `goal`، `business` (مرحلهٔ تحقیق وب، خروجی متن آزاد) |
+| `business_discover` | `language`، `count`، `keyword`، `location`، `notes`، `research` |
+| `business_build` | `language`، `business_name`، `sections_spec`، `business`، `instruction`، `research` |
+| `business_suggest` | `language`، `business`، `requested_sections`، `instruction`، `research` |
+
+اگر نسخهٔ ویرایش‌شدهٔ یک پرامپت در بک‌آفیس متغیر `{{business}}` یا `{{brand_docs}}` را نداشته باشد، `AiExecutor` بلوک `<business>` / `<brand_guidelines>` را به ابتدای پیام کاربر اضافه می‌کند تا پروفایل کسب‌وکار و اسناد برند هرگز جا نمانند.
+
+## تحقیق وب
+
+کارهای کسب‌وکار ابتدا با `AiExecutor.research()` و ابزار جست‌وجوی وبِ سمت سرور فروشنده (Claude: `web_search_20260209`، برای مدل‌های قدیمی‌تر `web_search_20250305`؛ OpenAI: `web_search`) یادداشت و منبع جمع می‌کنند، سپس با `execute()` خروجی ساختاریافته می‌سازند؛ چون citationهای جست‌وجو با Structured Outputs سازگار نیستند. `pause_turn` در Claude تا ۵ بار ادامه داده می‌شود. مصرف دو مرحله جمع و هر جست‌وجو ۰٫۰۱ دلار در هزینه لحاظ می‌شود. جزئیات: [12-businesses.md](12-businesses.md).
 
 ## ثبت هزینه
 

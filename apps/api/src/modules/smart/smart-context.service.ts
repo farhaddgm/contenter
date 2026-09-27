@@ -126,6 +126,16 @@ export class SmartContextBuilder {
       where: { id: topicId },
       include: {
         principles: { where: { isActive: true } },
+        brandDocs: { select: { id: true, title: true, kind: true, isActive: true } },
+        business: {
+          select: {
+            id: true,
+            name: true,
+            buildState: true,
+            buildError: true,
+            sections: { select: { key: true, content: true } },
+          },
+        },
         samples: { orderBy: { createdAt: 'desc' }, take: 15 },
         profiles: {
           orderBy: { version: 'desc' },
@@ -152,6 +162,15 @@ export class SmartContextBuilder {
       topic.audience ? `- audience: ${clip(topic.audience, 300)}` : '',
       `- walker progress: ${progress.steps.map((s) => `${s.key}=${s.done ? 'done' : s.blocked ? 'blocked' : 'todo'}${s.target !== undefined ? `(${s.current}/${s.target})` : ''}`).join(', ')}`,
       `- topic principles (${topic.principles.length}): ${topic.principles.map((p) => `[${p.kind}] ${clip(p.text, 120)}`).join(' | ') || 'none'}`,
+      `- brand documents (${topic.brandDocs.length}): ${topic.brandDocs.map((d) => `${d.id} [${d.kind}${d.isActive ? '' : ' · inactive'}] ${clip(d.title, 80)}`).join(' | ') || 'none'}`,
+      topic.business
+        ? `- business: "${topic.business.name}" id=${topic.business.id} build=${topic.business.buildState}${topic.business.buildError ? `(${clip(topic.business.buildError, 160)})` : ''} filled sections: ${
+            topic.business.sections
+              .filter((s) => s.content.trim())
+              .map((s) => s.key)
+              .join(', ') || 'none'
+          } (sent to every AI job of this topic)`
+        : '- business: none linked (AI jobs get no business profile)',
       '### Samples',
       ...(topic.samples.length
         ? topic.samples.map(
@@ -163,7 +182,7 @@ export class SmartContextBuilder {
       ...(topic.profiles.length
         ? topic.profiles.map(
             (p) =>
-              `- v${p.version} ${p.id} status=${p.status} traits=${p._count.traits} samplesUsed=${p.sampleIds.length}`,
+              `- v${p.version} ${p.id} status=${p.status} traits=${p._count.traits} samplesUsed=${p.sampleIds.length} brandDocsUsed=${p.brandDocIds.length} origin=${p.jobId ? `ai(job ${p.jobId})` : p.basedOnVersion ? `copy-of-v${p.basedOnVersion}` : 'manual'}`,
           )
         : ['- none']),
       `### Ideas by status: ${ideas.map((i) => `${i.status}=${i._count._all}`).join(', ') || 'none'}`,

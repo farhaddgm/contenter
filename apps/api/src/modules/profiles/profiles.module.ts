@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -12,12 +13,15 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
   BuildProfileSchema,
+  CreateProfileSchema,
   CreateTraitSchema,
   UpdateProfileSchema,
   UpdateTraitSchema,
   type BuildProfileInput,
+  type CreateProfileInput,
   type CreateTraitInput,
   type UpdateProfileInput,
   type UpdateTraitInput,
@@ -64,15 +68,23 @@ export class ProfilesService {
 
   async build(topicId: string, input: BuildProfileInput, user: AuthUser) {
     const { maxSamplesPerProfile } = await this.settings.getAi();
-    const analyzed = await this.prisma.sampleContent.count({
-      where: {
-        topicId,
-        analysisStatus: 'DONE',
-        ...(input.sampleIds?.length ? { id: { in: input.sampleIds } } : {}),
-      },
-    });
-    if (!analyzed)
-      throw new BadRequestException('Analyze at least one sample before building a profile');
+    const [analyzed, brandDocs, businessSections] = await Promise.all([
+      this.prisma.sampleContent.count({
+        where: {
+          topicId,
+          analysisStatus: 'DONE',
+          ...(input.sampleIds?.length ? { id: { in: input.sampleIds } } : {}),
+        },
+      }),
+      this.prisma.brandDocument.count({ where: { topicId, isActive: true } }),
+      this.prisma.businessSection.count({
+        where: { business: { topics: { some: { id: topicId } } }, content: { not: '' } },
+      }),
+    ]);
+    if (!analyzed && !brandDocs && !businessSections)
+      throw new BadRequestException(
+        'Analyze at least one sample, add a brand document or link a business with a filled profile before building a profile with AI',
+      );
 
     const sampleIds = input.sampleIds?.length
       ? input.sampleIds.slice(0, maxSamplesPerProfile)
@@ -96,7 +108,122 @@ export class ProfilesService {
     return { jobId: job.id };
   }
 
+  /** Creates a manual DRAFT version (no AI). Admin-written traits start APPROVED. */
+  async create(topicId: string, input: CreateProfileInput, user: AuthUser) {
+    const data = CreateProfileSchema.parse(input);
+    await this.prisma.topic.findUniqueOrThrow({ where: { id: topicId } });
+    const profile = await this.createVersion(topicId, (version) => ({
+      topicId,
+      version,
+      status: 'DRAFT',
+      summary: data.summary,
+      styleGuide: data.styleGuide,
+      traits: {
+        create: data.traits.map((t) => ({
+          ...t,
+          source: 'ADMIN' as const,
+          status: 'APPROVED' as const,
+          confidence: 1,
+        })),
+      },
+    }));
+    this.audit.log({
+      userId: user.id,
+      action: 'profile.create',
+      entityType: 'ContentProfile',
+      entityId: profile.id,
+      meta: { topicId, version: profile.version },
+    });
+    return this.get(profile.id);
+  }
+
+  /**
+   * "New version from this one": copies any version (usually the approved/active one) into a
+   * new editable DRAFT. Rejected traits are left behind; the source stays untouched.
+   */
+  async duplicate(id: string, user: AuthUser) {
+    const source = await this.prisma.contentProfile.findUnique({
+      where: { id },
+      include: { traits: { where: { status: { not: 'REJECTED' } } } },
+    });
+    if (!source) throw new NotFoundException('Profile not found');
+    const profile = await this.createVersion(source.topicId, (version) => ({
+      topicId: source.topicId,
+      version,
+      status: 'DRAFT',
+      summary: source.summary,
+      styleGuide: source.styleGuide,
+      sampleIds: source.sampleIds,
+      brandDocIds: source.brandDocIds,
+      basedOnVersion: source.version,
+      traits: {
+        create: source.traits.map((t) => ({
+          category: t.category,
+          name: t.name,
+          description: t.description,
+          evidence: t.evidence,
+          confidence: t.confidence,
+          status: t.status,
+          source: t.source,
+        })),
+      },
+    }));
+    this.audit.log({
+      userId: user.id,
+      action: 'profile.duplicate',
+      entityType: 'ContentProfile',
+      entityId: profile.id,
+      meta: { from: source.id, fromVersion: source.version, version: profile.version },
+    });
+    return this.get(profile.id);
+  }
+
+  /** Allocates the next version number; retries once if a concurrent build took it. */
+  private async createVersion(
+    topicId: string,
+    data: (version: number) => Prisma.ContentProfileUncheckedCreateInput,
+  ) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const last = await tx.contentProfile.findFirst({
+            where: { topicId },
+            orderBy: { version: 'desc' },
+            select: { version: true },
+          });
+          return tx.contentProfile.create({ data: data((last?.version ?? 0) + 1) });
+        });
+      } catch (e) {
+        const conflict = e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
+        if (!conflict || attempt >= 1) throw e;
+      }
+    }
+  }
+
+  /** Approved and archived versions are immutable; edits go to a new version. */
+  private async assertDraft(profileId: string) {
+    const p = await this.prisma.contentProfile.findUnique({
+      where: { id: profileId },
+      select: { status: true },
+    });
+    if (!p) throw new NotFoundException('Profile not found');
+    if (p.status !== 'DRAFT')
+      throw new ConflictException(
+        'Only draft profile versions can be edited. Create a new version from this one first.',
+      );
+  }
+
+  private async assertTraitDraft(traitId: string) {
+    const t = await this.prisma.profileTrait.findUnique({
+      where: { id: traitId },
+      select: { profileId: true },
+    });
+    if (!t) throw new NotFoundException('Trait not found');
+    await this.assertDraft(t.profileId);
+  }
+
   async update(id: string, input: UpdateProfileInput, user: AuthUser) {
+    await this.assertDraft(id);
     const p = await this.prisma.contentProfile.update({ where: { id }, data: input });
     this.audit.log({
       userId: user.id,
@@ -158,6 +285,7 @@ export class ProfilesService {
 
   async addTrait(profileId: string, input: CreateTraitInput, user: AuthUser) {
     const data = CreateTraitSchema.parse(input);
+    await this.assertDraft(profileId);
     const t = await this.prisma.profileTrait.create({
       data: { ...data, profileId, source: 'ADMIN', status: 'APPROVED', confidence: 1 },
     });
@@ -171,6 +299,7 @@ export class ProfilesService {
   }
 
   async updateTrait(id: string, input: UpdateTraitInput, user: AuthUser) {
+    await this.assertTraitDraft(id);
     const t = await this.prisma.profileTrait.update({ where: { id }, data: input });
     this.audit.log({
       userId: user.id,
@@ -183,6 +312,7 @@ export class ProfilesService {
   }
 
   async removeTrait(id: string, user: AuthUser) {
+    await this.assertTraitDraft(id);
     await this.prisma.profileTrait.delete({ where: { id } });
     this.audit.log({
       userId: user.id,
@@ -210,6 +340,20 @@ export class ProfilesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.profiles.build(topicId, body, user);
+  }
+
+  @Post('topics/:topicId/profiles')
+  create(
+    @Param('topicId') topicId: string,
+    @Body(new ZodValidationPipe(CreateProfileSchema)) body: CreateProfileInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.profiles.create(topicId, body, user);
+  }
+
+  @Post('profiles/:id/duplicate')
+  duplicate(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.profiles.duplicate(id, user);
   }
 
   @Get('profiles/:id')
