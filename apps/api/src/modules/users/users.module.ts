@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -24,7 +25,7 @@ import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
-import { AuthService, publicUser } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UsersService {
@@ -47,10 +48,17 @@ export class UsersService {
       this.prisma.user.findMany({ where, orderBy: { createdAt: 'desc' }, ...paginate(query) }),
       this.prisma.user.count({ where }),
     ]);
-    return toPage(items.map(publicUser), total, query);
+    return toPage(
+      items.map((u) => this.auth.toPublic(u)),
+      total,
+      query,
+    );
   }
 
   async create(input: CreateUserInput, actor: AuthUser) {
+    if (this.auth.isOwner(input.email) && !this.auth.isOwner(actor.email)) {
+      throw new ForbiddenException('This address is reserved for the owner');
+    }
     const user = await this.prisma.user.create({
       data: {
         email: input.email.toLowerCase(),
@@ -66,12 +74,21 @@ export class UsersService {
       entityId: user.id,
       meta: { role: user.role },
     });
-    return publicUser(user);
+    return this.auth.toPublic(user);
   }
 
   async update(id: string, input: UpdateUserInput, actor: AuthUser) {
     if (id === actor.id && ((input.role && input.role !== 'ADMIN') || input.isActive === false)) {
       throw new ForbiddenException('You cannot demote or deactivate yourself');
+    }
+    const target = await this.prisma.user.findUniqueOrThrow({ where: { id } });
+    if (this.auth.isOwner(target.email) && !this.auth.isOwner(actor.email)) {
+      throw new ForbiddenException('Only the owner can change the owner account');
+    }
+    if (input.password && target.loginMethod === 'GOOGLE') {
+      throw new BadRequestException(
+        'Google-only account has no password (Settings → Google access)',
+      );
     }
     const { password, ...rest } = input;
     const user = await this.prisma.user.update({
@@ -94,7 +111,7 @@ export class UsersService {
       entityId: id,
       meta: { ...rest, passwordReset: !!password },
     });
-    return publicUser(user);
+    return this.auth.toPublic(user);
   }
 }
 

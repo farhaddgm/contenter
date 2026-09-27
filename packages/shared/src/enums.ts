@@ -6,6 +6,14 @@
 export const Role = ['ADMIN', 'EDITOR', 'VIEWER'] as const;
 export type Role = (typeof Role)[number];
 
+/**
+ * How a user may sign in. PASSWORD = email + password only (default);
+ * GOOGLE = "Sign in with Google" only, no password; BOTH = either.
+ * Only the owner can grant GOOGLE/BOTH (docs/11-google-login.md).
+ */
+export const LoginMethod = ['PASSWORD', 'GOOGLE', 'BOTH'] as const;
+export type LoginMethod = (typeof LoginMethod)[number];
+
 export const Platform = [
   'INSTAGRAM',
   'YOUTUBE',
@@ -95,3 +103,15 @@ export type AiJobStatus = (typeof AiJobStatus)[number];
 
 export const AiEffort = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type AiEffort = (typeof AiEffort)[number];
+
+/** Reason codes the Google sign-in callback appends to `/auth/login?error=`. */
+export const GoogleLoginError = [
+  'not_configured',
+  'cancelled',
+  'expired',
+  'not_gmail',
+  'not_allowed',
+  'inactive',
+  'failed',
+] as const;
+export type GoogleLoginError = (typeof GoogleLoginError)[number];

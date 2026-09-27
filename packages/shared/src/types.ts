@@ -9,6 +9,7 @@ import type {
   ContentStatus,
   FetchStatus,
   IdeaStatus,
+  LoginMethod,
   MediaType,
   Platform,
   PrincipleKind,
@@ -45,8 +46,17 @@ export interface User {
   name: string;
   role: Role;
   isActive: boolean;
+  loginMethod: LoginMethod;
+  hasPassword: boolean;
+  /** The application owner (OWNER_EMAIL) — the only one who manages Google access. */
+  isOwner: boolean;
   lastLoginAt: ISODate | null;
   createdAt: ISODate;
+}
+
+export interface AuthProviders {
+  /** "Sign in with Google" is configured on the server. */
+  google: boolean;
 }
 
 export interface AuthResponse {

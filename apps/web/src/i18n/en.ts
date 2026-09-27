@@ -74,6 +74,18 @@ export const en: DeepStrings<Dictionary> = {
     password: 'Password',
     login: 'Sign in',
     loginFailed: 'Sign-in failed',
+    or: 'or',
+    withGoogle: 'Sign in with Google (Gmail)',
+    googleOnlyHint: 'Your account signs in with Gmail only and has no password.',
+    googleErrors: {
+      not_configured: 'Google sign-in is not configured on the server.',
+      cancelled: 'Google sign-in was cancelled.',
+      expired: 'The Google sign-in session expired; please try again.',
+      not_gmail: 'Only verified Gmail (@gmail.com) accounts are accepted.',
+      not_allowed: 'This Gmail account is not allowed to sign in. Ask the owner for access.',
+      inactive: 'Your account is inactive.',
+      failed: 'Google sign-in failed; please try again.',
+    },
     changePassword: 'Change password',
     currentPassword: 'Current password',
     newPassword: 'New password',
@@ -84,6 +96,7 @@ export const en: DeepStrings<Dictionary> = {
   },
   enums: {
     role: { ADMIN: 'Admin', EDITOR: 'Editor', VIEWER: 'Viewer' },
+    loginMethod: { PASSWORD: 'Password', GOOGLE: 'Gmail only', BOTH: 'Gmail and password' },
     platform: {
       INSTAGRAM: 'Instagram',
       YOUTUBE: 'YouTube',
@@ -413,6 +426,35 @@ export const en: DeepStrings<Dictionary> = {
     created: 'User created',
     deactivate: 'Deactivate',
     activate: 'Activate',
+    loginMethod: 'Sign-in method',
+    owner: 'Owner',
+    googleManaged:
+      'This account signs in with Gmail only; its sign-in method is managed by the owner in Settings → Gmail sign-in.',
+  },
+  googleAccess: {
+    title: 'Gmail sign-in',
+    description:
+      'Only the Gmail accounts listed here can use "Sign in with Google". For each person choose Gmail-only or Gmail plus a password. Only the owner sees this section.',
+    add: 'Add Gmail',
+    editTitle: 'Edit Gmail access',
+    email: 'Gmail address',
+    emailHint:
+      'Only @gmail.com. If a user with this email already exists, that account is granted access.',
+    method: 'Sign-in methods',
+    methodHint: {
+      GOOGLE: 'Signs in with Gmail only and has no password (any existing password is removed).',
+      BOTH: 'Can sign in with Gmail or with email and password.',
+    },
+    password: 'Password',
+    passwordKeep: 'Leave empty to keep the current password',
+    passwordRequired: 'A password is required for password sign-in',
+    owner: 'You (owner) — always sign in with Gmail as an admin',
+    empty: 'No Gmail accounts added yet.',
+    granted: 'Gmail access granted',
+    revoke: 'Remove Gmail access',
+    revokeBody:
+      'This Gmail can no longer sign in with Google and its active sessions are closed. If the account has no password it is deactivated.',
+    revoked: 'Gmail access removed',
   },
   prompts: {
     title: 'Prompts',
@@ -450,7 +492,8 @@ export const en: DeepStrings<Dictionary> = {
     customModelHint: 'Exact model id from the provider docs, e.g. gpt-5.4',
     add: 'Add',
     unavailable: 'no key',
-    missingKeyWarning: 'Some selected models belong to a provider without an API key; those jobs will fail.',
+    missingKeyWarning:
+      'Some selected models belong to a provider without an API key; those jobs will fail.',
   },
   audit: {
     title: 'Audit log',

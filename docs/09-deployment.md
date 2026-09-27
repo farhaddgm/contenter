@@ -6,6 +6,7 @@
 cp apps/api/.env.example apps/api/.env
 # حتماً تنظیم کنید: JWT_ACCESS_SECRET، JWT_REFRESH_SECRET (رشتهٔ تصادفی طولانی)،
 # AI_PROVIDER=live، OPENAI_API_KEY و/یا ANTHROPIC_API_KEY، COOKIE_SECURE=true (پشت HTTPS)، SEED_ADMIN_PASSWORD
+# ورود با گوگل (اختیاری): APP_URL، OWNER_EMAIL، GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI — docs/11-google-login.md
 docker compose --profile app up -d --build
 docker compose exec api npx -w @contenter/api prisma db seed   # فقط بار اول
 ```
@@ -33,5 +34,6 @@ docker compose exec api npx -w @contenter/api prisma db seed   # فقط بار �
 - [ ] `CORS_ORIGINS` فقط دامنهٔ فرانت
 - [ ] `FETCH_ALLOW_PRIVATE=false`
 - [ ] رمز ادمین seed تغییر کرده باشد
+- [ ] برای ورود با گوگل: `APP_URL` و `GOOGLE_REDIRECT_URI` روی دامنهٔ HTTPS، و redirect URI در Google Cloud ثبت شده باشد
 - [ ] پشتیبان‌گیری منظم از PostgreSQL
 - [ ] پایش `/api/health` و صفحهٔ «کارهای AI» برای خطاها

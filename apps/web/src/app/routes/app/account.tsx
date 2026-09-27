@@ -49,6 +49,10 @@ export default function AccountRoute() {
                 </dd>
               </div>
               <div className="flex justify-between">
+                <dt className="text-muted-foreground">{t('users.loginMethod')}</dt>
+                <dd>{t(`enums.loginMethod.${user.loginMethod}`)}</dd>
+              </div>
+              <div className="flex justify-between">
                 <dt className="text-muted-foreground">{t('users.lastLogin')}</dt>
                 <dd>{formatDate(user.lastLoginAt)}</dd>
               </div>
@@ -58,51 +62,55 @@ export default function AccountRoute() {
         <Card>
           <CardHeader title={t('auth.changePassword')} />
           <CardBody>
-            <form
-              className="space-y-4"
-              onSubmit={form.handleSubmit((values) =>
-                change.mutate(values, {
-                  onSuccess: () => {
-                    notify.success(t('auth.passwordChanged'));
-                    useAuthStore.getState().clear();
-                    navigate(paths.auth.login.getHref());
-                  },
-                  onError: (e) => notify.error(t('common.error'), e.message),
-                }),
-              )}
-            >
-              <Field
-                label={t('auth.currentPassword')}
-                error={form.formState.errors.currentPassword?.message}
-              >
-                {(id) => (
-                  <Input
-                    id={id}
-                    type="password"
-                    dir="ltr"
-                    autoComplete="current-password"
-                    {...form.register('currentPassword')}
-                  />
+            {user.hasPassword && user.loginMethod !== 'GOOGLE' ? (
+              <form
+                className="space-y-4"
+                onSubmit={form.handleSubmit((values) =>
+                  change.mutate(values, {
+                    onSuccess: () => {
+                      notify.success(t('auth.passwordChanged'));
+                      useAuthStore.getState().clear();
+                      navigate(paths.auth.login.getHref());
+                    },
+                    onError: (e) => notify.error(t('common.error'), e.message),
+                  }),
                 )}
-              </Field>
-              <Field
-                label={t('auth.newPassword')}
-                error={form.formState.errors.newPassword?.message}
               >
-                {(id) => (
-                  <Input
-                    id={id}
-                    type="password"
-                    dir="ltr"
-                    autoComplete="new-password"
-                    {...form.register('newPassword')}
-                  />
-                )}
-              </Field>
-              <Button type="submit" isLoading={change.isPending}>
-                {t('common.save')}
-              </Button>
-            </form>
+                <Field
+                  label={t('auth.currentPassword')}
+                  error={form.formState.errors.currentPassword?.message}
+                >
+                  {(id) => (
+                    <Input
+                      id={id}
+                      type="password"
+                      dir="ltr"
+                      autoComplete="current-password"
+                      {...form.register('currentPassword')}
+                    />
+                  )}
+                </Field>
+                <Field
+                  label={t('auth.newPassword')}
+                  error={form.formState.errors.newPassword?.message}
+                >
+                  {(id) => (
+                    <Input
+                      id={id}
+                      type="password"
+                      dir="ltr"
+                      autoComplete="new-password"
+                      {...form.register('newPassword')}
+                    />
+                  )}
+                </Field>
+                <Button type="submit" isLoading={change.isPending}>
+                  {t('common.save')}
+                </Button>
+              </form>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('auth.googleOnlyHint')}</p>
+            )}
           </CardBody>
         </Card>
       </div>

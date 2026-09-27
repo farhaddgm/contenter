@@ -18,16 +18,27 @@ enum Role {
   VIEWER
 }
 
+/// PASSWORD = email + password only; GOOGLE = Google sign-in only; BOTH = either.
+enum LoginMethod {
+  PASSWORD
+  GOOGLE
+  BOTH
+}
+
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String      @id @default(cuid())
+  email        String      @unique
   name         String
-  passwordHash String
-  role         Role      @default(EDITOR)
-  isActive     Boolean   @default(true)
+  /// null for Google-only accounts
+  passwordHash String?
+  role         Role        @default(EDITOR)
+  isActive     Boolean     @default(true)
+  loginMethod  LoginMethod @default(PASSWORD)
+  /// Google account id (`sub`), bound on the first Google sign-in
+  googleSub    String?     @unique
   lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   refreshTokens      RefreshToken[]
   auditLogs          AuditLog[]

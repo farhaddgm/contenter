@@ -5,11 +5,13 @@ import type {
   AiSettingsResponse,
   AuditLog,
   ChangePasswordInput,
+  CreateGoogleAccessInput,
   CreatePromptVersionInput,
   CreateUserInput,
   DashboardStats,
   Paginated,
   PromptTemplate,
+  UpdateGoogleAccessInput,
   UpdateUserInput,
   User,
 } from '@contenter/shared';
@@ -47,6 +49,47 @@ export function useUpdateUser() {
     mutationFn: ({ id, data }: { id: string; data: UpdateUserInput }) =>
       api.patch<User>(`/admin/users/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  });
+}
+
+// ---------- Gmail sign-in allowlist (owner only) ----------
+export function useGoogleAccess() {
+  return useQuery({
+    queryKey: ['google-access'],
+    queryFn: () => api.get<User[]>('/owner/google-access'),
+  });
+}
+
+function useInvalidateAccess() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ['google-access'] });
+    void qc.invalidateQueries({ queryKey: ['users'] });
+  };
+}
+
+export function useGrantGoogleAccess() {
+  const invalidate = useInvalidateAccess();
+  return useMutation({
+    mutationFn: (data: CreateGoogleAccessInput) => api.post<User>('/owner/google-access', data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateGoogleAccess() {
+  const invalidate = useInvalidateAccess();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateGoogleAccessInput }) =>
+      api.patch<User>(`/owner/google-access/${id}`, data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRevokeGoogleAccess() {
+  const invalidate = useInvalidateAccess();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/owner/google-access/${id}`),
+    onSuccess: invalidate,
   });
 }
 

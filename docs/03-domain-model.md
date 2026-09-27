@@ -23,6 +23,17 @@ SystemSetting  (key/value JSON)
 
 ## موجودیت‌ها
 
+### User (کاربر)
+| فیلد | توضیح |
+|---|---|
+| `email`، `name`، `role` | نقش: `ADMIN`، `EDITOR` یا `VIEWER` |
+| `passwordHash` | argon2id. برای حساب‌های «فقط جیمیل» خالی (null) است |
+| `loginMethod` | `PASSWORD` (پیش‌فرض)، `GOOGLE` (فقط جیمیل) یا `BOTH`. فقط مالک می‌تواند `GOOGLE` و `BOTH` را تعیین کند |
+| `googleSub` | شناسهٔ حساب گوگل که در اولین ورود با گوگل ثبت می‌شود (یکتا) |
+| `isActive`، `lastLoginAt` | وضعیت و زمان آخرین ورود |
+
+مالک برنامه کاربری است که ایمیلش با `OWNER_EMAIL` یکی باشد ([11-google-login.md](11-google-login.md)).
+
 ### Topic (موضوع)
 | فیلد | توضیح |
 |---|---|

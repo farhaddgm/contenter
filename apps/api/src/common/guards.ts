@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import type { Role } from '@contenter/shared';
+import { normalizeGmail, type Role } from '@contenter/shared';
 import { ENV, type Env } from '../config/env';
 import { IS_PUBLIC_KEY, ROLES_KEY, type AuthUser } from './auth.decorators';
 
@@ -75,6 +75,20 @@ export class RolesGuard implements CanActivate {
 
     if (req.method !== 'GET' && user.role === 'VIEWER') {
       throw new ForbiddenException('Read-only account');
+    }
+    return true;
+  }
+}
+
+/** Only the application owner (OWNER_EMAIL) passes — use with `@UseGuards(OwnerGuard)`. */
+@Injectable()
+export class OwnerGuard implements CanActivate {
+  constructor(@Inject(ENV) private readonly env: Env) {}
+
+  canActivate(ctx: ExecutionContext): boolean {
+    const user = ctx.switchToHttp().getRequest().user as AuthUser | undefined;
+    if (!user || normalizeGmail(user.email) !== normalizeGmail(this.env.OWNER_EMAIL)) {
+      throw new ForbiddenException('Only the owner can do this');
     }
     return true;
   }

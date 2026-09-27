@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
-import { useMutation } from '@tanstack/react-query';
-import type { AuthResponse, LoginInput, Role } from '@contenter/shared';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import type { AuthProviders, AuthResponse, LoginInput, Role } from '@contenter/shared';
+import { env } from '@/config/env';
 import { paths } from '@/config/paths';
 import { PageSpinner } from '@/components/ui/spinner';
 import { useAuthStore } from '@/stores/auth';
@@ -16,6 +17,19 @@ export function useLogin() {
     onSuccess: (res) => setSession(res.accessToken, res.user),
   });
 }
+
+/** Which sign-in methods the server offers (the Google button shows only when configured). */
+export function useAuthProviders() {
+  return useQuery({
+    queryKey: ['auth-providers'],
+    queryFn: () => api.get<AuthProviders>('/auth/providers'),
+    staleTime: Infinity,
+  });
+}
+
+/** Full-page navigation: the API redirects to Google and back, then sets the session cookie. */
+export const googleSignInUrl = (redirectTo: string) =>
+  `${env.API_URL}/auth/google?redirectTo=${encodeURIComponent(redirectTo)}`;
 
 export function useLogout() {
   const clear = useAuthStore((s) => s.clear);

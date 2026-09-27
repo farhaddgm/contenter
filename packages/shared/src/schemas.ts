@@ -9,6 +9,7 @@ import {
   ContentFormat,
   ContentStatus,
   IdeaStatus,
+  LoginMethod,
   Platform,
   PrincipleKind,
   Role,
@@ -38,6 +39,58 @@ export const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
+
+// ---------- Google sign-in (owner-managed allowlist) ----------
+/**
+ * Canonical form of a Gmail address for comparison: lower-case, dots and `+tag` removed from
+ * the local part, googlemail.com → gmail.com (Gmail treats all of these as one mailbox).
+ */
+export function normalizeGmail(email: string): string {
+  const lower = email.trim().toLowerCase();
+  const at = lower.lastIndexOf('@');
+  if (at < 0) return lower;
+  const domain = lower.slice(at + 1);
+  if (domain !== 'gmail.com' && domain !== 'googlemail.com') return lower;
+  const local = lower.slice(0, at).split('+')[0]!.replaceAll('.', '');
+  return `${local}@gmail.com`;
+}
+
+export const isGmail = (email: string) => /@(gmail|googlemail)\.com$/i.test(email.trim());
+
+export const GmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email())
+  .refine(isGmail, { message: 'Only @gmail.com addresses are allowed' });
+
+/** Login methods the owner can grant; PASSWORD-only users are managed in the Users page. */
+export const GoogleLoginMethod = ['GOOGLE', 'BOTH'] as const satisfies readonly LoginMethod[];
+export type GoogleLoginMethod = (typeof GoogleLoginMethod)[number];
+
+export const CreateGoogleAccessSchema = z
+  .object({
+    email: GmailSchema,
+    name: z.string().trim().min(2).max(100),
+    role: z.enum(Role),
+    loginMethod: z.enum(GoogleLoginMethod),
+    /** Required for BOTH when the account has no password yet (checked server-side). */
+    password: z.string().min(8).max(128).optional(),
+  })
+  .refine((v) => v.loginMethod === 'BOTH' || !v.password, {
+    path: ['password'],
+    message: 'Google-only accounts have no password',
+  });
+export type CreateGoogleAccessInput = z.infer<typeof CreateGoogleAccessSchema>;
+
+export const UpdateGoogleAccessSchema = z.object({
+  name: z.string().trim().min(2).max(100).optional(),
+  role: z.enum(Role).optional(),
+  isActive: z.boolean().optional(),
+  loginMethod: z.enum(GoogleLoginMethod).optional(),
+  password: z.string().min(8).max(128).optional(),
+});
+export type UpdateGoogleAccessInput = z.infer<typeof UpdateGoogleAccessSchema>;
 
 // ---------- users ----------
 export const CreateUserSchema = z.object({

@@ -6,6 +6,11 @@ const bool = (def: 'true' | 'false') =>
     .default(def)
     .transform((v) => v === 'true');
 
+const optionalString = z
+  .string()
+  .optional()
+  .transform((v) => v || undefined);
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /** api = HTTP only, worker = queue consumer only, all = both (local dev) */
@@ -21,6 +26,23 @@ const EnvSchema = z.object({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().default(900),
   REFRESH_TTL_DAYS: z.coerce.number().int().default(30),
   COOKIE_SECURE: bool('false'),
+  /** Public origin of the web app; the Google callback redirects back here. */
+  APP_URL: z.string().url().default('http://localhost:5173'),
+  /** The application owner: always an ADMIN and the only one who manages Google access. */
+  OWNER_EMAIL: z
+    .string()
+    .email()
+    .default('farhad.dgm@gmail.com')
+    .transform((v) => v.toLowerCase()),
+  /** "Sign in with Google" (OAuth web client). Disabled unless all three are set. */
+  GOOGLE_CLIENT_ID: optionalString,
+  GOOGLE_CLIENT_SECRET: optionalString,
+  /** Must match the redirect URI registered in Google Cloud, e.g. https://host/api/auth/google/callback */
+  GOOGLE_REDIRECT_URI: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   /**
    * mock = placeholder output, no vendor calls. Any other value = live: each task goes to the
    * vendor of the model chosen in the back office (`anthropic`/`openai` are kept as aliases).

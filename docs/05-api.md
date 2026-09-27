@@ -14,7 +14,12 @@
 | POST | `/auth/refresh` | چرخش توکن refresh ← `{ accessToken, user }` |
 | POST | `/auth/logout` | ابطال refresh |
 | GET | `/auth/me` | کاربر جاری |
-| POST | `/auth/change-password` | `{ currentPassword, newPassword }`، همهٔ نشست‌ها باطل می‌شوند |
+| POST | `/auth/change-password` | `{ currentPassword, newPassword }`، همهٔ نشست‌ها باطل می‌شوند. برای حساب «فقط جیمیل» خطای 400 می‌دهد |
+| GET | `/auth/providers` | `{ google }`: آیا ورود با گوگل پیکربندی شده است |
+| GET | `/auth/google`، `/auth/google/callback` | ورود با گوگل (ناوبری کامل صفحه). جزئیات در [11-google-login.md](11-google-login.md) |
+| GET / POST / PATCH / DELETE | `/owner/google-access[/:id]` | فهرست جیمیل‌های مجاز. **فقط مالک** (`OWNER_EMAIL`) |
+
+خطای ورود با رمز برای حساب «فقط جیمیل» همان پیام عمومی «ایمیل یا رمز نادرست» است. کاربر (`user`) این فیلدها را هم دارد: `loginMethod`، `hasPassword` و `isOwner`.
 
 ## موضوع‌ها و اصول
 | متد | مسیر | توضیح |

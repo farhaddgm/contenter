@@ -18,8 +18,10 @@ import { Field, Input, Select } from '@/components/ui/form-controls';
 import { PageHeader } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
+import { useUser } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { useAiSettings, useUpdateAiSettings } from '@/features/admin/api';
+import { GoogleAccessCard } from '@/features/settings/components/google-access-card';
 import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
 const PROVIDER_LABEL: Record<AiProviderName, string> = {
@@ -39,6 +41,7 @@ export default function SettingsRoute() {
 
 function SettingsForm({ data }: { data: AiSettingsResponse }) {
   const t = useT();
+  const isOwner = useUser()?.isOwner;
   const save = useUpdateAiSettings();
   const [form, setForm] = useState<AiSettings>({
     models: data.models,
@@ -239,6 +242,11 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
           </div>
         </Card>
       </div>
+      {isOwner && (
+        <div className="mt-6">
+          <GoogleAccessCard />
+        </div>
+      )}
       <div className="mt-6">
         <SmartSettingsCard />
       </div>

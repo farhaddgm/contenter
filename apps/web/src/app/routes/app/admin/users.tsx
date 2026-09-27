@@ -18,6 +18,7 @@ import { Field, Input, Select, Switch } from '@/components/ui/form-controls';
 import { PageHeader } from '@/components/ui/misc';
 import { Pagination, Table, type Column } from '@/components/ui/table';
 import { useT } from '@/i18n';
+import { useUser } from '@/lib/auth';
 import { useDebounce } from '@/hooks/use-debounce';
 import { notify } from '@/stores/notifications';
 import { formatDate, formatRelative } from '@/utils/format';
@@ -36,6 +37,7 @@ function UserDrawer({
   const create = useCreateUser();
   const update = useUpdateUser();
   const isEdit = !!user;
+  const googleOnly = user?.loginMethod === 'GOOGLE';
   const form = useForm<CreateUserInput & UpdateUserInput>({
     resolver: zodResolver(isEdit ? UpdateUserSchema : CreateUserSchema) as never,
   });
@@ -105,20 +107,28 @@ function UserDrawer({
             />
           )}
         </Field>
-        <Field
-          label={isEdit ? t('users.resetPassword') : t('users.password')}
-          error={errors.password?.message}
-        >
-          {(id) => (
-            <Input
-              id={id}
-              dir="ltr"
-              type="password"
-              autoComplete="new-password"
-              {...form.register('password', { setValueAs: (v) => (isEdit && !v ? undefined : v) })}
-            />
-          )}
-        </Field>
+        {googleOnly ? (
+          <p className="rounded-md bg-muted px-3 py-2 text-xs leading-6 text-muted-foreground">
+            {t('users.googleManaged')}
+          </p>
+        ) : (
+          <Field
+            label={isEdit ? t('users.resetPassword') : t('users.password')}
+            error={errors.password?.message}
+          >
+            {(id) => (
+              <Input
+                id={id}
+                dir="ltr"
+                type="password"
+                autoComplete="new-password"
+                {...form.register('password', {
+                  setValueAs: (v) => (isEdit && !v ? undefined : v),
+                })}
+              />
+            )}
+          </Field>
+        )}
         {isEdit && (
           <Switch
             checked={!!isActive}
@@ -136,6 +146,7 @@ export default function UsersRoute() {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
   const debouncedQ = useDebounce(q);
+  const me = useUser();
   const [editing, setEditing] = useState<User | null>(null);
   const [open, setOpen] = useState(false);
   const { data, isLoading } = useUsers({ page, q: debouncedQ });
@@ -150,7 +161,10 @@ export default function UsersRoute() {
             {u.name.slice(0, 1)}
           </span>
           <div>
-            <p className="font-medium">{u.name}</p>
+            <p className="flex items-center gap-2 font-medium">
+              {u.name}
+              {u.isOwner && <Badge tone="primary">{t('users.owner')}</Badge>}
+            </p>
             <p className="text-xs text-muted-foreground" dir="ltr">
               {u.email}
             </p>
@@ -163,6 +177,15 @@ export default function UsersRoute() {
       header: t('users.role'),
       cell: (u) => (
         <Badge tone={u.role === 'ADMIN' ? 'primary' : 'outline'}>{t(`enums.role.${u.role}`)}</Badge>
+      ),
+    },
+    {
+      key: 'loginMethod',
+      header: t('users.loginMethod'),
+      cell: (u) => (
+        <Badge tone={u.loginMethod === 'PASSWORD' ? 'outline' : 'neutral'}>
+          {t(`enums.loginMethod.${u.loginMethod}`)}
+        </Badge>
       ),
     },
     {
@@ -196,6 +219,7 @@ export default function UsersRoute() {
         <Button
           size="icon-sm"
           variant="ghost"
+          disabled={u.isOwner && !me?.isOwner}
           aria-label={t('common.edit')}
           onClick={() => {
             setEditing(u);
