@@ -34,6 +34,7 @@ function AdminOnly() {
 const router = createBrowserRouter([
   { path: '/', element: <Navigate to={paths.app.root.getHref()} replace /> },
   { path: paths.auth.login.path, lazy: lazyRoute(() => import('./routes/auth/login')) },
+  { path: paths.auth.loginUp.path, lazy: lazyRoute(() => import('./routes/auth/login-up')) },
   {
     path: paths.app.root.path,
     element: <AppRoot />,

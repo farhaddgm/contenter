@@ -6,6 +6,8 @@ export const paths = {
       getHref: (redirectTo?: string | null) =>
         `/auth/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
     },
+    /** Unlisted email + password sign-in — never link to it. */
+    loginUp: { path: '/auth/login-up' },
   },
   app: {
     root: { path: '/app', getHref: () => '/app' },
