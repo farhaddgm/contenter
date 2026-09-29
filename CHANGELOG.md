@@ -2,6 +2,12 @@
 
 قالب بر اساس [Keep a Changelog](https://keepachangelog.com/) و نسخه‌گذاری [SemVer](https://semver.org/).
 
+## [0.2.3] — 2026-09-29
+
+### تغییر کرد
+- **`/auth/login` فقط «ورود با گوگل» دارد.** فرم ایمیل و رمز عبور از این صفحه حذف شد.
+- **صفحهٔ مخفی `/auth/login-up`** با ایمیل و رمز عبور و همچنین گوگل. هیچ لینکی به آن نیست و با متای `robots` و هدر `X-Robots-Tag` (در nginx) از موتورهای جستجو پنهان است ([docs/11-google-login.md](docs/11-google-login.md)).
+
 ## [0.2.2] — 2026-09-29
 
 ### رفع شد
