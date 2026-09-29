@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   createHash,
@@ -59,13 +59,26 @@ export function safeRedirectPath(value: unknown): string {
  * The id_token is fetched directly from Google and its signature is checked against Google's JWKS.
  */
 @Injectable()
-export class GoogleOAuthService {
+export class GoogleOAuthService implements OnModuleInit {
+  private readonly logger = new Logger(GoogleOAuthService.name);
   private jwks: { keys: Map<string, KeyObject>; fetchedAt: number } | null = null;
 
   constructor(
     private readonly jwt: JwtService,
     @Inject(ENV) private readonly env: Env,
   ) {}
+
+  /** A partly filled config silently hides the Google button — make it loud in the logs. */
+  onModuleInit() {
+    const missing = (
+      ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'] as const
+    ).filter((key) => !this.env[key]);
+    if (missing.length > 0 && missing.length < 3) {
+      this.logger.warn(
+        `Google sign-in is DISABLED: ${missing.join(', ')} empty in apps/api/.env (docs/11-google-login.md)`,
+      );
+    }
+  }
 
   get enabled(): boolean {
     return !!(

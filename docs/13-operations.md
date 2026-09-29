@@ -105,6 +105,8 @@ df -h /
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ورود با جیمیل ([11-google-login.md](11-google-login.md)) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | کلیدهای امنیتی ورود؛ هرگز پاک یا عوض نکنید مگر عمداً |
 
+اگر فقط بخشی از متغیرهای `GOOGLE_*` مقدار داشته باشد، دکمهٔ «ورود با گوگل» بی‌صدا پنهان می‌شود. از این پس `deploy.sh` در این حالت متوقف می‌شود و API هم هنگام شروع هشدار می‌دهد. `GOOGLE_CLIENT_SECRET` فقط در Google Cloud Console است (Credentials ← OAuth client). اگر از `.env` پاک شد، باید از همان‌جا دوباره برداشته شود.
+
 ## ۷. نکات امنیتی سرور
 - هیچ پورتی از Contenter مستقیم روی اینترنت باز نیست؛ فقط از طریق HTTPS و Caddy در دسترس است (`docker-compose.override.yml`، که در git نیست).
 - فایل `apps/api/.env` و پشتیبان‌هایش فقط برای کاربر `farhaad` قابل خواندن‌اند (`chmod 600`).

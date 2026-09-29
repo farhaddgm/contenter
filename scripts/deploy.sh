@@ -29,6 +29,14 @@ done
 if grep -qE '^JWT_(ACCESS|REFRESH)_SECRET=change-me' "$ENV_FILE"; then
   fail "JWT secrets in $ENV_FILE are still the example values. Generate real ones (docs/09-deployment.md)."
 fi
+# Google sign-in needs all three values; a partial set silently hides the login button.
+google_set=0
+for key in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI; do
+  grep -qE "^${key}=.+" "$ENV_FILE" && google_set=$((google_set + 1))
+done
+if [ "$google_set" -gt 0 ] && [ "$google_set" -lt 3 ]; then
+  fail "Google sign-in is half-configured in $ENV_FILE: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI must all have values (docs/11-google-login.md). Fill them in, or empty all three to turn Google sign-in off."
+fi
 ok "Configuration looks complete"
 
 say "Checking disk space"
