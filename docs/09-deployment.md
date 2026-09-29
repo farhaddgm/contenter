@@ -1,5 +1,7 @@
 # استقرار
 
+> برای سرور فعلی (`contenter.beeproject.ir`) راهنمای ساده و گام‌به‌گام در [13-operations.md](13-operations.md) است؛ انتشار نسخهٔ جدید فقط با `bash scripts/deploy.sh`.
+
 ## با Docker Compose (یک سرور)
 
 ```bash
