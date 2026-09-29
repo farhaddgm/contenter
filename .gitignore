@@ -11,3 +11,6 @@ coverage/
 .turbo/
 apps/api/uploads/
 *.tsbuildinfo
+# server-local deploy files (production overrides, backups of them)
+docker-compose.override.yml*
+docker-compose.yml.local-change-*.diff

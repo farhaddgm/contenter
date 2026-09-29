@@ -33,12 +33,14 @@ services:
   api:
     profiles: [app]
     build: { context: ., dockerfile: apps/api/Dockerfile }
+    # worker runs the same image; it is built once here and reused below
+    image: contenter-api:latest
     env_file: apps/api/.env
+    # CORS_ORIGINS, APP_URL etc. come from apps/api/.env (values here would override it)
     environment:
       APP_ROLE: api
       DATABASE_URL: postgresql://contenter:contenter@postgres:5432/contenter
       REDIS_URL: redis://redis:6379
-      CORS_ORIGINS: http://localhost:8080
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -47,7 +49,8 @@ services:
 
   worker:
     profiles: [app]
-    build: { context: ., dockerfile: apps/api/Dockerfile }
+    image: contenter-api:latest
+    pull_policy: never
     env_file: apps/api/.env
     environment:
       APP_ROLE: worker
