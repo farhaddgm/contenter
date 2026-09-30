@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Contenter — one-command production deploy (run on the server, inside the repo folder).
 #
-#   cd ~/contenter && bash scripts/deploy.sh
+#   cd ~/contenter && bash scripts/deploy.sh            deploy the latest version
+#   cd ~/contenter && bash scripts/deploy.sh <commit>   deploy up to this commit (never goes back)
 #
-# Steps: safety checks (.env, disk) → backups (database + .env) → git pull →
+# GitHub Actions (.github/workflows/deploy.yml) runs it automatically after CI passes on main,
+# over SSH with a key that may only run this script; the commit arrives as SSH_ORIGINAL_COMMAND.
+#
+# Steps: safety checks (.env, disk) → backups (scripts/backup.sh: database + .env, local and
+# off-site) → git pull →
 # rebuild/restart app containers (migrations run automatically) → health check →
 # cleanup of old Docker build leftovers (never touches data or running images).
 #
@@ -18,12 +23,14 @@ main() {
   local ENV_FILE="apps/api/.env"
   local BACKUP_DIR="${BACKUP_DIR:-$HOME/contenter-backups}"
   local MIN_FREE_GB="${MIN_FREE_GB:-5}"
-  local KEEP_BACKUPS="${KEEP_BACKUPS:-14}"
-  local STAMP
-  STAMP="$(date +%Y%m%d-%H%M%S)"
+  # commit to deploy: argument, or what the GitHub Actions deploy key sent (empty = latest)
+  local TARGET="${1:-${SSH_ORIGINAL_COMMAND:-}}"
 
   # ── 1. Safety checks ───────────────────────────────────────────────────────
   say "Checking configuration"
+  if [ -n "$TARGET" ] && ! [[ "$TARGET" =~ ^[0-9a-f]{7,40}$ ]]; then
+    fail "'$TARGET' is not a commit id. Run without arguments to deploy the latest version."
+  fi
   [ -f docker-compose.yml ] || fail "Run this inside the contenter folder (cd ~/contenter)."
   [ -s "$ENV_FILE" ] || fail "$ENV_FILE is missing or EMPTY. Restore it from a backup first (see docs/13-operations.md): ls -l ~/contenter-backups/env-* apps/api/.env.bak-*"
   local key
@@ -52,27 +59,19 @@ main() {
   ok "$(free_gb)G free"
 
   # ── 2. Backups ─────────────────────────────────────────────────────────────
-  say "Backing up database and settings to $BACKUP_DIR"
-  mkdir -p "$BACKUP_DIR"
-  chmod 700 "$BACKUP_DIR"
-  cp "$ENV_FILE" "$BACKUP_DIR/env-$STAMP"
-  if docker compose ps --status running --services 2>/dev/null | grep -qx postgres; then
-    docker compose exec -T postgres pg_dump -U contenter contenter | gzip > "$BACKUP_DIR/db-$STAMP.sql.gz"
-    [ -s "$BACKUP_DIR/db-$STAMP.sql.gz" ] || fail "Database backup is empty — stopping before any change."
-    ok "Database backup: $BACKUP_DIR/db-$STAMP.sql.gz ($(du -h "$BACKUP_DIR/db-$STAMP.sql.gz" | cut -f1))"
-  else
-    echo "postgres is not running yet — skipping database backup"
-  fi
-  chmod 600 "$BACKUP_DIR"/* 2>/dev/null || true
-  # keep only the newest backups
-  ls -1t "$BACKUP_DIR"/db-*.sql.gz 2>/dev/null | tail -n +"$((KEEP_BACKUPS + 1))" | xargs -r rm -f
-  ls -1t "$BACKUP_DIR"/env-* 2>/dev/null | tail -n +"$((KEEP_BACKUPS + 1))" | xargs -r rm -f
+  # stops the deploy if the database backup fails; an unreachable off-site storage only warns
+  BACKUP_DIR="$BACKUP_DIR" BACKUP_FROM_DEPLOY=1 bash scripts/backup.sh
 
   # ── 3. Code ────────────────────────────────────────────────────────────────
   say "Getting the latest version from GitHub"
   local BEFORE AFTER
   BEFORE="$(git rev-parse --short HEAD)"
-  git pull --ff-only
+  if [ -n "$TARGET" ]; then
+    git fetch --quiet origin
+    git merge --ff-only "$TARGET" # an older commit than HEAD is a no-op ("Already up to date")
+  else
+    git pull --ff-only
+  fi
   AFTER="$(git rev-parse --short HEAD)"
   ok "Version: $BEFORE → $AFTER ($(git describe --tags --always))"
 
