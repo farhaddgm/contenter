@@ -110,6 +110,24 @@ export const UpdateUserSchema = z.object({
 });
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
 
+/**
+ * PATCH body from a create schema. Unlike `.partial()`, fields lose their defaults: in Zod 4 a
+ * default still fills an omitted field, so `{ status: 'ARCHIVED' }` would reset every defaulted
+ * field (tagline, language …). Here an omitted field stays undefined and Prisma leaves it as is.
+ */
+export function patchOf<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  const shape = Object.fromEntries(
+    Object.entries(schema.shape).map(([key, field]) => [
+      key,
+      (field instanceof z.ZodDefault
+        ? (field.removeDefault() as z.ZodType)
+        : (field as z.ZodType)
+      ).optional(),
+    ]),
+  );
+  return z.object(shape) as unknown as ReturnType<z.ZodObject<T>['partial']>;
+}
+
 // ---------- topics ----------
 export const CreateTopicSchema = z.object({
   title: z.string().trim().min(2).max(200),
@@ -122,7 +140,7 @@ export const CreateTopicSchema = z.object({
 });
 export type CreateTopicInput = z.input<typeof CreateTopicSchema>;
 
-export const UpdateTopicSchema = CreateTopicSchema.partial().extend({
+export const UpdateTopicSchema = patchOf(CreateTopicSchema).extend({
   status: z.enum(TopicStatus).optional(),
 });
 export type UpdateTopicInput = z.input<typeof UpdateTopicSchema>;
@@ -141,7 +159,7 @@ export const CreatePrincipleSchema = z.object({
 });
 export type CreatePrincipleInput = z.input<typeof CreatePrincipleSchema>;
 
-export const UpdatePrincipleSchema = CreatePrincipleSchema.partial();
+export const UpdatePrincipleSchema = patchOf(CreatePrincipleSchema);
 export type UpdatePrincipleInput = z.input<typeof UpdatePrincipleSchema>;
 
 // ---------- samples ----------

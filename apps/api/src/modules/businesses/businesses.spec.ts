@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import {
+  BusinessAuditResultSchema,
   BusinessBuildResultSchema,
   BusinessDiscoveryResultSchema,
   BusinessSectionKey,
@@ -11,7 +12,15 @@ import {
 } from '@contenter/shared';
 import type { ZodType } from 'zod';
 import { appendMissingBlocks } from '../ai/ai-executor.service';
-import { formatBusiness, formatSectionSpec, formatTopic, NO_BUSINESS } from '../ai/context';
+import {
+  formatBusiness,
+  formatBusinessFacts,
+  formatBusinessTerms,
+  formatSectionSpec,
+  formatTopic,
+  NO_BUSINESS,
+  UNREVIEWED_MARK,
+} from '../ai/context';
 import { estimateCostUsd } from '../ai/pricing';
 import { DEFAULT_PROMPTS } from '../ai/prompts/defaults';
 import { templateVariables } from '../ai/prompts/render';
@@ -36,6 +45,80 @@ const business = {
   ],
 };
 
+describe('business knowledge in the prompt', () => {
+  it('marks AI text nobody confirmed, but not reviewed or admin text', () => {
+    const out = formatBusiness({
+      ...business,
+      sections: [
+        { key: 'OVERVIEW', content: 'AI draft', source: 'AI', reviewedAt: null },
+        { key: 'SERVICES', content: 'AI ok', source: 'AI', reviewedAt: new Date() },
+        { key: 'GOALS', content: 'admin', source: 'ADMIN', reviewedAt: null },
+      ],
+    });
+    expect(out).toContain(`[OVERVIEW] ${UNREVIEWED_MARK}`);
+    expect(out).toContain('[SERVICES]\nAI ok');
+    expect(out).toContain('[GOALS]\nadmin');
+  });
+
+  it('sends valid facts exactly, marks unverified ones and drops expired ones', () => {
+    const out = formatBusinessFacts(
+      [
+        {
+          label: 'کارمزد',
+          value: 'رایگان',
+          category: 'PRICING',
+          verified: true,
+          validUntil: '2026-12-01',
+        },
+        {
+          label: 'سقف وام',
+          value: '۳۰۰ میلیون',
+          category: 'OFFER',
+          verified: false,
+          validUntil: null,
+        },
+        {
+          label: 'کمپین قدیمی',
+          value: 'x',
+          category: 'OFFER',
+          verified: true,
+          validUntil: '2020-01-01',
+        },
+      ],
+      new Date('2026-09-30'),
+    );
+    expect(out).toContain('[FACTS]');
+    expect(out).toContain('- [PRICING] کارمزد: رایگان (valid until 2026-12-01)');
+    expect(out).toMatch(/سقف وام: ۳۰۰ میلیون \(unverified/);
+    expect(out).not.toContain('کمپین قدیمی');
+    expect(formatBusinessFacts([], new Date())).toBe('');
+  });
+
+  it('turns terminology into binding rules', () => {
+    const out = formatBusinessTerms([
+      { term: 'ویپاد', kind: 'USE', alternatives: ['وی پاد'], note: 'نام برند' },
+      { term: 'بانک ویپاد', kind: 'AVOID', alternatives: ['شعبهٔ دیجیتال'], note: '' },
+    ]);
+    expect(out).toContain('- ALWAYS write "ویپاد" (never: "وی پاد") — نام برند');
+    expect(out).toContain('- NEVER write "بانک ویپاد"; use instead: "شعبهٔ دیجیتال"');
+  });
+
+  it('places facts and terms after the sections, before the assets', () => {
+    const out = formatBusiness({
+      ...business,
+      facts: [{ label: 'a', value: 'b', category: 'OTHER', verified: true, validUntil: null }],
+      terms: [{ term: 'ویپاد', kind: 'USE', alternatives: [], note: '' }],
+    });
+    expect(out.indexOf('[SERVICES]')).toBeLessThan(out.indexOf('[FACTS]'));
+    expect(out.indexOf('[FACTS]')).toBeLessThan(out.indexOf('[TERMINOLOGY]'));
+  });
+
+  it('tells section writers which sections are factual', () => {
+    expect(formatSectionSpec(['SERVICES'])).toContain('factual');
+    expect(formatSectionSpec(['PERSONAS'])).toContain('strategic');
+  });
+});
+
 describe('business context', () => {
   it('formats filled sections in the canonical order and skips empty ones', () => {
     const out = formatBusiness(business);
@@ -59,7 +142,8 @@ describe('business context', () => {
     const out = formatBusiness(long, { budget: 15_000 });
     expect(out).toContain('[truncated]');
     expect(out).toContain('[omitted — business profile budget exhausted]');
-    expect(out.length).toBeLessThan(16_000);
+    // Budget covers section text; headers and omission markers add a little on top.
+    expect(out.length).toBeLessThan(16_500);
   });
 
   it('names the business in the topic block', () => {
@@ -216,6 +300,7 @@ describe('business AI schemas', () => {
   const cases: [AiJobType, ZodType<unknown>, string][] = [
     ['BUSINESS_DISCOVER', BusinessDiscoveryResultSchema, '<count>2</count>'],
     ['BUSINESS_BUILD', BusinessBuildResultSchema, '<business_name>ویپاد</business_name>'],
+    ['BUSINESS_AUDIT', BusinessAuditResultSchema, '<business>x</business>'],
     [
       'BUSINESS_SUGGEST',
       BusinessSuggestResultSchema,

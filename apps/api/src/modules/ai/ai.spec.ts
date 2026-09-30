@@ -108,6 +108,7 @@ describe('renderTemplate', () => {
         'description',
         'text',
       ],
+      business_audit: ['language', 'sections_spec', 'business', 'gaps', 'standing_notes'],
     };
     expect(Object.keys(allowed).sort()).toEqual(DEFAULT_PROMPTS.map((p) => p.key).sort());
     for (const p of DEFAULT_PROMPTS) {

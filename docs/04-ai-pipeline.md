@@ -53,6 +53,7 @@
 | `business_discover` | `language`، `count`، `keyword`، `location`، `notes`، `research` |
 | `business_build` | `language`، `business_name`، `sections_spec`، `business`، `instruction`، `research` |
 | `business_suggest` | `language`، `business`، `requested_sections`، `instruction`، `research` |
+| `business_audit` | `language`، `sections_spec`، `business`، `gaps`، `standing_notes` ([16-business-profile-quality.md](16-business-profile-quality.md)) |
 
 اگر نسخهٔ ویرایش‌شدهٔ یک پرامپت در بک‌آفیس متغیر `{{business}}` یا `{{brand_docs}}` را نداشته باشد، `AiExecutor` بلوک `<business>` / `<brand_guidelines>` را به ابتدای پیام کاربر اضافه می‌کند تا پروفایل کسب‌وکار و اسناد برند هرگز جا نمانند.
 

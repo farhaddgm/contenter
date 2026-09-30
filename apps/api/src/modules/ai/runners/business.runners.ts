@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AiJob, Prisma } from '@prisma/client';
 import {
+  BUSINESS_FACT_LIMIT,
   BusinessBuildResultSchema,
   BusinessDiscoveryResultSchema,
   BusinessSectionKey,
@@ -9,6 +10,7 @@ import {
   isSourceBlocked,
   sourceBlockValue,
   suggestScope,
+  type ResearchedFact,
   type ResearchScope,
   type WebSource,
 } from '@contenter/shared';
@@ -152,6 +154,56 @@ export async function consult(
   return { notes, research, blocked, references: refs.length };
 }
 
+const MAX_RESEARCHED_FACTS = 25;
+
+/**
+ * Saves the key facts a build found, unverified. A fact the admin entered (same label) is never
+ * touched; an earlier AI fact with the same label is updated. Returns how many were written.
+ */
+export async function saveResearchedFacts(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  found: ResearchedFact[],
+  blocked: BlockRule[],
+): Promise<number> {
+  const existing = await tx.businessFact.findMany({ where: { businessId } });
+  const byLabel = new Map(existing.map((f) => [f.label.trim().toLowerCase(), f]));
+  let room = BUSINESS_FACT_LIMIT - existing.length;
+  let written = 0;
+  for (const f of found.slice(0, MAX_RESEARCHED_FACTS)) {
+    const label = f.label.trim().slice(0, 200);
+    const value = f.value.trim().slice(0, 1000);
+    if (!label || !value) continue;
+    const url = cleanUrl(f.sourceUrl);
+    const sourceUrl = url && !isSourceBlocked(url, blocked) ? url : '';
+    const prev = byLabel.get(label.toLowerCase());
+    if (prev) {
+      if (prev.source === 'ADMIN' || prev.value === value) continue;
+      await tx.businessFact.update({
+        where: { id: prev.id },
+        data: { value, category: f.category, sourceUrl, verified: false, updatedById: null },
+      });
+    } else {
+      if (room <= 0) continue;
+      await tx.businessFact.create({
+        data: {
+          businessId,
+          label,
+          value,
+          category: f.category,
+          sourceUrl,
+          source: 'AI',
+          verified: false,
+        },
+      });
+      byLabel.set(label.toLowerCase(), { source: 'AI', value } as (typeof existing)[number]);
+      room--;
+    }
+    written++;
+  }
+  return written;
+}
+
 /**
  * Keyword → web research → real business candidates. The admin then picks one
  * (BusinessesService.selectCandidate), which creates the business and queues BUSINESS_BUILD.
@@ -279,7 +331,7 @@ export class BusinessBuildRunner implements AiRunner {
     };
     const b = await this.prisma.business.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { sections: true, assets: BUSINESS_PROMPT_INCLUDE.assets },
+      include: { ...BUSINESS_PROMPT_INCLUDE, sections: true },
     });
     const known = formatBusiness(b);
     const directive = withStandingNotes(instruction, await this.ctx.standingNotes(b.id));
@@ -325,6 +377,7 @@ export class BusinessBuildRunner implements AiRunner {
     const seen = new Set<string>();
     let written = 0;
     let suggested = 0;
+    let facts = 0;
     await this.prisma.$transaction(async (tx) => {
       for (const s of data.sections) {
         const content = s.content.trim();
@@ -358,6 +411,7 @@ export class BusinessBuildRunner implements AiRunner {
           written++;
         }
       }
+      facts = await saveResearchedFacts(tx, b.id, data.facts, blocked);
       await tx.business.update({
         where: { id: b.id },
         data: {
@@ -389,6 +443,7 @@ export class BusinessBuildRunner implements AiRunner {
         businessId: b.id,
         sectionsWritten: written,
         suggestions: suggested,
+        facts,
         scope,
         references,
         sources: research?.sources.length ?? 0,
@@ -438,7 +493,7 @@ export class BusinessSuggestRunner implements AiRunner {
     if (!keys.length) throw new NonRetryableAiError('No sections were requested');
     const b = await this.prisma.business.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { sections: true, assets: BUSINESS_PROMPT_INCLUDE.assets },
+      include: { ...BUSINESS_PROMPT_INCLUDE, sections: true },
     });
 
     const { notes, research, blocked, references } = await consult(this.prisma, this.ai, {

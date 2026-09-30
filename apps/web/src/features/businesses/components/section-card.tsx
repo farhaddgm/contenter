@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Check, History, Pencil, Sparkles, X } from 'lucide-react';
+import { Check, CheckCheck, History, Pencil, ShieldAlert, Sparkles, X } from 'lucide-react';
 import {
   BUSINESS_SECTION_MAX_CHARS,
+  BUSINESS_SECTION_META,
   type BusinessSection,
   type BusinessSectionKey,
   type BusinessSuggestion,
@@ -23,6 +24,7 @@ import {
   useSectionRevisions,
   useUpdateSection,
 } from '../api/businesses';
+import { useReviewSection } from '../api/profile-knowledge';
 
 type Editing = { suggestionId: string | null; text: string } | null;
 
@@ -48,10 +50,13 @@ export function SectionCard({
   const save = useUpdateSection(businessId);
   const accept = useAcceptSuggestion();
   const dismiss = useDismissSuggestion();
+  const review = useReviewSection(businessId);
   const [editing, setEditing] = useState<Editing>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const content = section?.content.trim() ?? '';
   const title = t(`enums.businessSection.${sectionKey}`);
+  const unreviewed = !!content && section?.source === 'AI' && !section.reviewedAt;
+  const thin = !!content && content.length < BUSINESS_SECTION_META[sectionKey].minChars;
 
   const submitEdit = () => {
     if (!editing) return;
@@ -92,6 +97,13 @@ export function SectionCard({
                 {t(`enums.sectionSource.${section.source}`)}
               </Badge>
             )}
+            {unreviewed && (
+              <Badge tone="warning">
+                <ShieldAlert />
+                {t('businesses.review.unreviewed')}
+              </Badge>
+            )}
+            {thin && <Badge tone="outline">{t('businesses.review.thin')}</Badge>}
             {suggestions.length > 0 && (
               <Badge tone="warning">
                 <Sparkles />
@@ -166,15 +178,46 @@ export function SectionCard({
           </div>
         ) : content ? (
           <>
-            <MarkdownView>{content}</MarkdownView>
-            {section?.updatedBy && (
-              <p className="text-xs text-muted-foreground">
-                {t('businesses.updatedBy', {
-                  name: section.updatedBy.name,
-                  date: formatDate(section.updatedAt),
-                })}
-              </p>
+            {unreviewed && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2">
+                <p className="text-xs leading-6">{t('businesses.review.hint')}</p>
+                {editable && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<CheckCheck />}
+                    isLoading={review.isPending}
+                    onClick={() =>
+                      review.mutate(sectionKey, {
+                        onSuccess: () => notify.success(t('businesses.review.confirmed')),
+                        onError: (e) => notify.error(t('common.error'), e.message),
+                      })
+                    }
+                  >
+                    {t('businesses.review.confirm')}
+                  </Button>
+                )}
+              </div>
             )}
+            <MarkdownView>{content}</MarkdownView>
+            <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+              {section?.updatedBy && (
+                <span>
+                  {t('businesses.updatedBy', {
+                    name: section.updatedBy.name,
+                    date: formatDate(section.updatedAt),
+                  })}
+                </span>
+              )}
+              {section?.reviewedAt && section.reviewedBy && section.source === 'AI' && (
+                <span>
+                  {t('businesses.review.reviewedBy', {
+                    name: section.reviewedBy.name,
+                    date: formatDate(section.reviewedAt),
+                  })}
+                </span>
+              )}
+            </p>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">{t('businesses.sectionEmpty')}</p>
