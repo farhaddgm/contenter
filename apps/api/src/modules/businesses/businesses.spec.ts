@@ -5,6 +5,8 @@ import {
   BusinessDiscoveryResultSchema,
   BusinessSectionKey,
   BusinessSuggestResultSchema,
+  isSourceBlocked,
+  sourceBlockValue,
   type AiJobType,
 } from '@contenter/shared';
 import type { ZodType } from 'zod';
@@ -16,6 +18,7 @@ import { templateVariables } from '../ai/prompts/render';
 import { mergeSources, sumUsage } from '../ai/provider/ai-provider';
 import { collectResearch, webSearchToolType } from '../ai/provider/anthropic.provider';
 import { MockProvider } from '../ai/provider/mock.provider';
+import { blocklistNote, filterSources, searchToolBlocklist } from '../ai/source-blocklist';
 import { toStrictJsonSchema } from '../ai/provider/openai.provider';
 import { cleanUrl } from './section-writer';
 
@@ -235,5 +238,46 @@ describe('business AI schemas', () => {
     });
     expect(res.text).toContain('mock');
     expect(res.sources.length).toBeGreaterThan(0);
+  });
+});
+
+describe('research source blocklist', () => {
+  const rules = [
+    { kind: 'DOMAIN' as const, value: 'spam.com' },
+    { kind: 'URL' as const, value: 'news.ir/article/12' },
+    { kind: 'URL' as const, value: 'root.org' },
+  ];
+
+  it('normalizes block values', () => {
+    expect(sourceBlockValue('https://www.Spam.com/a/b?x=1', 'DOMAIN')).toBe('spam.com');
+    expect(sourceBlockValue('https://www.news.ir/article/12/?utm=1#top', 'URL')).toBe(
+      'news.ir/article/12',
+    );
+    expect(sourceBlockValue('example.com', 'DOMAIN')).toBe('example.com');
+    expect(sourceBlockValue('not a url', 'URL')).toBeNull();
+    expect(sourceBlockValue('javascript:alert(1)', 'DOMAIN')).toBeNull();
+  });
+
+  it('matches whole sites with subdomains, and single pages exactly', () => {
+    expect(isSourceBlocked('https://blog.spam.com/post', rules)).toBe(true);
+    expect(isSourceBlocked('http://spam.com', rules)).toBe(true);
+    expect(isSourceBlocked('https://notspam.com', rules)).toBe(false);
+    expect(isSourceBlocked('https://news.ir/article/12/', rules)).toBe(true);
+    expect(isSourceBlocked('https://news.ir/article/13', rules)).toBe(false);
+    expect(isSourceBlocked('https://root.org/', rules)).toBe(true);
+    expect(isSourceBlocked('https://root.org/other', rules)).toBe(false);
+    expect(isSourceBlocked('https://spam.com', [])).toBe(false);
+  });
+
+  it('filters sources and builds the search-tool list and prompt note', () => {
+    const sources = [
+      { url: 'https://a.spam.com/x', title: 'A' },
+      { url: 'https://ok.com', title: 'OK' },
+    ];
+    expect(filterSources(sources, rules)).toEqual([{ url: 'https://ok.com', title: 'OK' }]);
+    // A site-root URL rule must not block the whole host at the vendor.
+    expect(searchToolBlocklist(rules)).toEqual(['spam.com', 'news.ir/article/12']);
+    expect(blocklistNote([])).toBe('');
+    expect(blocklistNote(rules)).toContain('- spam.com (whole site');
   });
 });

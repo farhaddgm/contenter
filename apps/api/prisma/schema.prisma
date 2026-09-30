@@ -40,19 +40,22 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  refreshTokens      RefreshToken[]
-  auditLogs          AuditLog[]
-  aiJobs             AiJob[]
-  topics             Topic[]
-  interactionLogs    InteractionLog[]
-  appErrors          AppError[]
-  smartConversations SmartConversation[]
-  walkerIssues       WalkerIssue[]
-  brandDocuments     BrandDocument[]
-  businesses         Business[]
-  businessSections   BusinessSection[]
-  sectionRevisions   BusinessSectionRevision[]
-  businessDiscovery  BusinessDiscovery[]
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+  aiJobs              AiJob[]
+  topics              Topic[]
+  interactionLogs     InteractionLog[]
+  appErrors           AppError[]
+  smartConversations  SmartConversation[]
+  walkerIssues        WalkerIssue[]
+  brandDocuments      BrandDocument[]
+  businesses          Business[]
+  businessSections    BusinessSection[]
+  sectionRevisions    BusinessSectionRevision[]
+  businessDiscovery   BusinessDiscovery[]
+  blockedSources      BlockedSource[]
+  businessReferences  BusinessReference[]
+  googleDriveAccounts GoogleDriveAccount[]
 }
 
 model RefreshToken {
@@ -81,6 +84,7 @@ enum BusinessStatus {
 enum BusinessOrigin {
   MANUAL
   RESEARCH
+  SOURCES
 }
 
 enum BusinessBuildState {
@@ -153,6 +157,7 @@ model Business {
   sections    BusinessSection[]
   suggestions BusinessSuggestion[]
   discoveries BusinessDiscovery[]
+  references  BusinessReference[]
 
   @@index([status, updatedAt])
 }
@@ -231,6 +236,83 @@ model BusinessDiscovery {
   createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+}
+
+enum ReferenceKind {
+  URL
+  GOOGLE_DOC
+  TEXT
+}
+
+enum ReferenceStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+/// Admin-supplied source for AI builds/suggestions: a web page, a Google Docs/Drive file or a
+/// pasted text. `content` is the text snapshot AI reads (refreshed on demand).
+model BusinessReference {
+  id              String          @id @default(cuid())
+  businessId      String
+  kind            ReferenceKind
+  url             String          @default("")
+  title           String          @default("")
+  content         String          @default("")
+  status          ReferenceStatus @default(PENDING)
+  error           String?
+  isActive        Boolean         @default(true)
+  fetchedAt       DateTime?
+  googleAccountId String?
+  createdById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  googleAccount GoogleDriveAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)
+  createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+}
+
+/// Google account connected (OAuth, drive.readonly) to read private Google Docs/Drive files.
+model GoogleDriveAccount {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  googleSub     String
+  /// AES-256-GCM encrypted refresh token (see secret-box.ts)
+  refreshToken  String
+  scope         String    @default("")
+  /// Set when Google rejects the token (revoked / expired) — reconnect to clear
+  error         String?
+  lastUsedAt    DateTime?
+  connectedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  connectedBy User?               @relation(fields: [connectedById], references: [id], onDelete: SetNull)
+  references  BusinessReference[]
+}
+
+enum SourceBlockKind {
+  URL
+  DOMAIN
+}
+
+/// Research source the admin blacklisted: excluded from every future web research and purged
+/// from stored business/discovery sources.
+model BlockedSource {
+  id          String          @id @default(cuid())
+  kind        SourceBlockKind
+  /// `host/path` for URL, `host` for DOMAIN (normalized — see sourceBlockValue in shared)
+  value       String
+  note        String          @default("")
+  createdById String?
+  createdAt   DateTime        @default(now())
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([kind, value])
 }
 
 // ─────────────────────────────── Topics ───────────────────────────────

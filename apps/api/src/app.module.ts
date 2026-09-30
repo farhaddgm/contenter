@@ -18,6 +18,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { SamplesModule } from './modules/samples/samples.module';
 import { GoogleAccessModule } from './modules/google-access/google-access.module';
+import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { TopicsModule } from './modules/topics/topics.module';
 import { UsersModule } from './modules/users/users.module';
@@ -37,6 +38,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     AiModule,
     UsersModule,
     GoogleAccessModule,
+    GoogleDriveModule,
     BusinessesModule,
     TopicsModule,
     SamplesModule,

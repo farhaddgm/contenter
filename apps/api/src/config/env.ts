@@ -44,6 +44,21 @@ const EnvSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   /**
+   * "Connect Google account" for reading private Google Docs (same OAuth client as sign-in).
+   * Default: GOOGLE_REDIRECT_URI with `/auth/google/callback` → `/google-drive/callback`.
+   */
+  GOOGLE_DRIVE_REDIRECT_URI: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** Encrypts stored OAuth refresh tokens. Default: derived from JWT_REFRESH_SECRET. */
+  DATA_ENCRYPTION_KEY: z
+    .string()
+    .min(16)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /**
    * mock = placeholder output, no vendor calls. Any other value = live: each task goes to the
    * vendor of the model chosen in the back office (`anthropic`/`openai` are kept as aliases).
    */

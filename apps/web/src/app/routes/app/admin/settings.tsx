@@ -21,6 +21,7 @@ import { useT } from '@/i18n';
 import { useUser } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { useAiSettings, useUpdateAiSettings } from '@/features/admin/api';
+import { GoogleDriveCard } from '@/features/businesses/components/google-drive-card';
 import { GoogleAccessCard } from '@/features/settings/components/google-access-card';
 import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
@@ -247,6 +248,9 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
           <GoogleAccessCard />
         </div>
       )}
+      <div className="mt-6">
+        <GoogleDriveCard />
+      </div>
       <div className="mt-6">
         <SmartSettingsCard />
       </div>

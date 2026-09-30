@@ -18,6 +18,10 @@ export interface ResearchRequest {
   user: string;
   /** Upper bound on web searches for this request. */
   maxSearches: number;
+  /** `host` / `host/path` values the vendor search must skip (where the tool supports it). */
+  blockedDomains?: string[];
+  /** When set, the vendor search may only return pages of these hosts (subdomains included). */
+  allowedDomains?: string[];
   maxTokens?: number;
 }
 

@@ -37,5 +37,6 @@ docker compose exec api npx -w @contenter/api prisma db seed   # فقط بار �
 - [ ] `FETCH_ALLOW_PRIVATE=false`
 - [ ] رمز ادمین seed تغییر کرده باشد
 - [ ] برای ورود با گوگل: `APP_URL` و `GOOGLE_REDIRECT_URI` روی دامنهٔ HTTPS، و redirect URI در Google Cloud ثبت شده باشد
+- [ ] برای خواندن اسناد خصوصی Google Docs: Drive API فعال، redirect URI `/api/google-drive/callback` ثبت و scope `drive.readonly` اضافه شده باشد ([14-business-references.md](14-business-references.md))
 - [ ] پشتیبان‌گیری منظم از PostgreSQL
 - [ ] پایش `/api/health` و صفحهٔ «کارهای AI» برای خطاها

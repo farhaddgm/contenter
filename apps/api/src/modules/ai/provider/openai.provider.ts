@@ -68,7 +68,10 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  /** Web research with the Responses API `web_search` tool (runs on OpenAI's side). */
+  /**
+   * Web research with the Responses API `web_search` tool (runs on OpenAI's side). The tool only
+   * supports an allow-list, so blocked sources rely on the request note and the source filter.
+   */
   async research(req: ResearchRequest): Promise<ResearchResult> {
     if (!this.client) {
       throw new NonRetryableAiError(
@@ -85,7 +88,15 @@ export class OpenAiProvider implements AiProvider {
           model: req.model,
           instructions: req.system,
           input: [{ role: 'user', content: [{ type: 'input_text', text: req.user }] }],
-          tools: [{ type: 'web_search', search_context_size: 'high' }],
+          tools: [
+            {
+              type: 'web_search',
+              search_context_size: 'high',
+              ...(req.allowedDomains?.length
+                ? { filters: { allowed_domains: req.allowedDomains } }
+                : {}),
+            },
+          ],
           include: ['web_search_call.action.sources'],
           max_tool_calls: req.maxSearches,
           max_output_tokens: req.maxTokens ?? 32_000,

@@ -45,6 +45,12 @@
 | POST | `/business-suggestions/:id/accept`، `/business-suggestions/:id/dismiss` | پذیرش (با ویرایش اختیاری) / رد |
 | GET / POST | `/business-discoveries`، GET `/business-discoveries/:id` | تحقیق کلیدواژه (`BUSINESS_DISCOVER`) |
 | POST | `/business-discoveries/:id/select` | `{ index }` — تأیید کاندیدا، ساخت کسب‌وکار و شروع `BUSINESS_BUILD` |
+| POST | `/businesses/:id/sources/remove`، `/business-discoveries/:id/sources/remove` | `{ url, block }` — حذف منبع تحقیق و در صورت نیاز افزودن به فهرست سیاه (مسدودسازی فقط ADMIN) |
+| GET / POST / DELETE | `/source-blocklist`، `/source-blocklist/:id` | فهرست سیاه منابع تحقیق (تغییر فقط ADMIN) |
+| POST | `/businesses/from-references` | ساخت کسب‌وکار از لینک‌ها/متن ادمین و شروع `BUSINESS_BUILD` ([14-business-references.md](14-business-references.md)) |
+| GET / POST | `/businesses/:id/references` | منابع مرجع AI: فهرست / افزودن لینک یا متن |
+| GET / PATCH / DELETE | `/business-references/:id`، POST `…/refresh` | متن ذخیره‌شده، فعال/غیرفعال، خواندن دوباره، حذف |
+| GET | `/google-drive`، POST `/google-drive/connect`، DELETE `/google-drive/accounts/:id` | حساب‌های گوگل متصل برای اسناد خصوصی (اتصال/قطع فقط ADMIN) |
 
 جزئیات بدنه‌ها و پاسخ‌ها: [12-businesses.md](12-businesses.md).
 

@@ -36,7 +36,10 @@ import {
 import { BuildDialog, SuggestDialog } from '@/features/businesses/components/ai-dialogs';
 import { BusinessFormDrawer } from '@/features/businesses/components/business-form';
 import { CompletenessBar } from '@/features/businesses/components/completeness-bar';
+import { useDriveResultNotice } from '@/features/businesses/components/google-drive-card';
+import { ReferencesCard } from '@/features/businesses/components/references-card';
 import { SectionCard } from '@/features/businesses/components/section-card';
+import { SourceList } from '@/features/businesses/components/source-dialogs';
 
 const SOURCES_PREVIEW = 12;
 
@@ -58,6 +61,7 @@ export default function BusinessRoute() {
     null,
   );
   const [allSources, setAllSources] = useState(false);
+  useDriveResultNotice();
 
   const invalidate = [businessKeys.one(businessId), businessKeys.suggestions(businessId)];
   const building = business?.buildState === 'BUILDING';
@@ -98,7 +102,7 @@ export default function BusinessRoute() {
             <Badge tone={statusTone[business.status]}>
               {t(`enums.businessStatus.${business.status}`)}
             </Badge>
-            <Badge tone={business.origin === 'RESEARCH' ? 'primary' : 'neutral'}>
+            <Badge tone={business.origin === 'MANUAL' ? 'neutral' : 'primary'}>
               {t(`enums.businessOrigin.${business.origin}`)}
             </Badge>
             {business.buildState !== 'NONE' && (
@@ -188,6 +192,7 @@ export default function BusinessRoute() {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
+            <ReferencesCard businessId={business.id} />
             <div>
               <h2 className="text-lg font-semibold">{t('businesses.profile')}</h2>
               <p className="text-sm text-muted-foreground">{t('businesses.profileHint')}</p>
@@ -315,21 +320,7 @@ export default function BusinessRoute() {
             {business.sources.length > 0 && (
               <Card>
                 <CardHeader title={t('businesses.sources')} />
-                <ul className="space-y-1.5 px-5 py-4 text-xs">
-                  {sources.map((s) => (
-                    <li key={s.url} className="truncate">
-                      <a
-                        href={s.url}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="text-primary hover:underline"
-                        title={s.url}
-                      >
-                        {s.title || s.url}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                <SourceList sources={sources} target={{ business: business.id }} />
                 {business.sources.length > SOURCES_PREVIEW && (
                   <div className="border-t px-3 py-2">
                     <Button size="sm" variant="ghost" onClick={() => setAllSources((v) => !v)}>
@@ -344,10 +335,17 @@ export default function BusinessRoute() {
       </div>
 
       {formOpen && <BusinessFormDrawer business={business} onOpenChange={setFormOpen} />}
-      {buildOpen && <BuildDialog businessId={business.id} onOpenChange={setBuildOpen} />}
+      {buildOpen && (
+        <BuildDialog
+          businessId={business.id}
+          hasWebsite={!!business.website}
+          onOpenChange={setBuildOpen}
+        />
+      )}
       {suggestKeys && (
         <SuggestDialog
           businessId={business.id}
+          hasWebsite={!!business.website}
           initialKeys={suggestKeys}
           emptyKeys={emptyKeys}
           onQueued={(id, keys) => setSuggestJob({ id, keys })}

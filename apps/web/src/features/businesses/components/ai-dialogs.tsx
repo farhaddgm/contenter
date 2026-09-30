@@ -1,13 +1,30 @@
 import { useState } from 'react';
 import { Globe, Sparkles } from 'lucide-react';
-import { BusinessSectionKey } from '@contenter/shared';
+import { BuildScope, BusinessSectionKey, ResearchScope } from '@contenter/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Field, Switch, Textarea } from '@/components/ui/form-controls';
+import { Field, Textarea } from '@/components/ui/form-controls';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
-import { useBuildBusiness, useSuggest } from '../api/businesses';
+import { useBuildBusiness, useReferences, useSuggest } from '../api/businesses';
+import { ScopePicker, scopeIsUsable, usableReferences, type ScopeValue } from './scope-picker';
+
+/** Starts on the admin's references when there are any; otherwise on `fallback`. */
+function useScope(businessId: string, fallback: ResearchScope, hasWebsite: boolean) {
+  const refs = useReferences(businessId);
+  const [chosen, setChosen] = useState<ScopeValue | null>(null);
+  const value: ScopeValue = chosen ?? {
+    scope: usableReferences(refs.data).length ? 'REFERENCES' : fallback,
+    referenceIds: null,
+  };
+  return {
+    value,
+    setValue: setChosen,
+    usable: scopeIsUsable(value, refs.data, hasWebsite),
+    payload: { scope: value.scope, referenceIds: value.referenceIds ?? undefined },
+  };
+}
 
 /**
  * Asks AI to propose the selected sections (BUSINESS_SUGGEST). Mounted only while open;
@@ -15,12 +32,14 @@ import { useBuildBusiness, useSuggest } from '../api/businesses';
  */
 export function SuggestDialog({
   businessId,
+  hasWebsite,
   initialKeys,
   emptyKeys,
   onQueued,
   onOpenChange,
 }: {
   businessId: string;
+  hasWebsite: boolean;
   initialKeys: BusinessSectionKey[];
   emptyKeys: BusinessSectionKey[];
   onQueued: (jobId: string, keys: BusinessSectionKey[]) => void;
@@ -30,7 +49,7 @@ export function SuggestDialog({
   const suggest = useSuggest(businessId);
   const [keys, setKeys] = useState<Set<BusinessSectionKey>>(new Set(initialKeys));
   const [instruction, setInstruction] = useState('');
-  const [useWebSearch, setUseWebSearch] = useState(false);
+  const scope = useScope(businessId, 'NONE', hasWebsite);
 
   const toggle = (k: BusinessSectionKey) =>
     setKeys((prev) => {
@@ -45,7 +64,7 @@ export function SuggestDialog({
       {
         keys: BusinessSectionKey.filter((k) => keys.has(k)),
         instruction: instruction.trim(),
-        useWebSearch,
+        ...scope.payload,
       },
       {
         onSuccess: (r) => {
@@ -73,7 +92,7 @@ export function SuggestDialog({
             icon={<Sparkles />}
             onClick={submit}
             isLoading={suggest.isPending}
-            disabled={!keys.size}
+            disabled={!keys.size || !scope.usable}
           >
             {t('businesses.suggest.submit')}
           </Button>
@@ -128,15 +147,12 @@ export function SuggestDialog({
             />
           )}
         </Field>
-        <Switch
-          checked={useWebSearch}
-          onCheckedChange={setUseWebSearch}
-          label={
-            <span className="flex items-center gap-1.5">
-              <Globe className="size-4 text-muted-foreground" />
-              {t('businesses.suggest.webSearch')}
-            </span>
-          }
+        <ScopePicker
+          businessId={businessId}
+          scopes={ResearchScope}
+          value={scope.value}
+          onChange={scope.setValue}
+          hasWebsite={hasWebsite}
         />
       </div>
     </Dialog>
@@ -149,20 +165,24 @@ export function SuggestDialog({
  */
 export function BuildDialog({
   businessId,
+  hasWebsite,
   onOpenChange,
 }: {
   businessId: string;
+  hasWebsite: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
   const t = useT();
   const build = useBuildBusiness(businessId);
   const [instruction, setInstruction] = useState('');
+  const scope = useScope(businessId, 'WEB', hasWebsite);
   return (
     <Dialog
       open
       onOpenChange={onOpenChange}
       title={t('businesses.buildTitle')}
       description={t('businesses.buildBody')}
+      className="max-w-2xl"
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -171,9 +191,14 @@ export function BuildDialog({
           <Button
             icon={<Globe />}
             isLoading={build.isPending}
+            disabled={!scope.usable}
             onClick={() =>
               build.mutate(
-                { instruction: instruction.trim() },
+                {
+                  instruction: instruction.trim(),
+                  scope: scope.payload.scope as BuildScope,
+                  referenceIds: scope.payload.referenceIds,
+                },
                 {
                   onSuccess: () => {
                     notify.info(t('businesses.buildQueued'));
@@ -189,21 +214,30 @@ export function BuildDialog({
         </>
       }
     >
-      <Field
-        label={t('businesses.instruction')}
-        hint={t('businesses.instructionHint')}
-        optional={t('common.optional')}
-      >
-        {(id) => (
-          <Textarea
-            id={id}
-            rows={3}
-            value={instruction}
-            maxLength={2000}
-            onChange={(e) => setInstruction(e.target.value)}
-          />
-        )}
-      </Field>
+      <div className="space-y-5">
+        <ScopePicker
+          businessId={businessId}
+          scopes={BuildScope}
+          value={scope.value}
+          onChange={scope.setValue}
+          hasWebsite={hasWebsite}
+        />
+        <Field
+          label={t('businesses.instruction')}
+          hint={t('businesses.instructionHint')}
+          optional={t('common.optional')}
+        >
+          {(id) => (
+            <Textarea
+              id={id}
+              rows={3}
+              value={instruction}
+              maxLength={2000}
+              onChange={(e) => setInstruction(e.target.value)}
+            />
+          )}
+        </Field>
+      </div>
     </Dialog>
   );
 }

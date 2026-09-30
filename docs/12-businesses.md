@@ -79,6 +79,28 @@
 
 هر دو فراخوانی با مدل و effort همان نوع کار (از «تنظیمات AI») اجرا می‌شوند و مصرفشان جمع زده می‌شود. سقف جست‌وجو: یافتن ۱۰، ساخت ۱۲، پیشنهاد ۶.
 
+### حذف منبع و فهرست سیاه منابع
+
+کنار هر منبع در کارت «منابع تحقیق» (صفحهٔ کسب‌وکار و صفحهٔ تحقیق کلیدواژه) دکمهٔ حذف هست. پنجرهٔ حذف سه حالت دارد:
+
+1. **فقط حذف از این فهرست** (ADMIN/EDITOR) — منبع از `sources` همین کسب‌وکار/تحقیق برداشته می‌شود؛ ممکن است تحقیق بعدی دوباره پیدایش کند.
+2. **حذف و مسدود کردن همین صفحه** (فقط ADMIN) — قاعدهٔ `URL` با مقدار `host/path` (بدون `www.`، پروتکل، query و `/` پایانی).
+3. **حذف و مسدود کردن کل سایت** (فقط ADMIN) — قاعدهٔ `DOMAIN` با مقدار `host`؛ زیردامنه‌ها را هم می‌گیرد.
+
+قاعده‌ها در جدول `BlockedSource` (سراسری، برای همهٔ کسب‌وکارها) ذخیره می‌شوند و با افزودن هر قاعده، منابع منطبق از **همهٔ** کسب‌وکارها و تحقیق‌ها (و لینک منابع کاندیداها) پاک می‌شوند. فهرست کامل از دکمهٔ «منابع مسدود» در صفحهٔ کسب‌وکارها دیده می‌شود؛ ادمین همان‌جا می‌تواند دستی صفحه/دامنه اضافه کند یا قاعده را بردارد.
+
+اثر در تحقیق‌های بعدی (`AiExecutor.research()`؛ هر سه کار `BUSINESS_DISCOVER`، `BUSINESS_BUILD` و `BUSINESS_SUGGEST` با جست‌وجو):
+
+- Claude: قاعده‌ها به `blocked_domains` ابزار جست‌وجو داده می‌شوند، پس نتایجشان اصلاً برنمی‌گردد (قاعدهٔ `URL` روی ریشهٔ سایت استثناست تا کل سایت مسدود نشود).
+- OpenAI: ابزار `web_search` فقط فهرست مجاز دارد، نه فهرست سیاه؛ بنابراین به دستور متنی و فیلتر خروجی تکیه می‌شود.
+- همهٔ ارائه‌دهنده‌ها: بلوک `<blocked_sources>` به پیام تحقیق اضافه می‌شود (تا ۲۰۰ قاعده) و منابع برگشتی و منابع ادغام‌شده فیلتر می‌شوند.
+
+حذف منبع متن بخش‌هایی را که قبلاً از آن نوشته شده خودکار تغییر نمی‌دهد؛ برای بازسازی، «ساخت با تحقیق وب» را دوباره اجرا کنید.
+
+### منابع مرجع ادمین و دامنهٔ مراجعهٔ AI
+
+ادمین می‌تواند به‌جای (یا در کنار) جست‌وجوی وب، منابع خودش را بدهد: لینک صفحه، سند Google Docs (حتی خصوصی، با اتصال حساب گوگل) یا متن. ساخت و پیشنهاد یک «دامنهٔ مراجعه» می‌گیرند: فقط منابع مرجع، منابع + سایت‌های همان منابع، یا منابع + کل اینترنت. «ساخت از منابع من» در صفحهٔ کسب‌وکارها کل این مسیر را یک‌جا انجام می‌دهد. جزئیات کامل: [14-business-references.md](14-business-references.md).
+
 ## هزینه
 
 هزینهٔ کار = توکن‌های هر دو مرحله + ۰٫۰۱ دلار برای هر جست‌وجوی وب (هر دو فروشنده حدود ۱۰ دلار برای ۱۰۰۰ جست‌وجو). در حالت `AI_PROVIDER=mock` جست‌وجویی انجام نمی‌شود و داده‌ها آزمایشی‌اند.
@@ -90,6 +112,7 @@
 - `BusinessSectionRevision` — متن قبلی هر بخش
 - `BusinessSuggestion` — `key`، `content`، `rationale`، `status` (`PENDING` / `ACCEPTED` / `DISMISSED`)، `jobId`
 - `BusinessDiscovery` — `keyword`، `location`، `language`، `count`، `notes`، `status` (`RESEARCHING` / `READY` / `FAILED` / `USED`)، `summary`، `candidates` (JSON)، `sources`، `selectedIndex`، `businessId`
+- `BlockedSource` — `kind` (`URL` / `DOMAIN`)، `value` (نرمال‌شده، `(kind, value)` یکتا)، `note`، `createdById`
 - `Topic.businessId` — اتصال اختیاری (`onDelete: SetNull`)
 
 ## API
@@ -112,8 +135,12 @@
 | GET / POST | `/business-discoveries` | ۲۰ تحقیق اخیر / شروع تحقیق `{ keyword, location?, language, count, notes? }` ← `{ id, jobId }` |
 | GET | `/business-discoveries/:id` | نتیجهٔ تحقیق |
 | POST | `/business-discoveries/:id/select` | `{ index }` ← `{ businessId, jobId }` — تأیید کاندیدا و شروع ساخت |
+| POST | `/businesses/:id/sources/remove` | `{ url, block: NONE \| URL \| DOMAIN }` ← `{ removed, blocked }` — حذف منبع (مسدودسازی فقط ADMIN) |
+| POST | `/business-discoveries/:id/sources/remove` | همان، برای منابع تحقیق کلیدواژه |
+| GET / POST | `/source-blocklist` | فهرست سیاه / افزودن `{ kind, value, note? }` (فقط ADMIN) |
+| DELETE | `/source-blocklist/:id` | برداشتن قاعده (فقط ADMIN) |
 
-همهٔ تغییرات مهم در لاگ ممیزی ثبت می‌شوند (`business.create`، `business.section_update`، `business.suggestion_accept`، `business.create_from_research` و …).
+همهٔ تغییرات مهم در لاگ ممیزی ثبت می‌شوند (`business.create`، `business.section_update`، `business.suggestion_accept`، `business.create_from_research`، `business.source_remove`، `business.source_block`، `business.source_unblock` و …).
 
 ## پرامپت‌ها
 

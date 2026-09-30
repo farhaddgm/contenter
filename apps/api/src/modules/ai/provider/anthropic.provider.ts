@@ -184,7 +184,17 @@ export class AnthropicProvider implements AiProvider {
             },
           ],
           tools: [
-            { type: webSearchToolType(req.model), name: 'web_search', max_uses: req.maxSearches },
+            {
+              type: webSearchToolType(req.model),
+              name: 'web_search',
+              max_uses: req.maxSearches,
+              // The tool accepts an allow-list or a block-list, never both.
+              ...(req.allowedDomains?.length
+                ? { allowed_domains: req.allowedDomains }
+                : req.blockedDomains?.length
+                  ? { blocked_domains: req.blockedDomains }
+                  : {}),
+            },
           ],
           messages,
           ...(this.refusalFallback ? { betas: [REFUSAL_FALLBACK_BETA], fallbacks: 'default' } : {}),

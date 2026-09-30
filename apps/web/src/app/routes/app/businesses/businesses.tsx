@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Building2, Globe, Plus, Search, Sparkles } from 'lucide-react';
+import { Ban, BookOpen, Building2, Globe, Plus, Search, Sparkles } from 'lucide-react';
 import { BusinessSectionKey, type BusinessStatus } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ import { useBusinesses, useDiscoveries } from '@/features/businesses/api/busines
 import { BusinessFormDrawer } from '@/features/businesses/components/business-form';
 import { CompletenessBar } from '@/features/businesses/components/completeness-bar';
 import { DiscoverDialog } from '@/features/businesses/components/discover-dialog';
+import { FromSourcesDialog } from '@/features/businesses/components/from-sources-dialog';
+import { BlocklistDialog } from '@/features/businesses/components/source-dialogs';
 import { formatNumber, formatRelative } from '@/utils/format';
 
 function RecentDiscoveries() {
@@ -63,6 +65,8 @@ export default function BusinessesRoute() {
   const navigate = useNavigate();
   const [formOpen, setFormOpen] = useState(false);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [blocklistOpen, setBlocklistOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<BusinessStatus | ''>('ACTIVE');
@@ -74,8 +78,14 @@ export default function BusinessesRoute() {
       <Button icon={<Sparkles />} onClick={() => setDiscoverOpen(true)}>
         {t('businesses.autoCreate')}
       </Button>
+      <Button variant="outline" icon={<BookOpen />} onClick={() => setSourcesOpen(true)}>
+        {t('businesses.fromSources.open')}
+      </Button>
       <Button variant="outline" icon={<Plus />} onClick={() => setFormOpen(true)}>
         {t('businesses.new')}
+      </Button>
+      <Button variant="ghost" icon={<Ban />} onClick={() => setBlocklistOpen(true)}>
+        {t('businesses.blocklist.open')}
       </Button>
     </Authorization>
   );
@@ -192,6 +202,8 @@ export default function BusinessesRoute() {
         />
       )}
       {discoverOpen && <DiscoverDialog onOpenChange={setDiscoverOpen} />}
+      {blocklistOpen && <BlocklistDialog onOpenChange={setBlocklistOpen} />}
+      {sourcesOpen && <FromSourcesDialog onOpenChange={setSourcesOpen} />}
     </>
   );
 }

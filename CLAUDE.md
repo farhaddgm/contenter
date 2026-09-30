@@ -17,6 +17,10 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 - Dialogs with local state mount only while open (no reset-in-effect; react-hooks v7 rules).
 - Docs are in Persian under `docs/`; update them with behavior changes.
 
+## Businesses (docs/12-businesses.md, docs/14-business-references.md)
+- AI builds/suggestions take a `ResearchScope`; `consult()` in `business.runners.ts` assembles references + web notes into the `research` prompt variable.
+- References are read into a text snapshot in the request path (`ReferencesService`, no AI); runners only read the snapshot. Private Google Docs go through `GoogleDriveService` (encrypted refresh tokens via `SecretBox`).
+
 ## Smart (docs/10-smart.md)
 - Walker steps: `WalkerStepKey` in `packages/shared/src/smart.ts`; server progress in `WalkerProgressService`, client routing in `apps/web/src/features/smart/walker-steps.ts`.
 - Errors: 5xx are recorded by `AllExceptionsFilter` → `ErrorTrackerService`; browser errors go through `lib/smart-bus.ts` → `lib/error-reporter.ts`. Don't record 4xx.
