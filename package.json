@@ -1,7 +1,7 @@
 {
   "name": "contenter",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI-assisted content production platform",
   "workspaces": [
     "packages/*",
