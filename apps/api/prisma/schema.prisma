@@ -50,7 +50,9 @@ model User {
   walkerIssues        WalkerIssue[]
   brandDocuments      BrandDocument[]
   businesses          Business[]
-  businessSections    BusinessSection[]
+  businessSections    BusinessSection[]         @relation("SectionUpdatedBy")
+  reviewedSections    BusinessSection[]         @relation("SectionReviewedBy")
+  businessFacts       BusinessFact[]
   sectionRevisions    BusinessSectionRevision[]
   businessDiscovery   BusinessDiscovery[]
   blockedSources      BlockedSource[]
@@ -109,6 +111,9 @@ enum BusinessSectionKey {
   CONTENT_PILLARS
   GUIDELINES
   CHANNELS
+  GOALS
+  FAQ
+  CALENDAR
 }
 
 enum SectionSource {
@@ -162,24 +167,31 @@ model Business {
   references  BusinessReference[]
   notes       BusinessNote[]
   assets      BusinessAsset[]
+  facts       BusinessFact[]
+  terms       BusinessTerm[]
+  audits      BusinessAudit[]
 
   @@index([status, updatedAt])
 }
 
 /// One profile section of a business (services, personas, brand book, …). Markdown text.
 model BusinessSection {
-  id          String             @id @default(cuid())
-  businessId  String
-  key         BusinessSectionKey
-  content     String             @default("")
-  source      SectionSource      @default(ADMIN)
-  updatedById String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id           String             @id @default(cuid())
+  businessId   String
+  key          BusinessSectionKey
+  content      String             @default("")
+  source       SectionSource      @default(ADMIN)
+  updatedById  String?
+  /// When a person confirmed the current text; null = AI text nobody has reviewed yet
+  reviewedAt   DateTime?
+  reviewedById String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  business  Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  updatedBy User?                     @relation(fields: [updatedById], references: [id], onDelete: SetNull)
-  revisions BusinessSectionRevision[]
+  business   Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy  User?                     @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  reviewedBy User?                     @relation("SectionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  revisions  BusinessSectionRevision[]
 
   @@unique([businessId, key])
 }
@@ -375,6 +387,91 @@ model BusinessAsset {
 
   business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+}
+
+enum FactCategory {
+  IDENTITY
+  OFFER
+  PRICING
+  NUMBERS
+  CONTACT
+  LEGAL
+  OTHER
+}
+
+/// Exact value content may quote (price, fee, limit, number, date, contact, license …).
+/// Admin-typed facts are verified; facts found by a research build start unverified.
+model BusinessFact {
+  id          String        @id @default(cuid())
+  businessId  String
+  label       String
+  value       String
+  category    FactCategory  @default(OTHER)
+  sourceUrl   String        @default("")
+  note        String        @default("")
+  source      SectionSource @default(ADMIN)
+  verified    Boolean       @default(true)
+  /// After this day the value is no longer sent to AI (offers, rates, campaigns)
+  validUntil  DateTime?
+  isActive    Boolean       @default(true)
+  updatedById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, category])
+}
+
+enum TermKind {
+  USE
+  AVOID
+}
+
+/// Brand terminology: USE = always write `term` (alternatives = wrong variants to catch);
+/// AVOID = never write `term` (alternatives = replacements). Checked by code (checkTerms).
+model BusinessTerm {
+  id           String   @id @default(cuid())
+  businessId   String
+  term         String
+  kind         TermKind @default(USE)
+  alternatives String[]
+  note         String   @default("")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+enum AuditStatus {
+  RUNNING
+  READY
+  FAILED
+}
+
+/// AI quality review of the whole profile (BUSINESS_AUDIT). `issues` holds AuditIssue[] with
+/// their OPEN / FIXING / DISMISSED state.
+model BusinessAudit {
+  id          String      @id @default(cuid())
+  businessId  String
+  status      AuditStatus @default(RUNNING)
+  score       Int?
+  summary     String      @default("")
+  strengths   String[]
+  issues      Json        @default("[]")
+  error       String?
+  jobId       String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, createdAt])
 }
@@ -762,6 +859,7 @@ enum AiJobType {
   BUSINESS_SUGGEST
   BUSINESS_REVISE
   BUSINESS_ASSET_ANALYZE
+  BUSINESS_AUDIT
 }
 
 enum AiJobStatus {

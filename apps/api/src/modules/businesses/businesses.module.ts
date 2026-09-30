@@ -71,6 +71,8 @@ import {
   BusinessAssetsService,
   BusinessNotesService,
 } from './notes-assets.service';
+import { ProfileKnowledgeController } from './profile-knowledge.controller';
+import { ProfileKnowledgeService } from './profile-knowledge.service';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
 
@@ -146,7 +148,7 @@ export class BusinessesService {
     const b = await this.prisma.business.findUnique({
       where: { id },
       include: {
-        sections: { include: { updatedBy: USER_REF } },
+        sections: { include: { updatedBy: USER_REF, reviewedBy: USER_REF } },
         topics: { select: { id: true, title: true, status: true }, orderBy: { updatedAt: 'desc' } },
         _count: { select: { topics: true, suggestions: { where: { status: 'PENDING' } } } },
       },
@@ -321,6 +323,8 @@ export class BusinessesService {
         content,
         source,
         userId: user.id,
+        // The admin read and accepted it.
+        reviewed: true,
       });
     });
     await this.touch(s.businessId);
@@ -957,13 +961,19 @@ export class BusinessItemsController {
 
 @Module({
   imports: [SamplesCoreModule, GoogleDriveModule],
-  controllers: [BusinessesController, BusinessItemsController, BusinessNotesAssetsController],
+  controllers: [
+    BusinessesController,
+    BusinessItemsController,
+    BusinessNotesAssetsController,
+    ProfileKnowledgeController,
+  ],
   providers: [
     BusinessesService,
     ReferencesService,
     BusinessNotesService,
     BusinessAssetsService,
     AssetUploadInterceptor,
+    ProfileKnowledgeService,
   ],
   exports: [BusinessesService],
 })

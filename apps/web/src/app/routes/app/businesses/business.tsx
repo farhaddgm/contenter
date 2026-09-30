@@ -13,7 +13,13 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { BusinessSectionKey, type BusinessSuggestion } from '@contenter/shared';
+import {
+  BUSINESS_SECTION_GROUPS,
+  businessHealth,
+  BusinessSectionKey,
+  type BusinessSuggestion,
+  type HealthCheck,
+} from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -28,15 +34,19 @@ import { useTrackJob } from '@/features/jobs/api/jobs';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import {
   businessKeys,
+  useAssets,
   useBusiness,
   useDeleteBusiness,
   useSuggestions,
   useUpdateBusiness,
 } from '@/features/businesses/api/businesses';
+import { useAudit, useFacts, useTerms } from '@/features/businesses/api/profile-knowledge';
 import { BuildDialog, SuggestDialog } from '@/features/businesses/components/ai-dialogs';
 import { BusinessFormDrawer } from '@/features/businesses/components/business-form';
 import { AssetsPanel } from '@/features/businesses/components/assets-panel';
-import { CompletenessBar } from '@/features/businesses/components/completeness-bar';
+import { AuditCard } from '@/features/businesses/components/audit-card';
+import { HealthCard } from '@/features/businesses/components/health-card';
+import { KnowledgePanel } from '@/features/businesses/components/knowledge-panel';
 import { useDriveResultNotice } from '@/features/businesses/components/google-drive-card';
 import { NotesCard } from '@/features/businesses/components/notes-card';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
@@ -44,6 +54,8 @@ import { SectionCard } from '@/features/businesses/components/section-card';
 import { SourceList } from '@/features/businesses/components/source-dialogs';
 
 const SOURCES_PREVIEW = 12;
+const TABS = ['profile', 'knowledge', 'references', 'assets'] as const;
+type Tab = (typeof TABS)[number];
 
 export default function BusinessRoute() {
   const t = useT();
@@ -63,7 +75,11 @@ export default function BusinessRoute() {
     null,
   );
   const [allSources, setAllSources] = useState(false);
-  const [tab, setTab] = useState<'profile' | 'references' | 'assets'>('profile');
+  const [tab, setTab] = useState<Tab>('profile');
+  const facts = useFacts(businessId);
+  const terms = useTerms(businessId);
+  const assets = useAssets(businessId);
+  const audit = useAudit(businessId);
   useDriveResultNotice();
 
   const invalidate = [businessKeys.one(businessId), businessKeys.suggestions(businessId)];
@@ -79,6 +95,52 @@ export default function BusinessRoute() {
     for (const s of suggestions.data ?? []) map.set(s.key, [...(map.get(s.key) ?? []), s]);
     return map;
   }, [suggestions.data]);
+
+  const health = useMemo(() => {
+    if (!business) return null;
+    const last = audit.data?.status === 'READY' ? audit.data : null;
+    const open = last?.issues.filter((i) => i.status === 'OPEN') ?? [];
+    return businessHealth({
+      sections: business.sections ?? [],
+      pendingSuggestions: suggestions.data?.length ?? 0,
+      facts: facts.data ?? [],
+      terms: terms.data?.filter((x) => x.isActive).length ?? 0,
+      assets: assets.data?.filter((a) => a.isActive).length ?? 0,
+      gaps: business.gaps.length,
+      audit: last
+        ? { open: open.length, openHigh: open.filter((i) => i.severity === 'HIGH').length }
+        : null,
+    });
+  }, [business, suggestions.data, facts.data, terms.data, assets.data, audit.data]);
+
+  /** Opens the profile tab and scrolls to a section (or another anchor) once it is rendered. */
+  const jumpTo = (anchor: string) => {
+    setTab('profile');
+    requestAnimationFrame(() =>
+      document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  };
+
+  const onHealthAction = (check: HealthCheck) => {
+    if (check.keys?.length) return jumpTo(`section-${check.keys[0]}`);
+    switch (check.id) {
+      case 'FACTS':
+      case 'UNVERIFIED_FACTS':
+      case 'EXPIRED_FACTS':
+      case 'TERMS':
+        return setTab('knowledge');
+      case 'ASSETS':
+        return setTab('assets');
+      case 'AUDIT':
+        return jumpTo('business-audit');
+      case 'SUGGESTIONS': {
+        const first = BusinessSectionKey.find((k) => pendingByKey.has(k));
+        return first ? jumpTo(`section-${first}`) : undefined;
+      }
+      case 'GAPS':
+        return jumpTo('business-gaps');
+    }
+  };
 
   if (isLoading) return <PageSpinner />;
   if (error || !business) return <Navigate to={paths.app.businesses.getHref()} replace />;
@@ -198,11 +260,12 @@ export default function BusinessRoute() {
             <Segmented
               value={tab}
               onChange={setTab}
-              options={(['profile', 'references', 'assets'] as const).map((value) => ({
+              options={TABS.map((value) => ({
                 value,
                 label: t(`businesses.tabs.${value}`),
               }))}
             />
+            {tab === 'knowledge' && <KnowledgePanel businessId={business.id} />}
             {tab === 'references' && <ReferencesCard businessId={business.id} />}
             {tab === 'assets' && <AssetsPanel businessId={business.id} />}
             {tab === 'profile' && (
@@ -212,33 +275,78 @@ export default function BusinessRoute() {
                   hasWebsite={!!business.website}
                   disabled={building}
                 />
+                <AuditCard
+                  businessId={business.id}
+                  disabled={building}
+                  onJump={(key) => jumpTo(`section-${key}`)}
+                />
                 <div>
                   <h2 className="text-lg font-semibold">{t('businesses.profile')}</h2>
                   <p className="text-sm text-muted-foreground">{t('businesses.profileHint')}</p>
                 </div>
-                {BusinessSectionKey.map((key) => (
-                  <SectionCard
-                    key={key}
-                    businessId={business.id}
-                    sectionKey={key}
-                    section={sections.get(key)}
-                    suggestions={pendingByKey.get(key) ?? []}
-                    editable={editable}
-                    suggesting={suggestTracker.isRunning && !!suggestJob?.keys.includes(key)}
-                    onSuggest={(k) => setSuggestKeys([k])}
-                  />
+                <nav
+                  aria-label={t('businesses.toc')}
+                  className="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border bg-card px-4 py-3 text-xs"
+                >
+                  {BUSINESS_SECTION_GROUPS.map(({ group, keys }) => (
+                    <div key={group} className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-semibold text-muted-foreground">
+                        {t(`enums.sectionGroup.${group}`)}:
+                      </span>
+                      {keys.map((key) => {
+                        const s = sections.get(key);
+                        const filled = !!s?.content.trim();
+                        const draft = filled && s?.source === 'AI' && !s.reviewedAt;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => jumpTo(`section-${key}`)}
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 hover:bg-muted"
+                          >
+                            <span
+                              className={
+                                !filled
+                                  ? 'size-1.5 rounded-full bg-muted-foreground/40'
+                                  : draft || pendingByKey.has(key)
+                                    ? 'size-1.5 rounded-full bg-warning'
+                                    : 'size-1.5 rounded-full bg-success'
+                              }
+                            />
+                            {t(`enums.businessSection.${key}`)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </nav>
+                {BUSINESS_SECTION_GROUPS.map(({ group, keys }) => (
+                  <section key={group} className="space-y-4">
+                    <h3 className="pt-2 text-sm font-semibold text-muted-foreground">
+                      {t(`enums.sectionGroup.${group}`)}
+                    </h3>
+                    {keys.map((key) => (
+                      <SectionCard
+                        key={key}
+                        businessId={business.id}
+                        sectionKey={key}
+                        section={sections.get(key)}
+                        suggestions={pendingByKey.get(key) ?? []}
+                        editable={editable}
+                        suggesting={suggestTracker.isRunning && !!suggestJob?.keys.includes(key)}
+                        onSuggest={(k) => setSuggestKeys([k])}
+                      />
+                    ))}
+                  </section>
                 ))}
               </>
             )}
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-20 lg:h-fit">
+            {health && <HealthCard health={health} onAction={onHealthAction} />}
             <Card>
               <CardBody className="space-y-4 text-sm">
-                <CompletenessBar
-                  filled={BusinessSectionKey.length - emptyKeys.length}
-                  total={BusinessSectionKey.length}
-                />
                 <dl className="space-y-2">
                   {(
                     [
@@ -328,7 +436,7 @@ export default function BusinessRoute() {
             </Card>
 
             {business.gaps.length > 0 && (
-              <Card>
+              <Card id="business-gaps">
                 <CardHeader title={t('businesses.gaps')} />
                 <ul className="list-disc space-y-1 px-5 py-4 ps-9 text-xs leading-6">
                   {business.gaps.map((g, i) => (

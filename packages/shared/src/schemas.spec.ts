@@ -5,7 +5,10 @@ import {
   GenerateContentSchema,
   IdeateSchema,
   PaginationQuerySchema,
+  UpdatePrincipleSchema,
+  UpdateTopicSchema,
 } from './schemas';
+import { UpdateBusinessSchema } from './business';
 
 describe('shared schemas', () => {
   it('applies topic defaults', () => {
@@ -40,5 +43,19 @@ describe('shared schemas', () => {
       pageSize: 10,
     });
     expect(PaginationQuerySchema.safeParse({ pageSize: '500' }).success).toBe(false);
+  });
+});
+
+describe('PATCH schemas (patchOf)', () => {
+  it('do not fill omitted fields with create defaults', () => {
+    expect(UpdateTopicSchema.parse({ status: 'ARCHIVED' })).toEqual({ status: 'ARCHIVED' });
+    expect(UpdatePrincipleSchema.parse({ isActive: false })).toEqual({ isActive: false });
+    expect(UpdateBusinessSchema.parse({ status: 'ARCHIVED' })).toEqual({ status: 'ARCHIVED' });
+  });
+
+  it('still validate and transform the fields that are sent', () => {
+    expect(UpdateBusinessSchema.parse({ tagline: ' x ' })).toEqual({ tagline: 'x' });
+    expect(UpdateBusinessSchema.safeParse({ website: 'nope' }).success).toBe(false);
+    expect(UpdateTopicSchema.safeParse({ title: 'x' }).success).toBe(false);
   });
 });

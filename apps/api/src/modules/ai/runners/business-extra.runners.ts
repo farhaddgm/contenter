@@ -2,7 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { AiJob, Prisma } from '@prisma/client';
 import {
   ASSET_MAX_PREVIEWS,
+  AuditTarget,
   BusinessAssetAnalysisSchema,
+  BusinessAuditResultSchema,
   BusinessReviseResultSchema,
   BusinessSectionKey,
   type NoteApplyMode,
@@ -13,7 +15,7 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { FileStorageService } from '../../../infra/storage/file-storage.service';
 import { cleanUrl, writeSection } from '../../businesses/section-writer';
 import { AiExecutor } from '../ai-executor.service';
-import { formatBusiness, formatSectionSpec, formatStandingNotes } from '../context';
+import { clamp, formatBusiness, formatSectionSpec, formatStandingNotes } from '../context';
 import { BUSINESS_PROMPT_INCLUDE, ContextLoader } from '../context-loader.service';
 import { mergeSources, NonRetryableAiError, sumUsage } from '../provider/ai-provider';
 import { filterSources } from '../source-blocklist';
@@ -49,7 +51,7 @@ export class BusinessReviseRunner implements AiRunner {
     if (!note) throw new NonRetryableAiError('The note no longer exists');
     const b = await this.prisma.business.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { sections: true, assets: BUSINESS_PROMPT_INCLUDE.assets },
+      include: { ...BUSINESS_PROMPT_INCLUDE, sections: true },
     });
     const apply = input.apply ?? note.apply;
     const profile = formatBusiness(b, { includeEmpty: true });
@@ -276,6 +278,98 @@ export class BusinessAssetAnalyzeRunner implements AiRunner {
     await this.prisma.businessAsset.updateMany({
       where: { id: job.targetId },
       data: { analysisStatus: 'QUEUED', analysisError: null },
+    });
+  }
+}
+
+const MAX_AUDIT_ISSUES = 15;
+
+/**
+ * Quality review of the whole profile (docs/16): contradictions, gaps, vague, unsupported or
+ * risky text. The issues are stored on the BusinessAudit row; the admin fixes them with one
+ * click (a one-off note → BUSINESS_REVISE) or dismisses them.
+ */
+@Injectable()
+export class BusinessAuditRunner implements AiRunner {
+  readonly type = 'BUSINESS_AUDIT' as const;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiExecutor,
+    private readonly ctx: ContextLoader,
+  ) {}
+
+  async run(job: AiJob): Promise<RunnerResult> {
+    const { auditId } = (job.input ?? {}) as { auditId?: string };
+    const audit = await this.prisma.businessAudit.findUnique({ where: { id: auditId ?? '' } });
+    if (!audit) throw new NonRetryableAiError('The audit no longer exists');
+    const b = await this.prisma.business.findUniqueOrThrow({
+      where: { id: job.targetId },
+      include: BUSINESS_PROMPT_INCLUDE,
+    });
+
+    const result = await this.ai.execute({
+      task: this.type,
+      promptKey: 'business_audit',
+      schema: BusinessAuditResultSchema,
+      vars: {
+        language: b.language,
+        sections_spec: formatSectionSpec(),
+        business: formatBusiness(b, { includeEmpty: true }),
+        gaps: b.gaps.length ? b.gaps.map((g) => `- ${g}`).join('\n') : '(none)',
+        standing_notes: formatStandingNotes(await this.ctx.standingNotes(b.id)) || '(none)',
+      },
+    });
+    const data = result.data;
+    const issues = data.issues
+      .filter((i) => i.title.trim() && AuditTarget.includes(i.target))
+      .slice(0, MAX_AUDIT_ISSUES)
+      .map((i) => ({
+        ...i,
+        title: i.title.trim(),
+        detail: i.detail.trim(),
+        fix: i.fix.trim(),
+        status: 'OPEN' as const,
+      }));
+
+    await this.prisma.businessAudit.update({
+      where: { id: audit.id },
+      data: {
+        status: 'READY',
+        score: Math.round(clamp(data.score, 0, 100)),
+        summary: data.summary.trim().slice(0, 4000),
+        strengths: data.strengths
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .slice(0, 5),
+        issues: asJson(issues),
+        error: null,
+      },
+    });
+
+    return {
+      output: { businessId: b.id, auditId: audit.id, issues: issues.length },
+      model: result.model,
+      usage: result.usage,
+      prompt: result.prompt,
+    };
+  }
+
+  async onFailure(job: AiJob, error: string) {
+    const { auditId } = (job.input ?? {}) as { auditId?: string };
+    if (!auditId) return;
+    await this.prisma.businessAudit.updateMany({
+      where: { id: auditId },
+      data: { status: 'FAILED', error: error.slice(0, 2000) },
+    });
+  }
+
+  async onRetry(job: AiJob) {
+    const { auditId } = (job.input ?? {}) as { auditId?: string };
+    if (!auditId) return;
+    await this.prisma.businessAudit.updateMany({
+      where: { id: auditId },
+      data: { status: 'RUNNING', error: null },
     });
   }
 }
