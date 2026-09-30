@@ -89,6 +89,29 @@ export function sumUsage(...items: AiUsage[]): AiUsage {
   );
 }
 
+/**
+ * Sources of a research run: the pages the notes rely on — cited by the model, or named by URL
+ * in the notes. Search hits the model saw but did not use are not sources; listing them fills
+ * the admin's source list with unrelated pages. Only when the notes reference nothing at all do
+ * the raw hits stand in.
+ */
+export function researchSources(
+  cited: { url: string; title: string }[],
+  found: { url: string; title: string }[],
+  notes = '',
+): { url: string; title: string }[] {
+  const titles = new Map(
+    found.filter((f) => f.title && f.title !== f.url).map((f) => [f.url, f.title]),
+  );
+  const used = [...cited, ...found.filter((f) => f.url && notes.includes(f.url))];
+  return mergeSources(
+    (used.length ? used : found).map((s) => ({
+      url: s.url,
+      title: s.title && s.title !== s.url ? s.title : (titles.get(s.url) ?? ''),
+    })),
+  );
+}
+
 /** Adds sources, keeping the first occurrence of each URL. */
 export function mergeSources(
   ...lists: { url: string; title: string }[][]

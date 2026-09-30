@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { BookOpen, FileText, Globe, Link2, Plus, SearchCheck } from 'lucide-react';
 import type { BusinessReference, ResearchScope } from '@contenter/shared';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ export function ScopePicker({
   hasWebsite?: boolean;
 }) {
   const t = useT();
+  const group = useId();
   return (
     <fieldset className="space-y-2">
       <legend className="mb-2 text-sm font-medium">{t('businesses.scope.label')}</legend>
@@ -58,7 +59,7 @@ export function ScopePicker({
           >
             <input
               type="radio"
-              name="research-scope"
+              name={group}
               className="mt-1 accent-primary"
               checked={value.scope === s}
               onChange={() => onChange({ ...value, scope: s })}
@@ -118,12 +119,15 @@ function ReferencePick({
     add.mutate(
       { url: link.trim() },
       {
-        onSuccess: (r) => {
+        onSuccess: ({ references }) => {
           setLink('');
-          if (r.status !== 'READY') {
-            notify.warning(t('businesses.references.addedFailed'), r.error ?? undefined);
-          } else if (value.referenceIds) {
-            onChange({ ...value, referenceIds: [...value.referenceIds, r.id] });
+          const unread = references.find((r) => r.status !== 'READY');
+          if (unread) {
+            notify.warning(t('businesses.references.addedFailed'), unread.error ?? undefined);
+          }
+          if (value.referenceIds) {
+            const ready = references.filter((r) => r.status === 'READY').map((r) => r.id);
+            onChange({ ...value, referenceIds: [...value.referenceIds, ...ready] });
           }
         },
         onError: (e) => notify.error(t('common.error'), e.message),

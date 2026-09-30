@@ -14,6 +14,7 @@ import type {
   Topic,
 } from '@prisma/client';
 import {
+  BusinessAssetAnalysisSchema,
   BRAND_DOCS_PROMPT_CHARS,
   BUSINESS_SECTION_SPEC,
   BusinessSectionKey,
@@ -114,7 +115,65 @@ const SECTION_TITLE: Record<BusinessSectionKey, string> = {
 export type BusinessForPrompt = Pick<
   Business,
   'name' | 'tagline' | 'industry' | 'website' | 'location' | 'language'
-> & { sections: Pick<BusinessSection, 'key' | 'content'>[] };
+> & {
+  sections: Pick<BusinessSection, 'key' | 'content'>[];
+  /** Analyzed brand assets (past articles, creatives, videos …), when loaded. */
+  assets?: AssetForPrompt[];
+};
+
+export type AssetForPrompt = {
+  kind: string;
+  title: string;
+  description: string;
+  analysis: unknown;
+};
+
+/** Total text of the brand-assets block in one prompt. */
+export const MAX_ASSETS_TEXT = 9_000;
+const MAX_ASSET_TEXT = 900;
+
+/**
+ * Past pieces of the business as a style reference: per asset the admin's note and the AI
+ * analysis (BUSINESS_ASSET_ANALYZE), newest first, within a budget.
+ */
+export function formatBusinessAssets(assets: AssetForPrompt[], budget = MAX_ASSETS_TEXT): string {
+  const lines: string[] = [];
+  let left = budget;
+  let omitted = 0;
+  for (const a of assets) {
+    const parsed = BusinessAssetAnalysisSchema.safeParse(a.analysis);
+    const an = parsed.success ? parsed.data : null;
+    const parts = [
+      a.description ? `Admin note: ${a.description}` : null,
+      an?.summary ? `What it is: ${an.summary}` : null,
+      an?.visualStyle && an.visualStyle !== 'n/a' ? `Visual style: ${an.visualStyle}` : null,
+      an?.tone ? `Tone: ${an.tone}` : null,
+      an?.structure ? `Structure: ${an.structure}` : null,
+      an?.messages.length ? `Messages: ${an.messages.join(' | ')}` : null,
+      an?.guidelines.length ? `Follow: ${an.guidelines.join(' | ')}` : null,
+    ].filter(Boolean);
+    if (!parts.length) continue;
+    const body = parts.join('\n  ');
+    const block = `- [${a.kind}] ${a.title || 'Untitled'}\n  ${
+      body.length > MAX_ASSET_TEXT ? `${body.slice(0, MAX_ASSET_TEXT)}…` : body
+    }`;
+    if (block.length > left) {
+      omitted++;
+      continue;
+    }
+    lines.push(block);
+    left -= block.length;
+  }
+  if (!lines.length) return '';
+  return [
+    '### Past content & creatives of this business [ASSETS]',
+    'Real pieces this business already published. New content must feel like it belongs next to them: match their visual style, tone, structure and messaging, and reuse their wording conventions. They are style references — do not copy them verbatim.',
+    ...lines,
+    omitted ? `(${omitted} more asset(s) omitted — budget exhausted)` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
 /**
  * The business profile block. With `includeEmpty`, empty sections are listed as "(empty)" so a
@@ -152,7 +211,8 @@ export function formatBusiness(
     blocks.push(`${title}\n${text.length > cap ? `${text.slice(0, cap)}\n[truncated]` : text}`);
     left -= Math.min(text.length, cap);
   }
-  return [head, ...blocks].join('\n\n');
+  const assets = b.assets?.length ? formatBusinessAssets(b.assets) : '';
+  return [head, ...blocks, assets].filter(Boolean).join('\n\n');
 }
 
 /** Section keys with what each must contain, for prompts that write sections. */
@@ -251,5 +311,29 @@ export function formatReferences(
     '',
     blocks.join('\n\n'),
     '</admin_references>',
+  ].join('\n');
+}
+
+// ---------- standing admin notes ----------
+
+export const MAX_NOTES_TEXT = 6_000;
+
+/**
+ * Notes the admin recorded for this business (explanations and corrections), newest first.
+ * They outrank references and web research in every later build/suggestion/revision.
+ */
+export function formatStandingNotes(notes: { text: string }[], budget = MAX_NOTES_TEXT): string {
+  const lines: string[] = [];
+  let left = budget;
+  for (const n of notes) {
+    const text = n.text.trim();
+    if (!text || text.length > left) continue;
+    lines.push(`- ${text}`);
+    left -= text.length;
+  }
+  if (!lines.length) return '';
+  return [
+    'Standing admin notes (explanations and corrections recorded earlier — always respect them, they outrank references and web research):',
+    ...lines,
   ].join('\n');
 }

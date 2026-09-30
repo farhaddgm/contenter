@@ -57,6 +57,33 @@ export interface DriveFile {
   accountId: string;
 }
 
+export interface DriveFolder {
+  name: string;
+  /** Files that can be read as text, with a canonical link each. */
+  files: { id: string; name: string; mimeType: string; url: string }[];
+  /** Files that cannot be read as text (PDF, images, Office files …). */
+  skipped: { name: string; mimeType: string }[];
+  /** More readable files exist than the per-folder limit. */
+  truncated: boolean;
+  accountId: string;
+}
+
+const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const FOLDER_DEPTH = 3;
+const FOLDER_MAX_FILES = 40;
+
+/** The link a person would open for a Drive file (also what `parseGoogleFileUrl` recognizes). */
+export function driveFileUrl(file: { id: string; mimeType: string }): string {
+  const app = {
+    'application/vnd.google-apps.document': 'document',
+    'application/vnd.google-apps.spreadsheet': 'spreadsheets',
+    'application/vnd.google-apps.presentation': 'presentation',
+  }[file.mimeType];
+  return app
+    ? `https://docs.google.com/${app}/d/${file.id}/edit`
+    : `https://drive.google.com/file/d/${file.id}/view`;
+}
+
 const b64url = (buf: Buffer) => buf.toString('base64url');
 
 /** How each Drive file type is turned into text. Null = not readable as text. */
@@ -289,12 +316,34 @@ export class GoogleDriveService {
    * (`preferredAccountId` first). Throws DriveReadError with an admin-readable reason.
    */
   async readFile(fileId: string, preferredAccountId?: string | null): Promise<DriveFile> {
+    return this.withAccount('file', preferredAccountId, (account) =>
+      this.readWith(account, fileId),
+    );
+  }
+
+  /**
+   * Lists the files of a Drive folder (sub-folders included, a few levels deep) with the first
+   * connected account that can open it. `files` are the ones readable as text; `skipped` are
+   * the rest (PDF, images, Office files …), reported to the admin.
+   */
+  async listFolder(folderId: string, preferredAccountId?: string | null): Promise<DriveFolder> {
+    return this.withAccount('folder', preferredAccountId, (account) =>
+      this.listWith(account, folderId),
+    );
+  }
+
+  /** Runs `fn` with each connected account (the preferred one first) until one can see the item. */
+  private async withAccount<T>(
+    what: 'file' | 'folder',
+    preferredAccountId: string | null | undefined,
+    fn: (account: DriveAccountRow) => Promise<T>,
+  ): Promise<T & { accountId: string }> {
     const accounts = await this.prisma.googleDriveAccount.findMany({
       orderBy: { createdAt: 'asc' },
     });
     if (!accounts.length) {
       throw new DriveReadError(
-        'This Google file is private and no Google account is connected. Connect the account that can open it (Settings → Google Drive), or paste the text instead.',
+        `This Google ${what} is private and no Google account is connected. Connect the account that can open it (Settings → Google Drive), or paste the text instead.`,
       );
     }
     accounts.sort(
@@ -304,12 +353,12 @@ export class GoogleDriveService {
     let lastError: DriveReadError | null = null;
     for (const account of accounts) {
       try {
-        const file = await this.readWith(account, fileId);
+        const out = await fn(account);
         await this.prisma.googleDriveAccount.update({
           where: { id: account.id },
           data: { lastUsedAt: new Date(), error: null },
         });
-        return { ...file, accountId: account.id };
+        return { ...out, accountId: account.id };
       } catch (err) {
         if (err instanceof NoAccess) denied.push(account.email);
         else if (err instanceof DriveReadError) lastError = err;
@@ -318,10 +367,65 @@ export class GoogleDriveService {
     }
     if (denied.length) {
       throw new DriveReadError(
-        `The file was not found or is not shared with the connected Google account(s): ${denied.join(', ')}. Connect the account that can open it.`,
+        `The ${what} was not found or is not shared with the connected Google account(s): ${denied.join(', ')}. Connect the account that can open it.`,
       );
     }
-    throw lastError ?? new DriveReadError('The Google file could not be read');
+    throw lastError ?? new DriveReadError(`The Google ${what} could not be read`);
+  }
+
+  private async listWith(account: DriveAccountRow, folderId: string) {
+    const token = await this.accessToken(account);
+    const auth = { authorization: `Bearer ${token}` };
+    const get = async (url: string) => {
+      const res = await fetch(url, { headers: auth, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (res.status === 404) throw new NoAccess();
+      if (!res.ok) throw await this.apiError(res, account);
+      return res.json();
+    };
+
+    const root = (await get(
+      `${DRIVE_URL}/${encodeURIComponent(folderId)}?fields=name,mimeType&supportsAllDrives=true`,
+    )) as { name?: string; mimeType?: string };
+    if (root.mimeType !== FOLDER_MIME) {
+      throw new DriveReadError('This link is not a Google Drive folder');
+    }
+
+    const files: DriveFolder['files'] = [];
+    const skipped: DriveFolder['skipped'] = [];
+    let level = [{ id: folderId, path: '' }];
+    let truncated = false;
+    for (let depth = 0; depth < FOLDER_DEPTH && level.length && !truncated; depth++) {
+      const next: typeof level = [];
+      for (const folder of level) {
+        let pageToken: string | undefined;
+        do {
+          const params = new URLSearchParams({
+            q: `'${folder.id}' in parents and trashed = false`,
+            fields: 'nextPageToken,files(id,name,mimeType)',
+            pageSize: '200',
+            orderBy: 'folder,name',
+            supportsAllDrives: 'true',
+            includeItemsFromAllDrives: 'true',
+            ...(pageToken ? { pageToken } : {}),
+          });
+          const page = (await get(`${DRIVE_URL}?${params}`)) as {
+            nextPageToken?: string;
+            files?: { id: string; name: string; mimeType: string }[];
+          };
+          for (const f of page.files ?? []) {
+            const name = folder.path ? `${folder.path} / ${f.name}` : f.name;
+            if (f.mimeType === FOLDER_MIME) next.push({ id: f.id, path: name });
+            else if (!driveExportPlan(f.mimeType)) skipped.push({ name, mimeType: f.mimeType });
+            else if (files.length < FOLDER_MAX_FILES) {
+              files.push({ id: f.id, name, mimeType: f.mimeType, url: driveFileUrl(f) });
+            } else truncated = true;
+          }
+          pageToken = page.nextPageToken;
+        } while (pageToken && !truncated);
+      }
+      level = next;
+    }
+    return { name: root.name ?? '', files, skipped, truncated };
   }
 
   private async readWith(account: DriveAccountRow, fileId: string) {

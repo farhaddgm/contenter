@@ -15,7 +15,7 @@ import { formatBusiness, formatSectionSpec, formatTopic, NO_BUSINESS } from '../
 import { estimateCostUsd } from '../ai/pricing';
 import { DEFAULT_PROMPTS } from '../ai/prompts/defaults';
 import { templateVariables } from '../ai/prompts/render';
-import { mergeSources, sumUsage } from '../ai/provider/ai-provider';
+import { mergeSources, researchSources, sumUsage } from '../ai/provider/ai-provider';
 import { collectResearch, webSearchToolType } from '../ai/provider/anthropic.provider';
 import { MockProvider } from '../ai/provider/mock.provider';
 import { blocklistNote, filterSources, searchToolBlocklist } from '../ai/source-blocklist';
@@ -108,7 +108,7 @@ describe('web research helpers', () => {
     expect(webSearchToolType('claude-haiku-4-5')).toBe('web_search_20250305');
   });
 
-  it('keeps the final notes and collects searched and cited sources', () => {
+  it('keeps the final notes and lists only the sources the notes rely on', () => {
     const blocks = [
       { type: 'text', text: 'Let me search.', citations: null },
       { type: 'server_tool_use', id: 's1', name: 'web_search', input: {} },
@@ -123,11 +123,18 @@ describe('web research helpers', () => {
             encrypted_content: '',
             page_age: null,
           },
+          {
+            type: 'web_search_result',
+            url: 'https://unrelated.com/x',
+            title: 'Seen but never used',
+            encrypted_content: '',
+            page_age: null,
+          },
         ],
       },
       {
         type: 'text',
-        text: 'Found A.',
+        text: 'Found A (https://a.com).',
         citations: [
           {
             type: 'web_search_result_location',
@@ -141,8 +148,16 @@ describe('web research helpers', () => {
       { type: 'text', text: ' More.', citations: null },
     ] as unknown as Anthropic.Beta.BetaContentBlock[];
     const out = collectResearch(blocks);
-    expect(out.text).toBe('Found A. More.');
-    expect(out.sources.map((s) => s.url)).toEqual(['https://b.com', 'https://a.com']);
+    expect(out.text).toBe('Found A (https://a.com). More.');
+    // cited (b) + named in the notes (a); the unused search hit is not a source
+    expect(out.sources).toEqual([
+      { url: 'https://b.com', title: 'B' },
+      { url: 'https://a.com', title: 'A' },
+    ]);
+    // nothing cited or named → the raw hits stand in
+    expect(researchSources([], [{ url: 'https://c.com', title: 'C' }]).map((s) => s.url)).toEqual([
+      'https://c.com',
+    ]);
   });
 
   it('sums usage and de-duplicates sources', () => {

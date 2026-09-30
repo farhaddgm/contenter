@@ -84,6 +84,25 @@ describe('renderTemplate', () => {
         'research',
       ],
       business_suggest: ['language', 'business', 'requested_sections', 'instruction', 'research'],
+      business_revise: [
+        'language',
+        'sections_spec',
+        'business',
+        'gaps',
+        'standing_notes',
+        'research',
+        'note',
+      ],
+      business_asset_analyze: [
+        'language',
+        'business',
+        'kind',
+        'title',
+        'url',
+        'images',
+        'description',
+        'text',
+      ],
     };
     expect(Object.keys(allowed).sort()).toEqual(DEFAULT_PROMPTS.map((p) => p.key).sort());
     for (const p of DEFAULT_PROMPTS) {

@@ -41,6 +41,10 @@ services:
       APP_ROLE: api
       DATABASE_URL: postgresql://contenter:contenter@postgres:5432/contenter
       REDIS_URL: redis://redis:6379
+      UPLOAD_DIR: /data/uploads
+    # uploaded brand assets; the worker reads the same files for AI analysis
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -56,6 +60,9 @@ services:
       APP_ROLE: worker
       DATABASE_URL: postgresql://contenter:contenter@postgres:5432/contenter
       REDIS_URL: redis://redis:6379
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
     command: ['node', 'apps/api/dist/main.js']
     depends_on:
       api: { condition: service_started }
@@ -72,3 +79,4 @@ services:
 volumes:
   pgdata:
   redisdata:
+  uploads:

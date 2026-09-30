@@ -2,6 +2,8 @@ import {
   BusinessSectionKey,
   type BusinessBuildResult,
   type BusinessDiscoveryResult,
+  type BusinessAssetAnalysis,
+  type BusinessReviseResult,
   type BusinessSuggestResult,
   type ContentDraftResult,
   type IdeationResult,
@@ -133,6 +135,33 @@ export class MockProvider implements AiProvider {
             rationale: 'پیشنهاد آزمایشی (mock) بر اساس اطلاعات فعلی کسب‌وکار.',
           })),
         } satisfies BusinessSuggestResult;
+      case 'BUSINESS_REVISE':
+        return {
+          summary: 'بازبینی آزمایشی (mock): بخش «معرفی» بر اساس توضیح شما به‌روز شد.',
+          tagline: '',
+          industry: '',
+          website: '',
+          location: '',
+          sections: [
+            {
+              key: 'OVERVIEW',
+              content: `${MOCK_SECTION.OVERVIEW}\n\n(به‌روزشده بر اساس توضیح ادمین — mock)`,
+              change: 'توضیح ادمین به معرفی اضافه شد.',
+            },
+          ],
+          gaps: ['قیمت‌ها از منابع عمومی تأیید نشد (mock).'],
+        } satisfies BusinessReviseResult;
+      case 'BUSINESS_ASSET_ANALYZE':
+        return {
+          summary: 'تحلیل آزمایشی (mock): یک قطعهٔ تبلیغاتی ساده با پیام اصلی روشن.',
+          visualStyle: 'پس‌زمینهٔ روشن، رنگ اصلی آبی، تیتر درشت و لوگو در گوشه.',
+          tone: 'صمیمی و مطمئن',
+          structure: 'تیتر ← یک جملهٔ توضیح ← دعوت به اقدام',
+          messages: ['پیام اصلی نمونه', 'همین حالا امتحان کنید'],
+          copy: '',
+          guidelines: ['تیتر کوتاه و درشت', 'یک دعوت به اقدام در هر قطعه', 'از شلوغی پرهیز شود'],
+          bestFor: 'پست و استوری شبکه‌های اجتماعی',
+        } satisfies BusinessAssetAnalysis;
       case 'ANALYZE_SAMPLE':
         return {
           summary: 'نمونه یک پست آموزشی کوتاه است که یک مفهوم را با مثال روزمره توضیح می‌دهد.',

@@ -55,6 +55,8 @@ export function refreshSession(): Promise<boolean> {
 
 async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const token = useAuthStore.getState().accessToken;
+  // FormData (file uploads) is sent as is: the browser sets the multipart boundary header.
+  const form = opts.body instanceof FormData ? opts.body : null;
   let res: Response;
   try {
     res = await fetch(buildUrl(path, opts.params), {
@@ -65,10 +67,10 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
         Accept: 'application/json',
         // lets the server attach the current page to interaction logs and errors
         'X-Client-Route': window.location.pathname,
-        ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(opts.body !== undefined && !form ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body: form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
     });
   } catch (err) {
     if (

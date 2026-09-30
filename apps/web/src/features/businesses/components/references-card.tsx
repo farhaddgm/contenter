@@ -154,9 +154,13 @@ function AddReferenceDialog({
           : [{ content: text.trim(), title: title.trim() }];
       const results = await Promise.allSettled(inputs.map((i) => add.mutateAsync(i)));
       const rejected = results.filter((r) => r.status === 'rejected');
-      const unread = results.filter(
-        (r) => r.status === 'fulfilled' && r.value.status !== 'READY',
-      ).length;
+      const added = results.flatMap((r) => (r.status === 'fulfilled' ? r.value.references : []));
+      const skipped = results.reduce(
+        (n, r) => n + (r.status === 'fulfilled' ? r.value.skipped : 0),
+        0,
+      );
+      const unread = added.filter((r) => r.status !== 'READY').length;
+      if (skipped) notify.info(t('businesses.references.folderSkipped', { count: skipped }));
       if (rejected.length) {
         notify.error(t('common.error'), (rejected[0] as PromiseRejectedResult).reason?.message);
       }
@@ -411,13 +415,15 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                       icon={<RefreshCw />}
                       onClick={() =>
                         refresh.mutate(r.id, {
-                          onSuccess: (out) =>
-                            out.status === 'READY'
-                              ? notify.success(t('businesses.references.refreshed'))
-                              : notify.error(
-                                  t('businesses.references.refreshFailed'),
-                                  out.error ?? undefined,
-                                ),
+                          onSuccess: ({ references }) => {
+                            const failed = references.find((x) => x.status !== 'READY');
+                            if (failed) {
+                              notify.error(
+                                t('businesses.references.refreshFailed'),
+                                failed.error ?? undefined,
+                              );
+                            } else notify.success(t('businesses.references.refreshed'));
+                          },
                           onError: (e) => notify.error(t('common.error'), e.message),
                         })
                       }

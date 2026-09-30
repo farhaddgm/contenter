@@ -111,9 +111,15 @@ export class AiExecutor {
       blockedDomains: searchToolBlocklist(blocked),
       allowedDomains,
     });
+    const onAllowedSite = (url: string) =>
+      !allowedDomains ||
+      isSourceBlocked(
+        url,
+        allowedDomains.map((value) => ({ kind: 'DOMAIN' as const, value })),
+      );
     return {
       ...result,
-      sources: filterSources(result.sources, blocked),
+      sources: filterSources(result.sources, blocked).filter((s) => onAllowedSite(s.url)),
       prompt: { key: prompt.key, version: prompt.version },
     };
   }

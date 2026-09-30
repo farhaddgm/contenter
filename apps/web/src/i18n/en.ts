@@ -104,6 +104,22 @@ export const en: DeepStrings<Dictionary> = {
     },
     referenceKind: { URL: 'Web page', GOOGLE_DOC: 'Google file', TEXT: 'Text' },
     referenceStatus: { PENDING: 'Reading', READY: 'Ready', FAILED: 'Not readable' },
+    noteStatus: { PENDING: 'Reviewing', APPLIED: 'Applied', FAILED: 'Failed' },
+    businessAssetKind: {
+      ARTICLE: 'Article',
+      IMAGE: 'Image',
+      BANNER: 'Banner',
+      ARTWORK: 'Artwork',
+      CREATIVE: 'Ad creative',
+      VIDEO: 'Video',
+      MOTION: 'Motion',
+    },
+    assetAnalysisStatus: {
+      NONE: 'Not analyzed',
+      QUEUED: 'Analyzing',
+      DONE: 'Analyzed',
+      FAILED: 'Analysis failed',
+    },
     businessBuildState: {
       NONE: 'Not researched',
       BUILDING: 'Researching',
@@ -209,6 +225,8 @@ export const en: DeepStrings<Dictionary> = {
       BUSINESS_DISCOVER: 'Find businesses',
       BUSINESS_BUILD: 'Build business profile',
       BUSINESS_SUGGEST: 'Suggest business profile',
+      BUSINESS_REVISE: 'Revise profile from admin note',
+      BUSINESS_ASSET_ANALYZE: 'Analyze business asset',
     },
     jobStatus: {
       QUEUED: 'Queued',
@@ -919,6 +937,89 @@ export const en: DeepStrings<Dictionary> = {
       openBusiness: 'Open business',
       tryAgain: 'New research',
     },
+    tabs: { profile: 'Profile', references: 'References', assets: 'Content & files' },
+    notes: {
+      title: 'Note for AI',
+      hint: 'Write any explanation, correction or new information about this business. AI reviews the whole profile against it and updates every section that needs it.',
+      placeholder:
+        'e.g. “Vipod is not a bank; it is the all-digital branch of Bank Pasargad. Our main audience is people aged 18–35 and our tone should be friendlier.”',
+      options: 'Review settings',
+      asSuggestions: 'Bring the changes as suggestions only',
+      apply: { DIRECT: 'Apply directly', SUGGEST: 'As suggestions' },
+      applyHint: {
+        DIRECT:
+          'Sections are updated directly (even ones you wrote yourself). The previous text of each section stays in its history and can be restored.',
+        SUGGEST:
+          'Nothing is changed; the new version of each section arrives as a suggestion for you to accept or dismiss.',
+      },
+      submit: 'Save and review with AI',
+      queued: 'Note saved; AI is reviewing the profile',
+      running: 'AI is revising the profile from your note…',
+      runningHint: 'Usually a minute or two; you can leave the page.',
+      waitBuild: 'Wait for the profile build to finish.',
+      history: 'Earlier notes',
+      changed: { DIRECT: 'Updated sections:', SUGGEST: 'Suggestions were made for:' },
+      noChange: 'AI found nothing to change.',
+      keep: 'Always respect',
+      keepHint: 'While on, AI also respects this note in later builds and suggestions.',
+      deleteBody:
+        'Delete this note? The changes it made are not undone (restore them from each section’s history).',
+      showAll: 'Show all ({{count}})',
+      showLess: 'Show less',
+    },
+    assets: {
+      title: 'Content & files of this business',
+      hint: 'Articles, images, banners, artworks, creatives, videos and motion that already exist. AI analyzes each one and, in projects linked to this business, produces new content in the same style.',
+      empty:
+        'Nothing uploaded yet. Add good examples of past work so AI learns the brand’s visual style, tone and messages from them.',
+      add: 'Add content',
+      addTitle: 'Add a past piece',
+      addSubtitle:
+        'Upload the file, give a link or paste the text. AI analyzes it once it is added.',
+      submit: 'Add and analyze',
+      added: 'Added; AI is analyzing it',
+      kind: 'Kind',
+      titleField: 'Title',
+      chooseFile: 'Choose a file',
+      changeFile: 'Change file',
+      fileHint:
+        'Image: jpg, png, webp, gif · Video: mp4, webm, mov (up to 200 MB). A few frames of a video are captured for the analysis.',
+      preparing: 'Preparing the preview…',
+      noFrames:
+        'The browser could not capture frames from this video; AI will only use your description and text. Write a fuller description.',
+      noPreview:
+        'No preview could be made for this image; AI will only use your description and text.',
+      badFile: 'This file type is not supported.',
+      url: 'Link',
+      urlHint:
+        'Where it was published (website, YouTube, Instagram …). Without an uploaded file, the page text and cover image are read.',
+      badUrl: 'The link must start with http or https.',
+      description: 'Your note',
+      descriptionHint:
+        'What it is, where and for which campaign it ran, and why it is a good example.',
+      text: 'Text / caption / voice-over',
+      textHint: 'Caption, on-image copy, narration or the video’s script.',
+      articleText: 'Article text',
+      articleTextHint:
+        'Paste the article, or give only the link and the text is read from the page.',
+      needPayload: 'At least a file, a link or a text is required.',
+      analysis: 'AI analysis',
+      noAnalysis: 'No analysis yet.',
+      analyzing: 'Re-analysis started',
+      reanalyze: 'Save and analyze again',
+      active: 'Available to AI',
+      deleteBody: 'Delete this piece and its file?',
+      fields: {
+        summary: 'Summary',
+        visualStyle: 'Visual style',
+        tone: 'Tone',
+        structure: 'Structure',
+        messages: 'Messages',
+        copy: 'Notable copy',
+        guidelines: 'Style rules',
+        bestFor: 'Best for',
+      },
+    },
     references: {
       title: 'AI reference sources',
       hint: 'Links, Google documents and texts you supply. When building or improving the profile, AI only sees the stored snapshot of these; you can view and refresh each one.',
@@ -930,7 +1031,10 @@ export const en: DeepStrings<Dictionary> = {
       tabLink: 'Link',
       tabText: 'Text',
       url: 'Address',
-      urlHint: 'A web page or a Google Docs / Sheets / Slides link. One link per line.',
+      urlHint:
+        'A web page, a Google Docs / Sheets / Slides link, or a Google Drive folder link (every document inside is read). One link per line.',
+      folderSkipped:
+        '{{count}} file(s) in the folder are not text (PDF, image, Word …) and were not read.',
       titleField: 'Title',
       text: 'Text',
       textHint: 'Paste the document text or upload a .txt / .md file.',

@@ -504,3 +504,26 @@ export function parseGoogleFileUrl(input: string): { id: string; type: GoogleFil
   }
   return null;
 }
+
+/** A Google Drive folder link → its id (every readable file inside becomes a reference). */
+export function parseGoogleFolderUrl(input: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    return null;
+  }
+  if (url.hostname.toLowerCase() !== 'drive.google.com') return null;
+  const m = /^\/drive\/(?:u\/\d+\/)?(?:mobile\/)?folders\/([\w-]{10,})/.exec(url.pathname);
+  return m ? m[1]! : null;
+}
+
+/** Any link on Google Docs / Drive (file, folder, or something else such as the Drive home). */
+export function isGoogleDriveUrl(input: string): boolean {
+  try {
+    const host = new URL(input.trim()).hostname.toLowerCase();
+    return host === 'drive.google.com' || host === 'docs.google.com';
+  } catch {
+    return false;
+  }
+}

@@ -3,7 +3,11 @@ import type {
   AcceptSuggestionInput,
   AddReferenceInput,
   BlockedSource,
+  BusinessAsset,
+  BusinessNote,
   BusinessReference,
+  CreateBusinessNoteInput,
+  UpdateBusinessAssetInput,
   CreateFromReferencesInput,
   GoogleDriveStatus,
   UpdateReferenceInput,
@@ -39,7 +43,17 @@ export const businessKeys = {
   references: (id: string) => ['businesses', id, 'references'] as const,
   reference: (id: string) => ['business-references', id] as const,
   drive: ['google-drive'] as const,
+  notes: (id: string) => ['businesses', id, 'notes'] as const,
+  assets: (id: string) => ['businesses', id, 'assets'] as const,
+  asset: (id: string) => ['business-assets', id] as const,
 };
+
+/** A link can become several references (a Drive folder → one per readable file). */
+export interface ReferenceBatch {
+  references: BusinessReference[];
+  /** Folder files that cannot be read as text (PDF, images, Office files …). */
+  skipped: number;
+}
 
 export function useBusinesses(params: {
   page: number;
@@ -295,7 +309,7 @@ export function useAddReference(businessId: string) {
   const invalidate = useInvalidateReferences(businessId);
   return useMutation({
     mutationFn: (data: AddReferenceInput) =>
-      api.post<BusinessReference>(`/businesses/${businessId}/references`, data),
+      api.post<ReferenceBatch>(`/businesses/${businessId}/references`, data),
     onSuccess: invalidate,
   });
 }
@@ -312,7 +326,7 @@ export function useUpdateReference(businessId: string) {
 export function useRefreshReference(businessId: string) {
   const invalidate = useInvalidateReferences(businessId);
   return useMutation({
-    mutationFn: (id: string) => api.post<BusinessReference>(`/business-references/${id}/refresh`),
+    mutationFn: (id: string) => api.post<ReferenceBatch>(`/business-references/${id}/refresh`),
     onSuccess: invalidate,
   });
 }
@@ -360,5 +374,103 @@ export function useDisconnectDrive() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/google-drive/accounts/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: businessKeys.drive }),
+  });
+}
+
+// ---------- admin notes (AI revises the whole profile) ----------
+
+export function useNotes(businessId: string) {
+  return useQuery({
+    queryKey: businessKeys.notes(businessId),
+    queryFn: () => api.get<BusinessNote[]>(`/businesses/${businessId}/notes`),
+  });
+}
+
+export function useCreateNote(businessId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateBusinessNoteInput) =>
+      api.post<{ id: string; jobId: string }>(`/businesses/${businessId}/notes`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: businessKeys.notes(businessId) }),
+  });
+}
+
+export function useUpdateNote(businessId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      api.patch<BusinessNote>(`/business-notes/${id}`, { isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: businessKeys.notes(businessId) }),
+  });
+}
+
+export function useDeleteNote(businessId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/business-notes/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: businessKeys.notes(businessId) }),
+  });
+}
+
+// ---------- brand assets (past content AI learns from) ----------
+
+/** Polls while an analysis is running, so results appear without a reload. */
+export function useAssets(businessId: string) {
+  return useQuery({
+    queryKey: businessKeys.assets(businessId),
+    queryFn: () => api.get<BusinessAsset[]>(`/businesses/${businessId}/assets`),
+    refetchInterval: (q) =>
+      q.state.data?.some((a) => a.analysisStatus === 'QUEUED') ? 4000 : false,
+  });
+}
+
+/** One asset with its text. */
+export function useAsset(id: string) {
+  return useQuery({
+    queryKey: businessKeys.asset(id),
+    queryFn: () => api.get<BusinessAsset>(`/business-assets/${id}`),
+  });
+}
+
+function useInvalidateAssets(businessId: string) {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: businessKeys.assets(businessId) });
+    void qc.invalidateQueries({ queryKey: ['business-assets'] });
+  };
+}
+
+/** `form`: text fields + `file` + `previews` (multipart). */
+export function useCreateAsset(businessId: string) {
+  const invalidate = useInvalidateAssets(businessId);
+  return useMutation({
+    mutationFn: (form: FormData) =>
+      api.post<BusinessAsset>(`/businesses/${businessId}/assets`, form),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateAsset(businessId: string) {
+  const invalidate = useInvalidateAssets(businessId);
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateBusinessAssetInput }) =>
+      api.patch<BusinessAsset>(`/business-assets/${id}`, data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useAnalyzeAsset(businessId: string) {
+  const invalidate = useInvalidateAssets(businessId);
+  return useMutation({
+    mutationFn: (id: string) => api.post<BusinessAsset>(`/business-assets/${id}/analyze`),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteAsset(businessId: string) {
+  const invalidate = useInvalidateAssets(businessId);
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/business-assets/${id}`),
+    onSuccess: invalidate,
   });
 }

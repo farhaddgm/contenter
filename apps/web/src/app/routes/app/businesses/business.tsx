@@ -18,7 +18,7 @@ import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { PageHeader } from '@/components/ui/misc';
+import { PageHeader, Segmented } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
@@ -35,8 +35,10 @@ import {
 } from '@/features/businesses/api/businesses';
 import { BuildDialog, SuggestDialog } from '@/features/businesses/components/ai-dialogs';
 import { BusinessFormDrawer } from '@/features/businesses/components/business-form';
+import { AssetsPanel } from '@/features/businesses/components/assets-panel';
 import { CompletenessBar } from '@/features/businesses/components/completeness-bar';
 import { useDriveResultNotice } from '@/features/businesses/components/google-drive-card';
+import { NotesCard } from '@/features/businesses/components/notes-card';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
 import { SectionCard } from '@/features/businesses/components/section-card';
 import { SourceList } from '@/features/businesses/components/source-dialogs';
@@ -61,6 +63,7 @@ export default function BusinessRoute() {
     null,
   );
   const [allSources, setAllSources] = useState(false);
+  const [tab, setTab] = useState<'profile' | 'references' | 'assets'>('profile');
   useDriveResultNotice();
 
   const invalidate = [businessKeys.one(businessId), businessKeys.suggestions(businessId)];
@@ -192,23 +195,41 @@ export default function BusinessRoute() {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
-            <ReferencesCard businessId={business.id} />
-            <div>
-              <h2 className="text-lg font-semibold">{t('businesses.profile')}</h2>
-              <p className="text-sm text-muted-foreground">{t('businesses.profileHint')}</p>
-            </div>
-            {BusinessSectionKey.map((key) => (
-              <SectionCard
-                key={key}
-                businessId={business.id}
-                sectionKey={key}
-                section={sections.get(key)}
-                suggestions={pendingByKey.get(key) ?? []}
-                editable={editable}
-                suggesting={suggestTracker.isRunning && !!suggestJob?.keys.includes(key)}
-                onSuggest={(k) => setSuggestKeys([k])}
-              />
-            ))}
+            <Segmented
+              value={tab}
+              onChange={setTab}
+              options={(['profile', 'references', 'assets'] as const).map((value) => ({
+                value,
+                label: t(`businesses.tabs.${value}`),
+              }))}
+            />
+            {tab === 'references' && <ReferencesCard businessId={business.id} />}
+            {tab === 'assets' && <AssetsPanel businessId={business.id} />}
+            {tab === 'profile' && (
+              <>
+                <NotesCard
+                  businessId={business.id}
+                  hasWebsite={!!business.website}
+                  disabled={building}
+                />
+                <div>
+                  <h2 className="text-lg font-semibold">{t('businesses.profile')}</h2>
+                  <p className="text-sm text-muted-foreground">{t('businesses.profileHint')}</p>
+                </div>
+                {BusinessSectionKey.map((key) => (
+                  <SectionCard
+                    key={key}
+                    businessId={business.id}
+                    sectionKey={key}
+                    section={sections.get(key)}
+                    suggestions={pendingByKey.get(key) ?? []}
+                    editable={editable}
+                    suggesting={suggestTracker.isRunning && !!suggestJob?.keys.includes(key)}
+                    onSuggest={(k) => setSuggestKeys([k])}
+                  />
+                ))}
+              </>
+            )}
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-20 lg:h-fit">

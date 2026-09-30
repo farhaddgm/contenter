@@ -64,6 +64,13 @@ import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
 import { GoogleDriveModule } from '../google-drive/google-drive.module';
 import { SamplesCoreModule } from '../samples/samples-core.module';
+import { FileStorageService } from '../../infra/storage/file-storage.service';
+import { BusinessNotesAssetsController } from './notes-assets.controller';
+import {
+  AssetUploadInterceptor,
+  BusinessAssetsService,
+  BusinessNotesService,
+} from './notes-assets.service';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
 
@@ -84,6 +91,8 @@ export class BusinessesService {
     private readonly audit: AuditService,
     private readonly jobs: AiJobsService,
     private readonly references: ReferencesService,
+    private readonly assets: BusinessAssetsService,
+    private readonly storage: FileStorageService,
   ) {}
 
   // ---------- businesses ----------
@@ -189,7 +198,9 @@ export class BusinessesService {
   /** Linked topics keep existing; they are simply unlinked (onDelete: SetNull). */
   async remove(id: string, user: AuthUser) {
     await this.exists(id);
+    const files = await this.assets.fileKeysOf(id);
     await this.prisma.business.delete({ where: { id } });
+    await this.storage.remove(files);
     this.audit.log({
       userId: user.id,
       action: 'business.delete',
@@ -514,7 +525,7 @@ export class BusinessesService {
       inputs.map((ref) => this.references.add(business.id, ref, user)),
     );
     const failed = results.filter(
-      (r) => r.status === 'rejected' || r.value.status !== 'READY',
+      (r) => r.status === 'rejected' || r.value.references.some((ref) => ref.status !== 'READY'),
     ).length;
     if (failed) return { businessId: business.id, jobId: null, failed };
 
@@ -946,8 +957,14 @@ export class BusinessItemsController {
 
 @Module({
   imports: [SamplesCoreModule, GoogleDriveModule],
-  controllers: [BusinessesController, BusinessItemsController],
-  providers: [BusinessesService, ReferencesService],
+  controllers: [BusinessesController, BusinessItemsController, BusinessNotesAssetsController],
+  providers: [
+    BusinessesService,
+    ReferencesService,
+    BusinessNotesService,
+    BusinessAssetsService,
+    AssetUploadInterceptor,
+  ],
   exports: [BusinessesService],
 })
 export class BusinessesModule {}

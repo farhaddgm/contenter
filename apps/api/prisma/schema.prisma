@@ -56,6 +56,8 @@ model User {
   blockedSources      BlockedSource[]
   businessReferences  BusinessReference[]
   googleDriveAccounts GoogleDriveAccount[]
+  businessNotes       BusinessNote[]
+  businessAssets      BusinessAsset[]
 }
 
 model RefreshToken {
@@ -158,6 +160,8 @@ model Business {
   suggestions BusinessSuggestion[]
   discoveries BusinessDiscovery[]
   references  BusinessReference[]
+  notes       BusinessNote[]
+  assets      BusinessAsset[]
 
   @@index([status, updatedAt])
 }
@@ -292,6 +296,87 @@ model GoogleDriveAccount {
 
   connectedBy User?               @relation(fields: [connectedById], references: [id], onDelete: SetNull)
   references  BusinessReference[]
+}
+
+enum NoteStatus {
+  PENDING
+  APPLIED
+  FAILED
+}
+
+enum NoteApplyMode {
+  DIRECT
+  SUGGEST
+}
+
+/// An admin's explanation/correction; BUSINESS_REVISE updates the whole profile from it. Active
+/// notes are also given to later builds and suggestions as standing corrections.
+model BusinessNote {
+  id          String               @id @default(cuid())
+  businessId  String
+  text        String
+  apply       NoteApplyMode        @default(DIRECT)
+  /// ResearchScope the revision was allowed to consult (NONE / REFERENCES / REFERENCE_SITES / WEB)
+  scope       String               @default("NONE")
+  status      NoteStatus           @default(PENDING)
+  summary     String               @default("")
+  changedKeys BusinessSectionKey[]
+  error       String?
+  isActive    Boolean              @default(true)
+  jobId       String?
+  createdById String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+}
+
+enum BusinessAssetKind {
+  ARTICLE
+  IMAGE
+  BANNER
+  ARTWORK
+  CREATIVE
+  VIDEO
+  MOTION
+}
+
+/// A past piece of the business (article, image, banner, artwork, creative, video, motion).
+/// BUSINESS_ASSET_ANALYZE turns it into a style analysis that every AI job of a linked topic gets.
+model BusinessAsset {
+  id             String            @id @default(cuid())
+  businessId     String
+  kind           BusinessAssetKind
+  title          String            @default("")
+  description    String            @default("")
+  url            String            @default("")
+  /// Article body, caption or transcript (pasted, uploaded as text, or fetched from `url`)
+  text           String            @default("")
+  fileName       String?
+  mimeType       String?
+  size           Int?
+  /// Storage key of the uploaded original (FileStorageService)
+  storageKey     String?
+  /// Storage keys of JPEG previews: the downsized image, or frames captured from the video
+  previews       String[]
+  /// Public image URLs found on `url` (og:image), used when nothing was uploaded
+  remoteImages   String[]
+  analysisStatus AnalysisStatus    @default(NONE)
+  analysis       Json?
+  analysisError  String?
+  lastJobId      String?
+  isActive       Boolean           @default(true)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
 }
 
 enum SourceBlockKind {
@@ -675,6 +760,8 @@ enum AiJobType {
   BUSINESS_DISCOVER
   BUSINESS_BUILD
   BUSINESS_SUGGEST
+  BUSINESS_REVISE
+  BUSINESS_ASSET_ANALYZE
 }
 
 enum AiJobStatus {

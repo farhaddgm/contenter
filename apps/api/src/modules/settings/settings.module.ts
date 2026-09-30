@@ -27,6 +27,8 @@ const DEFAULT_EFFORT: Record<AiJobType, AiEffort> = {
   BUSINESS_DISCOVER: 'medium',
   BUSINESS_BUILD: 'high',
   BUSINESS_SUGGEST: 'medium',
+  BUSINESS_REVISE: 'high',
+  BUSINESS_ASSET_ANALYZE: 'medium',
 };
 
 @Injectable()

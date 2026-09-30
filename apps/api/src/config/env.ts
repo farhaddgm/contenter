@@ -75,6 +75,10 @@ const EnvSchema = z.object({
   AI_DEFAULT_MODEL: z.string().default('claude-opus-5'),
   /** Server-side refusal fallback (beta `server-side-fallback-2026-07-01`). */
   AI_REFUSAL_FALLBACK: bool('true'),
+  /** Where uploaded brand assets are stored (a volume shared by api and worker in Docker). */
+  UPLOAD_DIR: z.string().default('uploads'),
+  /** Largest accepted upload (videos). Keep nginx `client_max_body_size` at least this big. */
+  UPLOAD_MAX_MB: z.coerce.number().int().min(1).default(200),
   FETCH_TIMEOUT_MS: z.coerce.number().int().default(15000),
   FETCH_MAX_BYTES: z.coerce.number().int().default(5_000_000),
   /** Allow fetching private-network URLs (never enable in production). */

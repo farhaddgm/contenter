@@ -6,6 +6,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { QueueModule } from './infra/queue/queue.service';
+import { StorageModule } from './infra/storage/file-storage.service';
 import { AiModule } from './modules/ai/ai.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -30,6 +31,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     ConfigModule,
     PrismaModule,
     QueueModule,
+    StorageModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 600 }]),
     AuditModule,
     SmartCoreModule,

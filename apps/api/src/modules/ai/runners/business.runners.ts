@@ -5,6 +5,7 @@ import {
   BusinessDiscoveryResultSchema,
   BusinessSectionKey,
   BusinessSuggestResultSchema,
+  isSharedHost,
   isSourceBlocked,
   sourceBlockValue,
   suggestScope,
@@ -15,7 +16,14 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { cleanUrl, writeSection } from '../../businesses/section-writer';
 import { AiExecutor } from '../ai-executor.service';
 import { usableWhere } from '../../businesses/references.service';
-import { clamp, formatBusiness, formatReferences, formatSectionSpec } from '../context';
+import {
+  clamp,
+  formatBusiness,
+  formatReferences,
+  formatSectionSpec,
+  formatStandingNotes,
+} from '../context';
+import { BUSINESS_PROMPT_INCLUDE, ContextLoader } from '../context-loader.service';
 import {
   mergeSources,
   NonRetryableAiError,
@@ -26,7 +34,7 @@ import { filterSources, loadBlocklist, type BlockRule } from '../source-blocklis
 import type { AiRunner, RunnerResult } from './runner';
 
 /** Web searches allowed per research step. */
-const SEARCHES = { discover: 10, build: 12, suggest: 6 } as const;
+export const SEARCHES = { discover: 10, build: 12, suggest: 6, revise: 8 } as const;
 const NO_RESEARCH = '(no web research for this request — rely on the business profile)';
 /** Rationale of a build suggestion that sits next to admin-written text, in the business language. */
 const BUILD_KEPT_NOTE: Record<string, string> = {
@@ -41,7 +49,16 @@ const asJson = (v: unknown) => v as Prisma.InputJsonValue;
 
 type Reference = { kind: string; title: string; url: string; content: string };
 
-/** Hosts a REFERENCE_SITES search may use: the sites of link references and the business's own. */
+/** The admin's instruction for this job followed by the business's standing notes. */
+export function withStandingNotes(instruction: string, notes: { text: string }[]): string {
+  return [instruction.trim(), formatStandingNotes(notes)].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Hosts a REFERENCE_SITES search may use: the sites of link references and the business's own.
+ * Shared hosts (Google Drive, social networks, blogging platforms …) are left out: restricting a
+ * search to them would return everybody's public content, not this business's.
+ */
 export function referenceSites(
   refs: Pick<Reference, 'kind' | 'url'>[],
   website: string,
@@ -50,7 +67,9 @@ export function referenceSites(
   const urls = [...refs.filter((r) => r.kind === 'URL').map((r) => r.url), website];
   const hosts = urls
     .map((u) => (u ? sourceBlockValue(u, 'DOMAIN') : null))
-    .filter((h): h is string => !!h && !isSourceBlocked(`https://${h}`, blocked));
+    .filter(
+      (h): h is string => !!h && !isSharedHost(h) && !isSourceBlocked(`https://${h}`, blocked),
+    );
   return [...new Set(hosts)];
 }
 
@@ -59,11 +78,11 @@ export function referenceSites(
  * references (text snapshots) and/or web research. Returns the text for the `research` prompt
  * variable and the research call (null when no web search ran).
  */
-async function consult(
+export async function consult(
   prisma: PrismaService,
   ai: AiExecutor,
   args: {
-    task: 'BUSINESS_BUILD' | 'BUSINESS_SUGGEST';
+    task: 'BUSINESS_BUILD' | 'BUSINESS_SUGGEST' | 'BUSINESS_REVISE';
     scope: ResearchScope;
     business: { id: string; website: string; language: string };
     referenceIds?: string[];
@@ -245,6 +264,7 @@ export class BusinessBuildRunner implements AiRunner {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiExecutor,
+    private readonly ctx: ContextLoader,
   ) {}
 
   async run(job: AiJob): Promise<RunnerResult> {
@@ -259,9 +279,10 @@ export class BusinessBuildRunner implements AiRunner {
     };
     const b = await this.prisma.business.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { sections: true },
+      include: { sections: true, assets: BUSINESS_PROMPT_INCLUDE.assets },
     });
     const known = formatBusiness(b);
+    const directive = withStandingNotes(instruction, await this.ctx.standingNotes(b.id));
     const identity = [
       `"${b.name}"`,
       b.website ? `(website: ${b.website})` : null,
@@ -294,7 +315,7 @@ export class BusinessBuildRunner implements AiRunner {
         business_name: b.name,
         sections_spec: formatSectionSpec(),
         business: known,
-        instruction: instruction || '(none)',
+        instruction: directive || '(none)',
         research: notes,
       },
     });
@@ -401,6 +422,7 @@ export class BusinessSuggestRunner implements AiRunner {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiExecutor,
+    private readonly ctx: ContextLoader,
   ) {}
 
   async run(job: AiJob): Promise<RunnerResult> {
@@ -416,7 +438,7 @@ export class BusinessSuggestRunner implements AiRunner {
     if (!keys.length) throw new NonRetryableAiError('No sections were requested');
     const b = await this.prisma.business.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { sections: true },
+      include: { sections: true, assets: BUSINESS_PROMPT_INCLUDE.assets },
     });
 
     const { notes, research, blocked, references } = await consult(this.prisma, this.ai, {
@@ -441,7 +463,9 @@ export class BusinessSuggestRunner implements AiRunner {
         language: b.language,
         business: formatBusiness(b, { includeEmpty: true }),
         requested_sections: formatSectionSpec(keys),
-        instruction: input.instruction || '(none)',
+        instruction:
+          withStandingNotes(input.instruction ?? '', await this.ctx.standingNotes(b.id)) ||
+          '(none)',
         research: notes,
       },
     });

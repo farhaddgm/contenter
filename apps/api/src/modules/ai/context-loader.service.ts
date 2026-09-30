@@ -1,5 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+
+/** What `formatBusiness` needs: the sections and the usable brand assets (newest first). */
+export const BUSINESS_PROMPT_INCLUDE = {
+  sections: { select: { key: true, content: true } },
+  assets: {
+    where: { isActive: true },
+    orderBy: { createdAt: 'desc' },
+    take: 40,
+    select: { kind: true, title: true, description: true, analysis: true },
+  },
+} satisfies Prisma.BusinessInclude;
 
 /**
  * Loads the shared context every generative task needs: the linked business, principles, brand
@@ -43,7 +55,22 @@ export class ContextLoader {
   businessById(businessId: string) {
     return this.prisma.business.findUnique({
       where: { id: businessId },
-      include: { sections: { select: { key: true, content: true } } },
+      include: BUSINESS_PROMPT_INCLUDE,
+    });
+  }
+
+  /** Active notes of the business, newest first (`exceptId`: the note being applied now). */
+  standingNotes(businessId: string, exceptId?: string) {
+    return this.prisma.businessNote.findMany({
+      where: {
+        businessId,
+        isActive: true,
+        status: { not: 'FAILED' },
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { text: true },
     });
   }
 

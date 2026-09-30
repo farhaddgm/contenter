@@ -4,7 +4,9 @@ import {
   AddReferenceSchema,
   BUSINESS_REFERENCE_LIMIT,
   BUSINESS_REFERENCE_MAX_CHARS,
+  isGoogleDriveUrl,
   parseGoogleFileUrl,
+  parseGoogleFolderUrl,
   type AddReferenceInput,
   type GoogleFileType,
   type UpdateReferenceInput,
@@ -22,6 +24,9 @@ const PUBLIC_EXPORT: Record<GoogleFileType, ((id: string) => string) | null> = {
   presentation: (id) => `https://docs.google.com/presentation/d/${id}/export?format=txt`,
   file: null,
 };
+/** A web page with less readable text than this is a shell (login wall, JS app), not a source. */
+export const MIN_PAGE_TEXT = 200;
+const READ_CONCURRENCY = 4;
 
 type ReferenceWithAccount = ReferenceRow & {
   googleAccount: { id: string; email: string } | null;
@@ -33,6 +38,32 @@ const toPublic = ({ content, ...r }: ReferenceWithAccount, withContent = false) 
   chars: content.length,
   ...(withContent ? { content } : {}),
 });
+
+/**
+ * True when a fetch ended on a sign-in page instead of the requested one (the requested page is
+ * private). Such a page must never be stored as the content of a reference.
+ */
+export function isLoginWall(requestedUrl: string, finalUrl: string): boolean {
+  let requested: URL;
+  let final: URL;
+  try {
+    requested = new URL(requestedUrl);
+    final = new URL(finalUrl);
+  } catch {
+    return false;
+  }
+  const host = final.hostname.toLowerCase();
+  if (/^(accounts\.google\.com|login\.microsoftonline\.com|login\.live\.com)$/.test(host)) {
+    return true;
+  }
+  const moved = host !== requested.hostname.toLowerCase() || final.pathname !== requested.pathname;
+  return (
+    moved &&
+    /(^|[/._-])(login|signin|sign-in|sign_in|authwall|sso|auth)([/._?-]|$)/i.test(
+      `${host}${final.pathname}`,
+    )
+  );
+}
 
 /**
  * References of a business (docs/14-business-references.md): links, Google Docs/Drive files and
@@ -73,18 +104,28 @@ export class ReferencesService {
     return r;
   }
 
-  /** Adds a link (read right away) or a pasted text. A failed read is stored, not thrown. */
+  private async listByIds(ids: string[]) {
+    const refs = await this.prisma.businessReference.findMany({
+      where: { id: { in: ids } },
+      orderBy: { createdAt: 'asc' },
+      include: { googleAccount: ACCOUNT_REF },
+    });
+    return refs.map((r) => toPublic(r));
+  }
+
+  /**
+   * Adds a pasted text, a link (read right away) or a Google Drive folder (one reference per
+   * readable file inside). A failed read is stored on the reference, not thrown. `skipped`
+   * counts folder files that cannot be read as text.
+   */
   async add(businessId: string, input: AddReferenceInput, user: AuthUser) {
     const data = AddReferenceSchema.parse(input);
-    const count = await this.prisma.businessReference.count({ where: { businessId } });
-    if (count >= BUSINESS_REFERENCE_LIMIT) {
-      throw new BadRequestException(
-        `A business can have at most ${BUSINESS_REFERENCE_LIMIT} references`,
-      );
-    }
-    let row: ReferenceRow;
+    await this.assertRoom(businessId);
+
+    let ids: string[];
+    let skipped = 0;
     if (data.content) {
-      row = await this.prisma.businessReference.create({
+      const row = await this.prisma.businessReference.create({
         data: {
           businessId,
           kind: 'TEXT',
@@ -95,46 +136,63 @@ export class ReferencesService {
           createdById: user.id,
         },
       });
+      ids = [row.id];
     } else {
       const url = data.url!;
+      const google = isGoogleDriveUrl(url);
+      const isFile = !!parseGoogleFileUrl(url);
+      const isFolder = !!parseGoogleFolderUrl(url);
+      if (google && !isFile && !isFolder) {
+        // e.g. the Drive home or a search page: fetching it would only return a sign-in page.
+        throw new BadRequestException(
+          'This Google Drive link is neither a file nor a folder. Open the file or folder in Drive and copy its link.',
+        );
+      }
       const duplicate = await this.prisma.businessReference.findFirst({
         where: { businessId, url },
       });
       if (duplicate) throw new BadRequestException('This link is already a reference');
-      row = await this.prisma.businessReference.create({
+      const row = await this.prisma.businessReference.create({
         data: {
           businessId,
-          kind: parseGoogleFileUrl(url) ? 'GOOGLE_DOC' : 'URL',
+          kind: google ? 'GOOGLE_DOC' : 'URL',
           url,
           title: data.title,
           createdById: user.id,
         },
       });
-      await this.read(row);
+      if (isFolder) ({ ids, skipped } = await this.expandFolder(row));
+      else {
+        await this.read(row);
+        ids = [row.id];
+      }
     }
     this.audit.log({
       userId: user.id,
       action: 'business.reference_add',
       entityType: 'Business',
       entityId: businessId,
-      meta: { referenceId: row.id, kind: row.kind, url: row.url },
+      meta: { references: ids.length, skipped, url: data.url ?? null },
     });
-    return this.get(row.id).then(({ content: _content, ...rest }) => rest);
+    return { references: await this.listByIds(ids), skipped };
   }
 
-  /** Reads the link again and replaces the snapshot. */
+  /** Reads the link again and replaces the snapshot (a folder link is expanded into its files). */
   async refresh(id: string, user: AuthUser) {
     const row = await this.find(id);
     if (row.kind === 'TEXT') throw new BadRequestException('A pasted text has nothing to refresh');
-    await this.read(row);
+    let ids = [id];
+    let skipped = 0;
+    if (parseGoogleFolderUrl(row.url)) ({ ids, skipped } = await this.expandFolder(row));
+    else await this.read(row);
     this.audit.log({
       userId: user.id,
       action: 'business.reference_refresh',
       entityType: 'Business',
       entityId: row.businessId,
-      meta: { referenceId: id },
+      meta: { referenceId: id, references: ids.length, skipped },
     });
-    return toPublic(await this.find(id));
+    return { references: await this.listByIds(ids), skipped };
   }
 
   async update(id: string, input: UpdateReferenceInput, user: AuthUser) {
@@ -174,6 +232,85 @@ export class ReferencesService {
     return this.prisma.businessReference.count({ where: usableWhere(businessId, ids) });
   }
 
+  private async assertRoom(businessId: string) {
+    const count = await this.prisma.businessReference.count({ where: { businessId } });
+    if (count >= BUSINESS_REFERENCE_LIMIT) {
+      throw new BadRequestException(
+        `A business can have at most ${BUSINESS_REFERENCE_LIMIT} references`,
+      );
+    }
+    return BUSINESS_REFERENCE_LIMIT - count;
+  }
+
+  /**
+   * Turns a folder reference into one reference per readable file of the folder (read through
+   * a connected Google account). The folder row itself is removed on success; when the folder
+   * cannot be listed or has nothing readable it stays as a FAILED reference explaining why.
+   */
+  private async expandFolder(folderRow: ReferenceRow): Promise<{ ids: string[]; skipped: number }> {
+    const fail = async (error: string) => {
+      await this.prisma.businessReference.update({
+        where: { id: folderRow.id },
+        data: { kind: 'GOOGLE_DOC', status: 'FAILED', content: '', error: error.slice(0, 1000) },
+      });
+      return { ids: [folderRow.id], skipped: 0 };
+    };
+
+    let folder;
+    try {
+      folder = await this.drive.listFolder(
+        parseGoogleFolderUrl(folderRow.url)!,
+        folderRow.googleAccountId,
+      );
+    } catch (err) {
+      if (!(err instanceof DriveReadError)) {
+        this.logger.warn(`folder ${folderRow.url} failed: ${String(err)}`);
+      }
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+    const skippedNames = folder.skipped.map((f) => f.name);
+    if (!folder.files.length) {
+      return fail(
+        skippedNames.length
+          ? `The folder "${folder.name}" has no file that can be read as text. Not readable: ${skippedNames.slice(0, 8).join(', ')}. Convert them to Google Docs (File → Save as Google Docs) or paste their text.`
+          : `The folder "${folder.name}" is empty.`,
+      );
+    }
+
+    const existing = await this.prisma.businessReference.findMany({
+      where: { businessId: folderRow.businessId },
+      select: { id: true, url: true },
+    });
+    const byUrl = new Map(existing.map((r) => [r.url, r.id]));
+    // The folder row is replaced by its files, so it does not count against the limit.
+    let room = BUSINESS_REFERENCE_LIMIT - existing.length + 1;
+    const rows: ReferenceRow[] = [];
+    for (const file of folder.files) {
+      const known = byUrl.get(file.url);
+      if (!known && room <= 0) continue;
+      if (!known) room--;
+      const data = { googleAccountId: folder.accountId, title: file.name.slice(0, 300) };
+      rows.push(
+        known
+          ? await this.prisma.businessReference.update({ where: { id: known }, data })
+          : await this.prisma.businessReference.create({
+              data: {
+                ...data,
+                businessId: folderRow.businessId,
+                kind: 'GOOGLE_DOC',
+                url: file.url,
+                createdById: folderRow.createdById,
+              },
+            }),
+      );
+    }
+    for (let i = 0; i < rows.length; i += READ_CONCURRENCY) {
+      await Promise.all(rows.slice(i, i + READ_CONCURRENCY).map((r) => this.read(r)));
+    }
+    await this.prisma.businessReference.delete({ where: { id: folderRow.id } });
+    return { ids: rows.map((r) => r.id), skipped: folder.skipped.length };
+  }
+
   /** Fetches the link into the snapshot; the outcome (READY / FAILED + reason) is persisted. */
   private async read(row: ReferenceRow): Promise<void> {
     let data: Prisma.BusinessReferenceUpdateInput;
@@ -206,11 +343,18 @@ export class ReferencesService {
 
   private async readPage(url: string) {
     const { media } = await this.fetcher.fetch(url);
-    return {
-      title: media.title ?? '',
-      text: media.text ?? media.description ?? '',
-      accountId: null as string | null,
-    };
+    if (isLoginWall(url, media.finalUrl ?? url)) {
+      throw new FetchError(
+        'This page requires signing in, so its content cannot be read. Paste the text instead.',
+      );
+    }
+    const text = (media.text ?? media.description ?? '').trim();
+    if (text.length < MIN_PAGE_TEXT) {
+      throw new FetchError(
+        `Only ${text.length} characters of readable text were found — the page probably needs a login or JavaScript. Paste the text instead.`,
+      );
+    }
+    return { title: media.title ?? '', text, accountId: null as string | null };
   }
 
   /**
@@ -218,7 +362,8 @@ export class ReferencesService {
    * through a connected Google account that can open it.
    */
   private async readGoogle(row: ReferenceRow) {
-    const file = parseGoogleFileUrl(row.url)!;
+    const file = parseGoogleFileUrl(row.url);
+    if (!file) throw new DriveReadError('This Google Drive link is not a file link');
     const pub = await this.readPublicGoogle(file).catch(() => null);
     if (pub) return { ...pub, accountId: null as string | null };
     return this.drive.readFile(file.id, row.googleAccountId);

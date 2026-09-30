@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import {
-  mergeSources,
+  researchSources,
   NonRetryableAiError,
   type AiProvider,
   type ResearchRequest,
@@ -139,7 +139,7 @@ export class OpenAiProvider implements AiProvider {
     const cached = u?.input_tokens_details?.cached_tokens ?? 0;
     return {
       text,
-      sources: mergeSources(cited, found),
+      sources: researchSources(cited, found, text),
       model: response.model,
       usage: {
         inputTokens: Math.max(0, (u?.input_tokens ?? 0) - cached),
