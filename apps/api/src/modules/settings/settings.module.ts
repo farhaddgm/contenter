@@ -112,8 +112,8 @@ export class SettingsController {
     return this.withStatus(await this.settings.updateAi(body, user.id));
   }
 
-  private withStatus(settings: AiSettings): AiSettingsResponse {
-    return { ...settings, mock: this.providers.isMock, providers: this.providers.status() };
+  private async withStatus(settings: AiSettings): Promise<AiSettingsResponse> {
+    return { ...settings, mock: this.providers.isMock, providers: await this.providers.status() };
   }
 }
 

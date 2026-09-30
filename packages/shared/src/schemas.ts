@@ -305,6 +305,8 @@ export interface AiProviderStatus {
   name: AiProviderName;
   /** API key present in the server environment. */
   configured: boolean;
+  /** Text models the vendor's API currently lists (live, cached); absent when unavailable. */
+  models?: string[];
 }
 
 export type AiSettingsResponse = AiSettings & {

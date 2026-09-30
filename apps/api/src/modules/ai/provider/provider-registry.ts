@@ -6,7 +6,11 @@ import { AnthropicProvider } from './anthropic.provider';
 import { MockProvider } from './mock.provider';
 import { OpenAiProvider } from './openai.provider';
 
-type LiveProvider = AiProvider & { readonly configured: boolean };
+type LiveProvider = AiProvider & {
+  readonly configured: boolean;
+  /** Live model list from the vendor, if it offers one. */
+  listModels?(): Promise<string[] | undefined>;
+};
 
 /**
  * All AI vendors Contenter can talk to. The model chosen in settings (`provider:model`)
@@ -32,7 +36,13 @@ export class AiProviderRegistry {
     return { provider: this.isMock ? this.mock : this.live[provider], model };
   }
 
-  status(): AiProviderStatus[] {
-    return AiProviderName.map((name) => ({ name, configured: this.live[name].configured }));
+  async status(): Promise<AiProviderStatus[]> {
+    return Promise.all(
+      AiProviderName.map(async (name) => {
+        const p = this.live[name];
+        const models = p.configured ? await p.listModels?.() : undefined;
+        return { name, configured: p.configured, ...(models ? { models } : {}) };
+      }),
+    );
   }
 }
