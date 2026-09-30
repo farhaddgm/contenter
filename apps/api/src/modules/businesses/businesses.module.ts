@@ -71,6 +71,7 @@ import {
   BusinessAssetsService,
   BusinessNotesService,
 } from './notes-assets.service';
+import { PodSpaceService } from './podspace.service';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
 
@@ -961,6 +962,7 @@ export class BusinessItemsController {
   providers: [
     BusinessesService,
     ReferencesService,
+    PodSpaceService,
     BusinessNotesService,
     BusinessAssetsService,
     AssetUploadInterceptor,

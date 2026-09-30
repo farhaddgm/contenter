@@ -527,3 +527,46 @@ export function isGoogleDriveUrl(input: string): boolean {
     return false;
   }
 }
+
+// ---------- PodSpace (Fanap cloud storage) links ----------
+
+const PODSPACE_HOSTS = ['podspace.ir', 'www.podspace.ir', 'podspace.pod.ir'];
+
+export interface PodSpaceLink {
+  kind: 'folder' | 'file';
+  hash: string;
+  /** The public share token (`?shareHash=`); without it only the owner can open the link. */
+  shareHash: string | null;
+  /** `https://podspace.ir` or `https://podspace.pod.ir` — the API lives under the same host. */
+  origin: string;
+}
+
+/**
+ * A PodSpace folder or file link (e.g. `https://podspace.ir/folder/RKBY…?shareHash=PN7L…`).
+ * The share page is a JavaScript app with no readable text, so such links are read through the
+ * PodSpace API instead (a folder → one reference or asset per file, subfolders included).
+ */
+export function parsePodSpaceUrl(input: string): PodSpaceLink | null {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  if (!PODSPACE_HOSTS.includes(host)) return null;
+  const m = /^\/(?:[a-z]{2}\/)?(folders?|files?)\/([A-Za-z0-9_-]{6,})\/?$/.exec(url.pathname);
+  if (!m) return null;
+  return {
+    kind: m[1]!.startsWith('folder') ? 'folder' : 'file',
+    hash: m[2]!,
+    shareHash: url.searchParams.get('shareHash') || url.searchParams.get('sharehash') || null,
+    origin: `https://${host.replace(/^www\./, '')}`,
+  };
+}
+
+/** The canonical link of a PodSpace file or folder (what a reference stores as `url`). */
+export function podSpaceUrl(link: PodSpaceLink): string {
+  const share = link.shareHash ? `?shareHash=${encodeURIComponent(link.shareHash)}` : '';
+  return `${link.origin}/${link.kind}/${link.hash}${share}`;
+}

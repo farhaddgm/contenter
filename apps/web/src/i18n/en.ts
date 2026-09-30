@@ -1032,9 +1032,11 @@ export const en: DeepStrings<Dictionary> = {
       tabText: 'Text',
       url: 'Address',
       urlHint:
-        'A web page, a Google Docs / Sheets / Slides link, or a Google Drive folder link (every document inside is read). One link per line.',
+        'A web page, a Google Docs / Sheets / Slides link, or a shared Google Drive or PodSpace folder link (every file inside, subfolders included, is read). One link per line.',
       folderSkipped:
-        '{{count}} file(s) in the folder are not text (PDF, image, Word …) and were not read.',
+        '{{count}} file(s) in the folder were not read (video, unknown format, too large …).',
+      folderAssets:
+        '{{count}} image(s) from the folder were added to the brand assets and will be analyzed by AI.',
       titleField: 'Title',
       text: 'Text',
       textHint: 'Paste the document text or upload a .txt / .md file.',

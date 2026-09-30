@@ -37,10 +37,13 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.8.1",
     "linkedom": "^0.18.12",
+    "mammoth": "^1.13.0",
     "multer": "^2.4.0",
     "openai": "^6.49.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "undici": "^7.30.0",
+    "unpdf": "^1.8.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {

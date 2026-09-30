@@ -224,6 +224,8 @@ const SHARED_HOSTS = [
   'digikala.com',
   'torob.com',
   'divar.ir',
+  'podspace.ir',
+  'podspace.pod.ir',
 ] as const;
 
 export function isSharedHost(host: string): boolean {

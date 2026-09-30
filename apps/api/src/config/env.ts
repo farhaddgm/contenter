@@ -81,6 +81,18 @@ const EnvSchema = z.object({
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).default(200),
   FETCH_TIMEOUT_MS: z.coerce.number().int().default(15000),
   FETCH_MAX_BYTES: z.coerce.number().int().default(5_000_000),
+  /**
+   * Optional HTTP(S) proxy for outbound reads of links (references, samples, assets), e.g. a
+   * small proxy on a server inside Iran: many Iranian services (PodSpace, …) do not answer
+   * servers abroad, which shows up as a timeout. Empty = direct.
+   */
+  FETCH_PROXY_URL: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** Hosts sent through FETCH_PROXY_URL: comma-separated domain suffixes, `*` = every host. */
+  FETCH_PROXY_HOSTS: z.string().default('ir'),
   /** Allow fetching private-network URLs (never enable in production). */
   FETCH_ALLOW_PRIVATE: bool('false'),
   SEED_ADMIN_EMAIL: z.string().default('admin@contenter.local'),
