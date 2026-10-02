@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import {
-  mergeSources,
+  researchSources,
   NonRetryableAiError,
   type AiProvider,
   type ResearchRequest,
@@ -15,8 +15,19 @@ type OpenAiEffort = NonNullable<OpenAI.Reasoning['effort']>;
 
 /** Reasoning models accept `reasoning.effort`; older chat models reject it. */
 export function isReasoningModel(model: string): boolean {
-  return /^(gpt-5|o\d)/i.test(model) && !/-chat(-latest)?$/i.test(model);
+  return /^(gpt-([5-9]|\d{2,})|o\d)/i.test(model) && !/-chat(-latest)?$/i.test(model);
 }
+
+/** Ids from `GET /v1/models` that can run Contenter's text tasks (no audio/image/embedding…). */
+export function isTextModel(id: string): boolean {
+  return (
+    /^(gpt-\d|o\d|chatgpt-)/i.test(id) &&
+    !/(audio|realtime|tts|transcribe|image|embedding|instruct|moderation|search|codex)/i.test(id) &&
+    !/-\d{4}-\d{2}-\d{2}$/.test(id)
+  );
+}
+
+const MODELS_TTL_MS = 60 * 60 * 1000;
 
 /**
  * OpenAI implementation of AiProvider (Responses API).
@@ -38,6 +49,31 @@ export class OpenAiProvider implements AiProvider {
 
   get configured(): boolean {
     return this.client !== null;
+  }
+
+  private modelsCache: { at: number; ids: string[] } | null = null;
+
+  /**
+   * Text models the account can use, straight from the API, so new releases show up in
+   * Settings without a code change. Cached for an hour; `undefined` if the list can't be read.
+   */
+  async listModels(): Promise<string[] | undefined> {
+    if (!this.client) return undefined;
+    if (this.modelsCache && Date.now() - this.modelsCache.at < MODELS_TTL_MS) {
+      return this.modelsCache.ids;
+    }
+    try {
+      const ids: string[] = [];
+      for await (const m of this.client.models.list({ timeout: 10_000, maxRetries: 0 })) {
+        if (isTextModel(m.id)) ids.push(m.id);
+      }
+      ids.sort((a, b) => b.localeCompare(a, 'en', { numeric: true }));
+      this.modelsCache = { at: Date.now(), ids };
+      return ids;
+    } catch (err) {
+      this.logger.warn(`Could not list OpenAI models: ${(err as Error).message}`);
+      return this.modelsCache?.ids;
+    }
   }
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
@@ -68,7 +104,10 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  /** Web research with the Responses API `web_search` tool (runs on OpenAI's side). */
+  /**
+   * Web research with the Responses API `web_search` tool (runs on OpenAI's side). The tool only
+   * supports an allow-list, so blocked sources rely on the request note and the source filter.
+   */
   async research(req: ResearchRequest): Promise<ResearchResult> {
     if (!this.client) {
       throw new NonRetryableAiError(
@@ -85,7 +124,15 @@ export class OpenAiProvider implements AiProvider {
           model: req.model,
           instructions: req.system,
           input: [{ role: 'user', content: [{ type: 'input_text', text: req.user }] }],
-          tools: [{ type: 'web_search', search_context_size: 'high' }],
+          tools: [
+            {
+              type: 'web_search',
+              search_context_size: 'high',
+              ...(req.allowedDomains?.length
+                ? { filters: { allowed_domains: req.allowedDomains } }
+                : {}),
+            },
+          ],
           include: ['web_search_call.action.sources'],
           max_tool_calls: req.maxSearches,
           max_output_tokens: req.maxTokens ?? 32_000,
@@ -128,7 +175,7 @@ export class OpenAiProvider implements AiProvider {
     const cached = u?.input_tokens_details?.cached_tokens ?? 0;
     return {
       text,
-      sources: mergeSources(cited, found),
+      sources: researchSources(cited, found, text),
       model: response.model,
       usage: {
         inputTokens: Math.max(0, (u?.input_tokens ?? 0) - cached),

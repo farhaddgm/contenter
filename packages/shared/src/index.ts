@@ -5,3 +5,5 @@ export * from './types';
 export * from './smart';
 export * from './ai-providers';
 export * from './business';
+export * from './business-assets';
+export * from './business-profile';

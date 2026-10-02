@@ -29,6 +29,7 @@ import {
   useSelectCandidate,
 } from '@/features/businesses/api/businesses';
 import { DiscoverDialog } from '@/features/businesses/components/discover-dialog';
+import { SourceList } from '@/features/businesses/components/source-dialogs';
 
 const hostOf = (url: string) => {
   try {
@@ -236,21 +237,11 @@ export default function DiscoveryRoute() {
             {d.sources.length > 0 && (
               <Card>
                 <CardHeader title={t('businesses.sources')} />
-                <ul className="grid gap-1.5 px-5 py-4 text-xs sm:grid-cols-2">
-                  {d.sources.map((s) => (
-                    <li key={s.url} className="truncate">
-                      <a
-                        href={s.url}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="text-primary hover:underline"
-                        title={s.url}
-                      >
-                        {s.title || s.url}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                <SourceList
+                  sources={d.sources}
+                  target={{ discovery: d.id }}
+                  className="grid gap-x-4 space-y-0 sm:grid-cols-2"
+                />
               </Card>
             )}
           </>

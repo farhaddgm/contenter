@@ -18,6 +18,10 @@ export interface ResearchRequest {
   user: string;
   /** Upper bound on web searches for this request. */
   maxSearches: number;
+  /** `host` / `host/path` values the vendor search must skip (where the tool supports it). */
+  blockedDomains?: string[];
+  /** When set, the vendor search may only return pages of these hosts (subdomains included). */
+  allowedDomains?: string[];
   maxTokens?: number;
 }
 
@@ -82,6 +86,29 @@ export function sumUsage(...items: AiUsage[]): AiUsage {
       webSearches: (acc.webSearches ?? 0) + (u.webSearches ?? 0),
     }),
     { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, webSearches: 0 },
+  );
+}
+
+/**
+ * Sources of a research run: the pages the notes rely on — cited by the model, or named by URL
+ * in the notes. Search hits the model saw but did not use are not sources; listing them fills
+ * the admin's source list with unrelated pages. Only when the notes reference nothing at all do
+ * the raw hits stand in.
+ */
+export function researchSources(
+  cited: { url: string; title: string }[],
+  found: { url: string; title: string }[],
+  notes = '',
+): { url: string; title: string }[] {
+  const titles = new Map(
+    found.filter((f) => f.title && f.title !== f.url).map((f) => [f.url, f.title]),
+  );
+  const used = [...cited, ...found.filter((f) => f.url && notes.includes(f.url))];
+  return mergeSources(
+    (used.length ? used : found).map((s) => ({
+      url: s.url,
+      title: s.title && s.title !== s.url ? s.title : (titles.get(s.url) ?? ''),
+    })),
   );
 }
 

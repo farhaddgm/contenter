@@ -1,6 +1,7 @@
 /**
  * API response shapes (what the web app receives).
  */
+import type { TermIssue } from './business-profile';
 import type {
   AiJobStatus,
   AiJobType,
@@ -243,6 +244,8 @@ export interface Content {
   versions?: ContentVersion[];
   topic?: Pick<Topic, 'id' | 'title'>;
   idea?: Pick<Idea, 'id' | 'title'> | null;
+  /** Detail only: brand terminology violations of the current version (linked business). */
+  termIssues?: TermIssue[];
 }
 
 export interface AiJob {

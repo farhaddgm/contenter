@@ -40,19 +40,26 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  refreshTokens      RefreshToken[]
-  auditLogs          AuditLog[]
-  aiJobs             AiJob[]
-  topics             Topic[]
-  interactionLogs    InteractionLog[]
-  appErrors          AppError[]
-  smartConversations SmartConversation[]
-  walkerIssues       WalkerIssue[]
-  brandDocuments     BrandDocument[]
-  businesses         Business[]
-  businessSections   BusinessSection[]
-  sectionRevisions   BusinessSectionRevision[]
-  businessDiscovery  BusinessDiscovery[]
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+  aiJobs              AiJob[]
+  topics              Topic[]
+  interactionLogs     InteractionLog[]
+  appErrors           AppError[]
+  smartConversations  SmartConversation[]
+  walkerIssues        WalkerIssue[]
+  brandDocuments      BrandDocument[]
+  businesses          Business[]
+  businessSections    BusinessSection[]         @relation("SectionUpdatedBy")
+  reviewedSections    BusinessSection[]         @relation("SectionReviewedBy")
+  businessFacts       BusinessFact[]
+  sectionRevisions    BusinessSectionRevision[]
+  businessDiscovery   BusinessDiscovery[]
+  blockedSources      BlockedSource[]
+  businessReferences  BusinessReference[]
+  googleDriveAccounts GoogleDriveAccount[]
+  businessNotes       BusinessNote[]
+  businessAssets      BusinessAsset[]
 }
 
 model RefreshToken {
@@ -81,6 +88,7 @@ enum BusinessStatus {
 enum BusinessOrigin {
   MANUAL
   RESEARCH
+  SOURCES
 }
 
 enum BusinessBuildState {
@@ -103,6 +111,9 @@ enum BusinessSectionKey {
   CONTENT_PILLARS
   GUIDELINES
   CHANNELS
+  GOALS
+  FAQ
+  CALENDAR
 }
 
 enum SectionSource {
@@ -153,24 +164,34 @@ model Business {
   sections    BusinessSection[]
   suggestions BusinessSuggestion[]
   discoveries BusinessDiscovery[]
+  references  BusinessReference[]
+  notes       BusinessNote[]
+  assets      BusinessAsset[]
+  facts       BusinessFact[]
+  terms       BusinessTerm[]
+  audits      BusinessAudit[]
 
   @@index([status, updatedAt])
 }
 
 /// One profile section of a business (services, personas, brand book, …). Markdown text.
 model BusinessSection {
-  id          String             @id @default(cuid())
-  businessId  String
-  key         BusinessSectionKey
-  content     String             @default("")
-  source      SectionSource      @default(ADMIN)
-  updatedById String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id           String             @id @default(cuid())
+  businessId   String
+  key          BusinessSectionKey
+  content      String             @default("")
+  source       SectionSource      @default(ADMIN)
+  updatedById  String?
+  /// When a person confirmed the current text; null = AI text nobody has reviewed yet
+  reviewedAt   DateTime?
+  reviewedById String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  business  Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  updatedBy User?                     @relation(fields: [updatedById], references: [id], onDelete: SetNull)
-  revisions BusinessSectionRevision[]
+  business   Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy  User?                     @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  reviewedBy User?                     @relation("SectionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  revisions  BusinessSectionRevision[]
 
   @@unique([businessId, key])
 }
@@ -231,6 +252,249 @@ model BusinessDiscovery {
   createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+}
+
+enum ReferenceKind {
+  URL
+  GOOGLE_DOC
+  TEXT
+}
+
+enum ReferenceStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+/// Admin-supplied source for AI builds/suggestions: a web page, a Google Docs/Drive file or a
+/// pasted text. `content` is the text snapshot AI reads (refreshed on demand).
+model BusinessReference {
+  id              String          @id @default(cuid())
+  businessId      String
+  kind            ReferenceKind
+  url             String          @default("")
+  title           String          @default("")
+  content         String          @default("")
+  status          ReferenceStatus @default(PENDING)
+  error           String?
+  isActive        Boolean         @default(true)
+  fetchedAt       DateTime?
+  googleAccountId String?
+  createdById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  googleAccount GoogleDriveAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)
+  createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+}
+
+/// Google account connected (OAuth, drive.readonly) to read private Google Docs/Drive files.
+model GoogleDriveAccount {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  googleSub     String
+  /// AES-256-GCM encrypted refresh token (see secret-box.ts)
+  refreshToken  String
+  scope         String    @default("")
+  /// Set when Google rejects the token (revoked / expired) — reconnect to clear
+  error         String?
+  lastUsedAt    DateTime?
+  connectedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  connectedBy User?               @relation(fields: [connectedById], references: [id], onDelete: SetNull)
+  references  BusinessReference[]
+}
+
+enum NoteStatus {
+  PENDING
+  APPLIED
+  FAILED
+}
+
+enum NoteApplyMode {
+  DIRECT
+  SUGGEST
+}
+
+/// An admin's explanation/correction; BUSINESS_REVISE updates the whole profile from it. Active
+/// notes are also given to later builds and suggestions as standing corrections.
+model BusinessNote {
+  id          String               @id @default(cuid())
+  businessId  String
+  text        String
+  apply       NoteApplyMode        @default(DIRECT)
+  /// ResearchScope the revision was allowed to consult (NONE / REFERENCES / REFERENCE_SITES / WEB)
+  scope       String               @default("NONE")
+  status      NoteStatus           @default(PENDING)
+  summary     String               @default("")
+  changedKeys BusinessSectionKey[]
+  error       String?
+  isActive    Boolean              @default(true)
+  jobId       String?
+  createdById String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+}
+
+enum BusinessAssetKind {
+  ARTICLE
+  IMAGE
+  BANNER
+  ARTWORK
+  CREATIVE
+  VIDEO
+  MOTION
+}
+
+/// A past piece of the business (article, image, banner, artwork, creative, video, motion).
+/// BUSINESS_ASSET_ANALYZE turns it into a style analysis that every AI job of a linked topic gets.
+model BusinessAsset {
+  id             String            @id @default(cuid())
+  businessId     String
+  kind           BusinessAssetKind
+  title          String            @default("")
+  description    String            @default("")
+  url            String            @default("")
+  /// Article body, caption or transcript (pasted, uploaded as text, or fetched from `url`)
+  text           String            @default("")
+  fileName       String?
+  mimeType       String?
+  size           Int?
+  /// Storage key of the uploaded original (FileStorageService)
+  storageKey     String?
+  /// Storage keys of JPEG previews: the downsized image, or frames captured from the video
+  previews       String[]
+  /// Public image URLs found on `url` (og:image), used when nothing was uploaded
+  remoteImages   String[]
+  analysisStatus AnalysisStatus    @default(NONE)
+  analysis       Json?
+  analysisError  String?
+  lastJobId      String?
+  isActive       Boolean           @default(true)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+}
+
+enum FactCategory {
+  IDENTITY
+  OFFER
+  PRICING
+  NUMBERS
+  CONTACT
+  LEGAL
+  OTHER
+}
+
+/// Exact value content may quote (price, fee, limit, number, date, contact, license …).
+/// Admin-typed facts are verified; facts found by a research build start unverified.
+model BusinessFact {
+  id          String        @id @default(cuid())
+  businessId  String
+  label       String
+  value       String
+  category    FactCategory  @default(OTHER)
+  sourceUrl   String        @default("")
+  note        String        @default("")
+  source      SectionSource @default(ADMIN)
+  verified    Boolean       @default(true)
+  /// After this day the value is no longer sent to AI (offers, rates, campaigns)
+  validUntil  DateTime?
+  isActive    Boolean       @default(true)
+  updatedById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, category])
+}
+
+enum TermKind {
+  USE
+  AVOID
+}
+
+/// Brand terminology: USE = always write `term` (alternatives = wrong variants to catch);
+/// AVOID = never write `term` (alternatives = replacements). Checked by code (checkTerms).
+model BusinessTerm {
+  id           String   @id @default(cuid())
+  businessId   String
+  term         String
+  kind         TermKind @default(USE)
+  alternatives String[]
+  note         String   @default("")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+enum AuditStatus {
+  RUNNING
+  READY
+  FAILED
+}
+
+/// AI quality review of the whole profile (BUSINESS_AUDIT). `issues` holds AuditIssue[] with
+/// their OPEN / FIXING / DISMISSED state.
+model BusinessAudit {
+  id          String      @id @default(cuid())
+  businessId  String
+  status      AuditStatus @default(RUNNING)
+  score       Int?
+  summary     String      @default("")
+  strengths   String[]
+  issues      Json        @default("[]")
+  error       String?
+  jobId       String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+}
+
+enum SourceBlockKind {
+  URL
+  DOMAIN
+}
+
+/// Research source the admin blacklisted: excluded from every future web research and purged
+/// from stored business/discovery sources.
+model BlockedSource {
+  id          String          @id @default(cuid())
+  kind        SourceBlockKind
+  /// `host/path` for URL, `host` for DOMAIN (normalized — see sourceBlockValue in shared)
+  value       String
+  note        String          @default("")
+  createdById String?
+  createdAt   DateTime        @default(now())
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([kind, value])
 }
 
 // ─────────────────────────────── Topics ───────────────────────────────
@@ -593,6 +857,9 @@ enum AiJobType {
   BUSINESS_DISCOVER
   BUSINESS_BUILD
   BUSINESS_SUGGEST
+  BUSINESS_REVISE
+  BUSINESS_ASSET_ANALYZE
+  BUSINESS_AUDIT
 }
 
 enum AiJobStatus {

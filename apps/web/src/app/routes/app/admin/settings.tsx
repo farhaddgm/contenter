@@ -21,6 +21,7 @@ import { useT } from '@/i18n';
 import { useUser } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { useAiSettings, useUpdateAiSettings } from '@/features/admin/api';
+import { GoogleDriveCard } from '@/features/businesses/components/google-drive-card';
 import { GoogleAccessCard } from '@/features/settings/components/google-access-card';
 import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
@@ -57,6 +58,7 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
   const refs = [
     ...new Set([
       ...AI_MODEL_CATALOG.map((m) => modelRef(m.provider, m.id)),
+      ...data.providers.flatMap((p) => (p.models ?? []).map((id) => modelRef(p.name, id))),
       ...customModels,
       ...Object.values(form.models),
     ]),
@@ -247,6 +249,9 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
           <GoogleAccessCard />
         </div>
       )}
+      <div className="mt-6">
+        <GoogleDriveCard />
+      </div>
       <div className="mt-6">
         <SmartSettingsCard />
       </div>

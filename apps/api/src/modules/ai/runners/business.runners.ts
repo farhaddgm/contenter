@@ -1,21 +1,42 @@
 import { Injectable } from '@nestjs/common';
 import type { AiJob, Prisma } from '@prisma/client';
 import {
+  BUSINESS_FACT_LIMIT,
   BusinessBuildResultSchema,
   BusinessDiscoveryResultSchema,
   BusinessSectionKey,
   BusinessSuggestResultSchema,
+  isSharedHost,
+  isSourceBlocked,
+  sourceBlockValue,
+  suggestScope,
+  type ResearchedFact,
+  type ResearchScope,
   type WebSource,
 } from '@contenter/shared';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { cleanUrl, writeSection } from '../../businesses/section-writer';
 import { AiExecutor } from '../ai-executor.service';
-import { clamp, formatBusiness, formatSectionSpec } from '../context';
-import { mergeSources, NonRetryableAiError, sumUsage } from '../provider/ai-provider';
+import { usableWhere } from '../../businesses/references.service';
+import {
+  clamp,
+  formatBusiness,
+  formatReferences,
+  formatSectionSpec,
+  formatStandingNotes,
+} from '../context';
+import { BUSINESS_PROMPT_INCLUDE, ContextLoader } from '../context-loader.service';
+import {
+  mergeSources,
+  NonRetryableAiError,
+  sumUsage,
+  type ResearchResult,
+} from '../provider/ai-provider';
+import { filterSources, loadBlocklist, type BlockRule } from '../source-blocklist';
 import type { AiRunner, RunnerResult } from './runner';
 
 /** Web searches allowed per research step. */
-const SEARCHES = { discover: 10, build: 12, suggest: 6 } as const;
+export const SEARCHES = { discover: 10, build: 12, suggest: 6, revise: 8 } as const;
 const NO_RESEARCH = '(no web research for this request — rely on the business profile)';
 /** Rationale of a build suggestion that sits next to admin-written text, in the business language. */
 const BUILD_KEPT_NOTE: Record<string, string> = {
@@ -23,7 +44,165 @@ const BUILD_KEPT_NOTE: Record<string, string> = {
   en: 'Built from web research. Your own text was kept; compare and decide.',
 };
 
+const REFERENCES_ONLY =
+  '(No web research was done for this request. Rely only on the admin references above and the known information; do not add facts from memory. Report what the references do not cover as gaps.)';
+
 const asJson = (v: unknown) => v as Prisma.InputJsonValue;
+
+type Reference = { kind: string; title: string; url: string; content: string };
+
+/** The admin's instruction for this job followed by the business's standing notes. */
+export function withStandingNotes(instruction: string, notes: { text: string }[]): string {
+  return [instruction.trim(), formatStandingNotes(notes)].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Hosts a REFERENCE_SITES search may use: the sites of link references and the business's own.
+ * Shared hosts (Google Drive, social networks, blogging platforms …) are left out: restricting a
+ * search to them would return everybody's public content, not this business's.
+ */
+export function referenceSites(
+  refs: Pick<Reference, 'kind' | 'url'>[],
+  website: string,
+  blocked: BlockRule[],
+): string[] {
+  const urls = [...refs.filter((r) => r.kind === 'URL').map((r) => r.url), website];
+  const hosts = urls
+    .map((u) => (u ? sourceBlockValue(u, 'DOMAIN') : null))
+    .filter(
+      (h): h is string => !!h && !isSharedHost(h) && !isSourceBlocked(`https://${h}`, blocked),
+    );
+  return [...new Set(hosts)];
+}
+
+/**
+ * Collects what a build/suggestion may consult, according to the research scope: the admin's
+ * references (text snapshots) and/or web research. Returns the text for the `research` prompt
+ * variable and the research call (null when no web search ran).
+ */
+export async function consult(
+  prisma: PrismaService,
+  ai: AiExecutor,
+  args: {
+    task: 'BUSINESS_BUILD' | 'BUSINESS_SUGGEST' | 'BUSINESS_REVISE';
+    scope: ResearchScope;
+    business: { id: string; website: string; language: string };
+    referenceIds?: string[];
+    maxSearches: number;
+    /** Research goal lines and the known-information block for the web step. */
+    goal: (string | null)[];
+    known: string;
+  },
+): Promise<{
+  notes: string;
+  research: ResearchResult | null;
+  blocked: BlockRule[];
+  references: number;
+}> {
+  const { scope, business } = args;
+  if (scope === 'NONE') return { notes: NO_RESEARCH, research: null, blocked: [], references: 0 };
+
+  const refs: Reference[] = await prisma.businessReference.findMany({
+    where: usableWhere(business.id, args.referenceIds),
+    orderBy: { createdAt: 'asc' },
+    select: { kind: true, title: true, url: true, content: true },
+  });
+  const blocked = scope === 'REFERENCES' ? [] : await loadBlocklist(prisma);
+  const sites = scope === 'REFERENCE_SITES' ? referenceSites(refs, business.website, blocked) : [];
+  const searchWeb = scope === 'WEB' || sites.length > 0;
+  if (!refs.length && !searchWeb) {
+    throw new NonRetryableAiError(
+      'No readable reference is available. Add a link, a Google Doc or a text to the business references (or fix the failed ones), or choose web research.',
+    );
+  }
+
+  const research = searchWeb
+    ? await ai.research({
+        task: args.task,
+        promptKey: 'business_research',
+        maxSearches: args.maxSearches,
+        blocked,
+        allowedDomains: scope === 'REFERENCE_SITES' ? sites : undefined,
+        vars: {
+          language: business.language,
+          goal: [
+            ...args.goal,
+            refs.length
+              ? `The admin already supplied these reference documents (the writer receives their full text): ${refs
+                  .slice(0, 20)
+                  .map((r) => `"${r.title || r.url}"`)
+                  .join(', ')}. Use the web to verify and complement them, not to repeat them.`
+              : null,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          business: args.known,
+        },
+      })
+    : null;
+
+  const notes = [
+    formatReferences(refs),
+    research
+      ? refs.length
+        ? `<web_research_notes>\n${research.text}\n</web_research_notes>`
+        : research.text
+      : REFERENCES_ONLY,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  return { notes, research, blocked, references: refs.length };
+}
+
+const MAX_RESEARCHED_FACTS = 25;
+
+/**
+ * Saves the key facts a build found, unverified. A fact the admin entered (same label) is never
+ * touched; an earlier AI fact with the same label is updated. Returns how many were written.
+ */
+export async function saveResearchedFacts(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  found: ResearchedFact[],
+  blocked: BlockRule[],
+): Promise<number> {
+  const existing = await tx.businessFact.findMany({ where: { businessId } });
+  const byLabel = new Map(existing.map((f) => [f.label.trim().toLowerCase(), f]));
+  let room = BUSINESS_FACT_LIMIT - existing.length;
+  let written = 0;
+  for (const f of found.slice(0, MAX_RESEARCHED_FACTS)) {
+    const label = f.label.trim().slice(0, 200);
+    const value = f.value.trim().slice(0, 1000);
+    if (!label || !value) continue;
+    const url = cleanUrl(f.sourceUrl);
+    const sourceUrl = url && !isSourceBlocked(url, blocked) ? url : '';
+    const prev = byLabel.get(label.toLowerCase());
+    if (prev) {
+      if (prev.source === 'ADMIN' || prev.value === value) continue;
+      await tx.businessFact.update({
+        where: { id: prev.id },
+        data: { value, category: f.category, sourceUrl, verified: false, updatedById: null },
+      });
+    } else {
+      if (room <= 0) continue;
+      await tx.businessFact.create({
+        data: {
+          businessId,
+          label,
+          value,
+          category: f.category,
+          sourceUrl,
+          source: 'AI',
+          verified: false,
+        },
+      });
+      byLabel.set(label.toLowerCase(), { source: 'AI', value } as (typeof existing)[number]);
+      room--;
+    }
+    written++;
+  }
+  return written;
+}
 
 /**
  * Keyword → web research → real business candidates. The admin then picks one
@@ -43,11 +222,13 @@ export class BusinessDiscoverRunner implements AiRunner {
       where: { id: job.targetId },
     });
     const where = d.location ? ` in or serving "${d.location}"` : '';
+    const blocked = await loadBlocklist(this.prisma);
 
     const research = await this.ai.research({
       task: this.type,
       promptKey: 'business_research',
       maxSearches: SEARCHES.discover,
+      blocked,
       vars: {
         language: d.language,
         goal: [
@@ -83,7 +264,7 @@ export class BusinessDiscoverRunner implements AiRunner {
         name: c.name.trim(),
         website: cleanUrl(c.website),
         confidence: clamp(c.confidence, 0, 1),
-        sourceUrls: c.sourceUrls.map(cleanUrl).filter(Boolean),
+        sourceUrls: c.sourceUrls.map(cleanUrl).filter((u) => u && !isSourceBlocked(u, blocked)),
       }));
 
     await this.prisma.businessDiscovery.update({
@@ -135,15 +316,25 @@ export class BusinessBuildRunner implements AiRunner {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiExecutor,
+    private readonly ctx: ContextLoader,
   ) {}
 
   async run(job: AiJob): Promise<RunnerResult> {
-    const { instruction = '' } = (job.input ?? {}) as { instruction?: string };
+    const {
+      instruction = '',
+      scope = 'WEB',
+      referenceIds,
+    } = (job.input ?? {}) as {
+      instruction?: string;
+      scope?: ResearchScope;
+      referenceIds?: string[];
+    };
     const b = await this.prisma.business.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { sections: true },
+      include: { ...BUSINESS_PROMPT_INCLUDE, sections: true },
     });
     const known = formatBusiness(b);
+    const directive = withStandingNotes(instruction, await this.ctx.standingNotes(b.id));
     const identity = [
       `"${b.name}"`,
       b.website ? `(website: ${b.website})` : null,
@@ -152,23 +343,19 @@ export class BusinessBuildRunner implements AiRunner {
     ]
       .filter(Boolean)
       .join(' ');
-
-    const research = await this.ai.research({
+    const { notes, research, blocked, references } = await consult(this.prisma, this.ai, {
       task: this.type,
-      promptKey: 'business_research',
+      scope,
+      business: b,
+      referenceIds,
       maxSearches: SEARCHES.build,
-      vars: {
-        language: b.language,
-        goal: [
-          `Research the real business ${identity} in depth, for a complete business profile covering:`,
-          formatSectionSpec(),
-          'Make sure you are researching this exact business, not a namesake.',
-          instruction ? `Admin instruction: ${instruction}` : null,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        business: known,
-      },
+      goal: [
+        `Research the real business ${identity} in depth, for a complete business profile covering:`,
+        formatSectionSpec(),
+        'Make sure you are researching this exact business, not a namesake.',
+        instruction ? `Admin instruction: ${instruction}` : null,
+      ],
+      known,
     });
 
     const result = await this.ai.execute({
@@ -180,8 +367,8 @@ export class BusinessBuildRunner implements AiRunner {
         business_name: b.name,
         sections_spec: formatSectionSpec(),
         business: known,
-        instruction: instruction || '(none)',
-        research: research.text,
+        instruction: directive || '(none)',
+        research: notes,
       },
     });
     const data = result.data;
@@ -190,6 +377,7 @@ export class BusinessBuildRunner implements AiRunner {
     const seen = new Set<string>();
     let written = 0;
     let suggested = 0;
+    let facts = 0;
     await this.prisma.$transaction(async (tx) => {
       for (const s of data.sections) {
         const content = s.content.trim();
@@ -223,6 +411,7 @@ export class BusinessBuildRunner implements AiRunner {
           written++;
         }
       }
+      facts = await saveResearchedFacts(tx, b.id, data.facts, blocked);
       await tx.business.update({
         where: { id: b.id },
         data: {
@@ -231,7 +420,16 @@ export class BusinessBuildRunner implements AiRunner {
           industry: b.industry || data.industry.trim(),
           website: b.website || cleanUrl(data.website),
           location: b.location || data.location.trim(),
-          sources: asJson(mergeSources(b.sources as unknown as WebSource[], research.sources)),
+          ...(research
+            ? {
+                sources: asJson(
+                  filterSources(
+                    mergeSources(b.sources as unknown as WebSource[], research.sources),
+                    blocked,
+                  ),
+                ),
+              }
+            : {}),
           gaps: data.gaps.map((g) => g.trim()).filter(Boolean),
           buildState: 'READY',
           buildError: null,
@@ -245,10 +443,13 @@ export class BusinessBuildRunner implements AiRunner {
         businessId: b.id,
         sectionsWritten: written,
         suggestions: suggested,
-        sources: research.sources.length,
+        facts,
+        scope,
+        references,
+        sources: research?.sources.length ?? 0,
       },
       model: result.model,
-      usage: sumUsage(research.usage, result.usage),
+      usage: research ? sumUsage(research.usage, result.usage) : result.usage,
       prompt: result.prompt,
     };
   }
@@ -276,39 +477,38 @@ export class BusinessSuggestRunner implements AiRunner {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiExecutor,
+    private readonly ctx: ContextLoader,
   ) {}
 
   async run(job: AiJob): Promise<RunnerResult> {
     const input = (job.input ?? {}) as {
       keys?: string[];
       instruction?: string;
+      scope?: ResearchScope;
+      referenceIds?: string[];
       useWebSearch?: boolean;
     };
+    const scope = suggestScope(input);
     const keys = BusinessSectionKey.filter((k) => input.keys?.includes(k));
     if (!keys.length) throw new NonRetryableAiError('No sections were requested');
     const b = await this.prisma.business.findUniqueOrThrow({
       where: { id: job.targetId },
-      include: { sections: true },
+      include: { ...BUSINESS_PROMPT_INCLUDE, sections: true },
     });
 
-    const research = input.useWebSearch
-      ? await this.ai.research({
-          task: this.type,
-          promptKey: 'business_research',
-          maxSearches: SEARCHES.suggest,
-          vars: {
-            language: b.language,
-            goal: [
-              `Research the real business "${b.name}"${b.website ? ` (website: ${b.website})` : ''} to write these profile sections:`,
-              formatSectionSpec(keys),
-              input.instruction ? `Admin instruction: ${input.instruction}` : null,
-            ]
-              .filter(Boolean)
-              .join('\n'),
-            business: formatBusiness(b),
-          },
-        })
-      : null;
+    const { notes, research, blocked, references } = await consult(this.prisma, this.ai, {
+      task: this.type,
+      scope,
+      business: b,
+      referenceIds: input.referenceIds,
+      maxSearches: SEARCHES.suggest,
+      goal: [
+        `Research the real business "${b.name}"${b.website ? ` (website: ${b.website})` : ''} to write these profile sections:`,
+        formatSectionSpec(keys),
+        input.instruction ? `Admin instruction: ${input.instruction}` : null,
+      ],
+      known: formatBusiness(b),
+    });
 
     const result = await this.ai.execute({
       task: this.type,
@@ -318,8 +518,10 @@ export class BusinessSuggestRunner implements AiRunner {
         language: b.language,
         business: formatBusiness(b, { includeEmpty: true }),
         requested_sections: formatSectionSpec(keys),
-        instruction: input.instruction || '(none)',
-        research: research?.text ?? NO_RESEARCH,
+        instruction:
+          withStandingNotes(input.instruction ?? '', await this.ctx.standingNotes(b.id)) ||
+          '(none)',
+        research: notes,
       },
     });
 
@@ -349,13 +551,24 @@ export class BusinessSuggestRunner implements AiRunner {
       await this.prisma.business.update({
         where: { id: b.id },
         data: {
-          sources: asJson(mergeSources(b.sources as unknown as WebSource[], research.sources)),
+          sources: asJson(
+            filterSources(
+              mergeSources(b.sources as unknown as WebSource[], research.sources),
+              blocked,
+            ),
+          ),
         },
       });
     }
 
     return {
-      output: { businessId: b.id, suggestions: picked.size, webSearch: !!research },
+      output: {
+        businessId: b.id,
+        suggestions: picked.size,
+        scope,
+        references,
+        webSearch: !!research,
+      },
       model: result.model,
       usage: research ? sumUsage(research.usage, result.usage) : result.usage,
       prompt: result.prompt,

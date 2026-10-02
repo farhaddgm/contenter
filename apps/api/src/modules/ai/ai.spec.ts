@@ -16,7 +16,12 @@ import { estimateCostUsd, priceFor } from './pricing';
 import { DEFAULT_PROMPTS } from './prompts/defaults';
 import { renderTemplate, templateVariables } from './prompts/render';
 import { MockProvider } from './provider/mock.provider';
-import { isReasoningModel, OpenAiProvider, toStrictJsonSchema } from './provider/openai.provider';
+import {
+  isReasoningModel,
+  isTextModel,
+  OpenAiProvider,
+  toStrictJsonSchema,
+} from './provider/openai.provider';
 import { AiProviderRegistry } from './provider/provider-registry';
 import type { Env } from '../../config/env';
 
@@ -84,6 +89,26 @@ describe('renderTemplate', () => {
         'research',
       ],
       business_suggest: ['language', 'business', 'requested_sections', 'instruction', 'research'],
+      business_revise: [
+        'language',
+        'sections_spec',
+        'business',
+        'gaps',
+        'standing_notes',
+        'research',
+        'note',
+      ],
+      business_asset_analyze: [
+        'language',
+        'business',
+        'kind',
+        'title',
+        'url',
+        'images',
+        'description',
+        'text',
+      ],
+      business_audit: ['language', 'sections_spec', 'business', 'gaps', 'standing_notes'],
     };
     expect(Object.keys(allowed).sort()).toEqual(DEFAULT_PROMPTS.map((p) => p.key).sort());
     for (const p of DEFAULT_PROMPTS) {
@@ -134,6 +159,8 @@ describe('pricing', () => {
     expect(priceFor('gpt-5-mini-2025-08-07')?.input).toBe(0.25);
     expect(priceFor('openai:gpt-5')?.input).toBe(1.25);
     expect(priceFor('gpt-5.4-mini')).toBeUndefined();
+    expect(priceFor('openai:gpt-6-sol')?.input).toBe(2);
+    expect(priceFor('gpt-5.6-luna')?.output).toBe(1.2);
     const cost = estimateCostUsd('gpt-5', {
       inputTokens: 1_000_000,
       outputTokens: 0,
@@ -152,6 +179,7 @@ describe('model references', () => {
       model: 'claude-opus-5',
     });
     expect(parseModelRef('o4-mini').provider).toBe('openai');
+    expect(parseModelRef('gpt-6-luna').provider).toBe('openai');
     expect(normalizeModelRef('gpt-5')).toBe('openai:gpt-5');
   });
   it('routes by provider, or everything to mock', () => {
@@ -183,6 +211,18 @@ describe('OpenAI structured output schema', () => {
     expect(isReasoningModel('o4-mini')).toBe(true);
     expect(isReasoningModel('gpt-4.1')).toBe(false);
     expect(isReasoningModel('gpt-5-chat-latest')).toBe(false);
+    expect(isReasoningModel('gpt-5.6-luna')).toBe(true);
+    expect(isReasoningModel('gpt-6-sol')).toBe(true);
+  });
+  it('keeps only text models from the live model list', () => {
+    expect(isTextModel('gpt-6-sol')).toBe(true);
+    expect(isTextModel('gpt-5.6-luna')).toBe(true);
+    expect(isTextModel('o4-mini')).toBe(true);
+    expect(isTextModel('gpt-4o-realtime-preview')).toBe(false);
+    expect(isTextModel('gpt-image-1')).toBe(false);
+    expect(isTextModel('text-embedding-3-large')).toBe(false);
+    expect(isTextModel('whisper-1')).toBe(false);
+    expect(isTextModel('gpt-5-2025-08-07')).toBe(false);
   });
 });
 

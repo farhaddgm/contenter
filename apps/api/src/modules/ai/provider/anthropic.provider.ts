@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import {
-  mergeSources,
+  researchSources,
   NonRetryableAiError,
   sumUsage,
   type AiProvider,
@@ -101,10 +101,20 @@ export class AnthropicProvider implements AiProvider {
     imageUrls: string[],
   ): Promise<StructuredResult<T>> {
     const content: Anthropic.Beta.BetaContentBlockParam[] = [
-      ...imageUrls.map((url): Anthropic.Beta.BetaImageBlockParam => ({
-        type: 'image',
-        source: { type: 'url', url },
-      })),
+      ...imageUrls.map((url): Anthropic.Beta.BetaImageBlockParam => {
+        // Uploaded brand assets arrive as data: URLs; fetched samples as public URLs.
+        const inline = /^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/.exec(url);
+        return inline
+          ? {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: inline[1] as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+                data: inline[2]!,
+              },
+            }
+          : { type: 'image', source: { type: 'url', url } };
+      }),
       { type: 'text', text: req.user },
     ];
 
@@ -184,7 +194,17 @@ export class AnthropicProvider implements AiProvider {
             },
           ],
           tools: [
-            { type: webSearchToolType(req.model), name: 'web_search', max_uses: req.maxSearches },
+            {
+              type: webSearchToolType(req.model),
+              name: 'web_search',
+              max_uses: req.maxSearches,
+              // The tool accepts an allow-list or a block-list, never both.
+              ...(req.allowedDomains?.length
+                ? { allowed_domains: req.allowedDomains }
+                : req.blockedDomains?.length
+                  ? { blocked_domains: req.blockedDomains }
+                  : {}),
+            },
           ],
           messages,
           ...(this.refusalFallback ? { betas: [REFUSAL_FALLBACK_BETA], fallbacks: 'default' } : {}),
@@ -253,5 +273,5 @@ export function collectResearch(blocks: Anthropic.Beta.BetaContentBlock[]): {
       .join('')
       .trim();
   const text = textOf(lastResult + 1) || textOf(0);
-  return { text, sources: mergeSources(cited, results) };
+  return { text, sources: researchSources(cited, results, text) };
 }

@@ -2,6 +2,9 @@ import {
   BusinessSectionKey,
   type BusinessBuildResult,
   type BusinessDiscoveryResult,
+  type BusinessAssetAnalysis,
+  type BusinessAuditResult,
+  type BusinessReviseResult,
   type BusinessSuggestResult,
   type ContentDraftResult,
   type IdeationResult,
@@ -36,6 +39,11 @@ const MOCK_SECTION: Record<BusinessSectionKey, string> = {
   GUIDELINES:
     '- ادعای «بهترین» یا «ارزان‌ترین» بدون مستند ممنوع است.\n- از مقایسهٔ مستقیم با نام رقبا پرهیز شود.',
   CHANNELS: '- وب‌سایت رسمی\n- اینستاگرام\n- CTA اصلی: «همین حالا مشاوره رایگان بگیرید»',
+  GOALS:
+    '- هدف فعلی: افزایش ثبت‌نام آنلاین\n- اولویت: معرفی خدمت اصلی\n- شاخص: نرخ کلیک روی دعوت به اقدام',
+  FAQ: '- **هزینه چقدر است؟** قیمت‌ها شفاف روی سایت اعلام می‌شود.\n- **چقدر طول می‌کشد؟** معمولاً کمتر از ۴۸ ساعت.',
+  CALENDAR:
+    '- نوروز: کمپین پیشنهاد ویژه\n- شب یلدا: محتوای خانوادگی\n- سالگرد برند: روایت پشت صحنه',
 };
 
 /** Section keys named in `<requested_sections>` of a suggestion prompt. */
@@ -123,8 +131,47 @@ export class MockProvider implements AiProvider {
           website: 'https://example.com',
           location: 'تهران، ایران',
           sections: BusinessSectionKey.map((key) => ({ key, content: MOCK_SECTION[key] })),
+          facts: [
+            {
+              label: 'زمان پاسخ‌گویی',
+              value: '۲۴ ساعته',
+              category: 'OFFER',
+              sourceUrl: 'https://example.com',
+            },
+            {
+              label: 'سال تأسیس',
+              value: '۱۳۹۸',
+              category: 'IDENTITY',
+              sourceUrl: 'https://example.com/about',
+            },
+          ],
           gaps: ['قیمت‌ها از منابع عمومی تأیید نشد (mock).'],
         } satisfies BusinessBuildResult;
+      case 'BUSINESS_AUDIT':
+        return {
+          score: 68,
+          summary:
+            'بررسی آزمایشی (mock): پروفایل پایهٔ خوبی دارد اما چند ادعای بدون پشتوانه و بخش‌های کوتاه دارد.',
+          strengths: ['پرسوناها مشخص‌اند', 'قواعد ادعاهای ممنوع نوشته شده'],
+          issues: [
+            {
+              severity: 'HIGH',
+              type: 'UNSUPPORTED_CLAIM',
+              target: 'VALUE_PROPOSITION',
+              title: 'ادعای «کیفیت تضمینی» بدون شرط ضمانت',
+              detail: '«کیفیت تضمینی» آمده اما شرایط ضمانت در هیچ‌جا نیست.',
+              fix: 'شرایط ضمانت را از ادمین بپرسید یا عبارت را به «پیگیری تا رضایت» تغییر دهید.',
+            },
+            {
+              severity: 'MEDIUM',
+              type: 'VAGUE',
+              target: 'OVERVIEW',
+              title: 'معرفی کلی و بدون جزئیات',
+              detail: '«خدمات تخصصی به مشتریان شهری» مشخص نمی‌کند چه خدمتی.',
+              fix: 'نام خدمات اصلی و سابقهٔ کسب‌وکار را به معرفی اضافه کنید.',
+            },
+          ],
+        } satisfies BusinessAuditResult;
       case 'BUSINESS_SUGGEST':
         return {
           suggestions: requestedKeys(req.user).map((key) => ({
@@ -133,6 +180,33 @@ export class MockProvider implements AiProvider {
             rationale: 'پیشنهاد آزمایشی (mock) بر اساس اطلاعات فعلی کسب‌وکار.',
           })),
         } satisfies BusinessSuggestResult;
+      case 'BUSINESS_REVISE':
+        return {
+          summary: 'بازبینی آزمایشی (mock): بخش «معرفی» بر اساس توضیح شما به‌روز شد.',
+          tagline: '',
+          industry: '',
+          website: '',
+          location: '',
+          sections: [
+            {
+              key: 'OVERVIEW',
+              content: `${MOCK_SECTION.OVERVIEW}\n\n(به‌روزشده بر اساس توضیح ادمین — mock)`,
+              change: 'توضیح ادمین به معرفی اضافه شد.',
+            },
+          ],
+          gaps: ['قیمت‌ها از منابع عمومی تأیید نشد (mock).'],
+        } satisfies BusinessReviseResult;
+      case 'BUSINESS_ASSET_ANALYZE':
+        return {
+          summary: 'تحلیل آزمایشی (mock): یک قطعهٔ تبلیغاتی ساده با پیام اصلی روشن.',
+          visualStyle: 'پس‌زمینهٔ روشن، رنگ اصلی آبی، تیتر درشت و لوگو در گوشه.',
+          tone: 'صمیمی و مطمئن',
+          structure: 'تیتر ← یک جملهٔ توضیح ← دعوت به اقدام',
+          messages: ['پیام اصلی نمونه', 'همین حالا امتحان کنید'],
+          copy: '',
+          guidelines: ['تیتر کوتاه و درشت', 'یک دعوت به اقدام در هر قطعه', 'از شلوغی پرهیز شود'],
+          bestFor: 'پست و استوری شبکه‌های اجتماعی',
+        } satisfies BusinessAssetAnalysis;
       case 'ANALYZE_SAMPLE':
         return {
           summary: 'نمونه یک پست آموزشی کوتاه است که یک مفهوم را با مثال روزمره توضیح می‌دهد.',

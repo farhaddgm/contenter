@@ -6,7 +6,7 @@
  * See docs/12-businesses.md. Enums mirror `apps/api/prisma/schema.prisma`.
  */
 import { z } from 'zod';
-import { PaginationQuerySchema } from './schemas';
+import { PaginationQuerySchema, patchOf } from './schemas';
 
 // ---------- enums ----------
 
@@ -14,14 +14,18 @@ export const BusinessStatus = ['ACTIVE', 'ARCHIVED'] as const;
 export type BusinessStatus = (typeof BusinessStatus)[number];
 
 /** MANUAL = created by the admin; RESEARCH = built from a keyword discovery (web research). */
-export const BusinessOrigin = ['MANUAL', 'RESEARCH'] as const;
+/** SOURCES = built by AI from references the admin supplied (links, Google Docs, text). */
+export const BusinessOrigin = ['MANUAL', 'RESEARCH', 'SOURCES'] as const;
 export type BusinessOrigin = (typeof BusinessOrigin)[number];
 
 /** State of the "build the whole profile from web research" job. */
 export const BusinessBuildState = ['NONE', 'BUILDING', 'READY', 'FAILED'] as const;
 export type BusinessBuildState = (typeof BusinessBuildState)[number];
 
-/** Profile sections, in display order. */
+/**
+ * Profile sections, in prompt order (new keys are appended so prompt prefixes stay stable).
+ * The UI shows them grouped by `BUSINESS_SECTION_META[key].group` — see BUSINESS_SECTION_GROUPS.
+ */
 export const BusinessSectionKey = [
   'OVERVIEW',
   'SERVICES',
@@ -35,6 +39,9 @@ export const BusinessSectionKey = [
   'CONTENT_PILLARS',
   'GUIDELINES',
   'CHANNELS',
+  'GOALS',
+  'FAQ',
+  'CALENDAR',
 ] as const;
 export type BusinessSectionKey = (typeof BusinessSectionKey)[number];
 
@@ -61,7 +68,63 @@ export const BUSINESS_SECTION_SPEC: Record<BusinessSectionKey, string> = {
     'Rules and constraints: legal/compliance limits, claims that must not be made, sensitive topics, required disclaimers.',
   CHANNELS:
     'Official website, social channels, contact points and the preferred calls to action (CTA).',
+  GOALS:
+    'Business and content goals: what content must achieve now (awareness, sign-ups, sales, trust …), priority products/campaigns, KPIs and what to push or de-emphasize.',
+  FAQ: 'Real customer questions and objections with the approved short answer to each (the answers content may repeat).',
+  CALENDAR:
+    'Occasions, seasons, campaigns and launches relevant to the business (with dates or periods) and how content should use them.',
 };
+
+/** Where a section sits in the profile page. */
+export const BusinessSectionGroup = ['IDENTITY', 'AUDIENCE', 'BRAND', 'STRATEGY', 'RULES'] as const;
+export type BusinessSectionGroup = (typeof BusinessSectionGroup)[number];
+
+/**
+ * Registry of section behavior. To add a section later: append its key to BusinessSectionKey (and
+ * the Prisma enum), give it a spec and an entry here, and add its i18n labels — everything else
+ * (prompts, completeness, health, UI grouping) follows from this table.
+ *
+ * - `nature`: FACT sections must come from sources/admin (never invented); STRATEGY sections may
+ *   be derived by analysis; RULES sections are binding constraints.
+ * - `weight`: importance for the profile health score (3 = core, 2 = important, 1 = optional).
+ * - `minChars`: below this the section counts as "thin" (half credit) in the health score.
+ */
+export const BUSINESS_SECTION_META: Record<
+  BusinessSectionKey,
+  {
+    group: BusinessSectionGroup;
+    nature: 'FACT' | 'STRATEGY' | 'RULES';
+    weight: 1 | 2 | 3;
+    minChars: number;
+  }
+> = {
+  OVERVIEW: { group: 'IDENTITY', nature: 'FACT', weight: 3, minChars: 400 },
+  SERVICES: { group: 'IDENTITY', nature: 'FACT', weight: 3, minChars: 400 },
+  VALUE_PROPOSITION: { group: 'IDENTITY', nature: 'STRATEGY', weight: 2, minChars: 250 },
+  COMPETITORS: { group: 'IDENTITY', nature: 'FACT', weight: 1, minChars: 200 },
+  TARGET_MARKET: { group: 'AUDIENCE', nature: 'STRATEGY', weight: 3, minChars: 300 },
+  PERSONAS: { group: 'AUDIENCE', nature: 'STRATEGY', weight: 3, minChars: 500 },
+  FAQ: { group: 'AUDIENCE', nature: 'FACT', weight: 1, minChars: 250 },
+  BRAND_VOICE: { group: 'BRAND', nature: 'STRATEGY', weight: 3, minChars: 300 },
+  BRAND_BOOK: { group: 'BRAND', nature: 'RULES', weight: 2, minChars: 250 },
+  KEY_MESSAGES: { group: 'BRAND', nature: 'STRATEGY', weight: 2, minChars: 150 },
+  GOALS: { group: 'STRATEGY', nature: 'STRATEGY', weight: 2, minChars: 200 },
+  CONTENT_PILLARS: { group: 'STRATEGY', nature: 'STRATEGY', weight: 2, minChars: 300 },
+  CHANNELS: { group: 'STRATEGY', nature: 'FACT', weight: 2, minChars: 150 },
+  CALENDAR: { group: 'STRATEGY', nature: 'STRATEGY', weight: 1, minChars: 200 },
+  GUIDELINES: { group: 'RULES', nature: 'RULES', weight: 3, minChars: 200 },
+};
+
+/** Groups with their sections, in display order. */
+export const BUSINESS_SECTION_GROUPS: {
+  group: BusinessSectionGroup;
+  keys: BusinessSectionKey[];
+}[] = BusinessSectionGroup.map((group) => ({
+  group,
+  keys: (Object.keys(BUSINESS_SECTION_META) as BusinessSectionKey[]).filter(
+    (k) => BUSINESS_SECTION_META[k].group === group,
+  ),
+}));
 
 export const SectionSource = ['ADMIN', 'AI'] as const;
 export type SectionSource = (typeof SectionSource)[number];
@@ -71,6 +134,29 @@ export type SuggestionStatus = (typeof SuggestionStatus)[number];
 
 export const DiscoveryStatus = ['RESEARCHING', 'READY', 'FAILED', 'USED'] as const;
 export type DiscoveryStatus = (typeof DiscoveryStatus)[number];
+
+/** Blocked research source: one page (URL) or a whole site with its subdomains (DOMAIN). */
+export const SourceBlockKind = ['URL', 'DOMAIN'] as const;
+export type SourceBlockKind = (typeof SourceBlockKind)[number];
+
+/** Admin-supplied reference: a public web page, a Google Docs/Drive file, or a pasted text. */
+export const ReferenceKind = ['URL', 'GOOGLE_DOC', 'TEXT'] as const;
+export type ReferenceKind = (typeof ReferenceKind)[number];
+
+export const ReferenceStatus = ['PENDING', 'READY', 'FAILED'] as const;
+export type ReferenceStatus = (typeof ReferenceStatus)[number];
+
+/**
+ * What an AI build/suggestion may consult besides the business profile:
+ * NONE — nothing else · REFERENCES — only the admin's references (no web search) ·
+ * REFERENCE_SITES — references + web search limited to their sites · WEB — references + whole web.
+ */
+export const ResearchScope = ['NONE', 'REFERENCES', 'REFERENCE_SITES', 'WEB'] as const;
+export type ResearchScope = (typeof ResearchScope)[number];
+
+/** Text kept per reference (the stored snapshot AI reads). */
+export const BUSINESS_REFERENCE_MAX_CHARS = 200_000;
+export const BUSINESS_REFERENCE_LIMIT = 50;
 
 export const BUSINESS_SECTION_MAX_CHARS = 50_000;
 
@@ -107,6 +193,27 @@ export const BusinessDiscoveryResultSchema = z.object({
 });
 export type BusinessDiscoveryResult = z.infer<typeof BusinessDiscoveryResultSchema>;
 
+/** Kind of a key fact (the exact values content may quote: prices, numbers, dates, contacts …). */
+export const FactCategory = [
+  'IDENTITY',
+  'OFFER',
+  'PRICING',
+  'NUMBERS',
+  'CONTACT',
+  'LEGAL',
+  'OTHER',
+] as const;
+export type FactCategory = (typeof FactCategory)[number];
+
+/** A key fact AI found while researching; saved unverified until the admin confirms it. */
+export const ResearchedFactSchema = z.object({
+  label: z.string().describe('Short name of the fact, e.g. "Card delivery fee" or "Founded"'),
+  value: z.string().describe('The exact value as stated by the source'),
+  category: z.enum(FactCategory),
+  sourceUrl: z.string().describe('URL of the source that states it, or ""'),
+});
+export type ResearchedFact = z.infer<typeof ResearchedFactSchema>;
+
 export const BusinessBuildResultSchema = z.object({
   name: z.string(),
   tagline: z.string().describe('One-line description / slogan, or ""'),
@@ -119,6 +226,11 @@ export const BusinessBuildResultSchema = z.object({
       content: z.string().describe('Section content in Markdown'),
     }),
   ),
+  facts: z
+    .array(ResearchedFactSchema)
+    .describe(
+      'Up to 25 exact, source-backed facts content may quote (prices, limits, fees, numbers, dates, official contacts, license/legal facts). Only facts a source states; none invented.',
+    ),
   gaps: z
     .array(z.string())
     .describe('Facts that could not be verified and parts the admin should complete or check'),
@@ -142,7 +254,7 @@ export const CreateBusinessSchema = z.object({
 });
 export type CreateBusinessInput = z.input<typeof CreateBusinessSchema>;
 
-export const UpdateBusinessSchema = CreateBusinessSchema.partial().extend({
+export const UpdateBusinessSchema = patchOf(CreateBusinessSchema).extend({
   status: z.enum(BusinessStatus).optional(),
 });
 export type UpdateBusinessInput = z.input<typeof UpdateBusinessSchema>;
@@ -156,19 +268,81 @@ export const UpdateBusinessSectionSchema = z.object({
 });
 export type UpdateBusinessSectionInput = z.infer<typeof UpdateBusinessSectionSchema>;
 
+/** References used by one AI job; omitted = every active, readable reference of the business. */
+const ReferenceIdsSchema = z
+  .array(z.string().min(1).max(50))
+  .max(BUSINESS_REFERENCE_LIMIT)
+  .optional();
+
 export const SuggestBusinessSchema = z.object({
   /** Sections to propose; empty = every section that is still empty. */
   keys: z.array(z.enum(BusinessSectionKey)).max(BusinessSectionKey.length).default([]),
   instruction: z.string().trim().max(2000).optional().default(''),
-  /** Research the business on the web before proposing (slower, costs more). */
+  /** What AI may consult besides the profile. Omitted = WEB when `useWebSearch`, else NONE. */
+  scope: z.enum(ResearchScope).optional(),
+  referenceIds: ReferenceIdsSchema,
+  /** Legacy switch (= scope WEB). */
   useWebSearch: z.boolean().default(false),
 });
 export type SuggestBusinessInput = z.input<typeof SuggestBusinessSchema>;
 
+/** Research scopes that make sense for building a whole profile (NONE has nothing to build from). */
+export const BuildScope = ['REFERENCES', 'REFERENCE_SITES', 'WEB'] as const;
+export type BuildScope = (typeof BuildScope)[number];
+
 export const BuildBusinessSchema = z.object({
   instruction: z.string().trim().max(2000).optional().default(''),
+  scope: z.enum(BuildScope).default('WEB'),
+  referenceIds: ReferenceIdsSchema,
 });
 export type BuildBusinessInput = z.input<typeof BuildBusinessSchema>;
+
+/** Effective scope of a suggestion request (keeps the legacy `useWebSearch` switch working). */
+export function suggestScope(input: {
+  scope?: ResearchScope;
+  useWebSearch?: boolean;
+}): ResearchScope {
+  return input.scope ?? (input.useWebSearch ? 'WEB' : 'NONE');
+}
+
+const httpUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), 'Only http(s) links');
+
+/** Adds a reference: a link (web page or Google Docs/Drive file) or a pasted text. */
+export const AddReferenceSchema = z
+  .object({
+    url: httpUrl.optional(),
+    title: z.string().trim().max(300).optional().default(''),
+    content: z.string().trim().max(BUSINESS_REFERENCE_MAX_CHARS).optional(),
+  })
+  .refine((v) => !!v.url !== !!v.content, 'Give either a link or a text');
+export type AddReferenceInput = z.input<typeof AddReferenceSchema>;
+
+export const UpdateReferenceSchema = z.object({
+  title: z.string().trim().max(300).optional(),
+  isActive: z.boolean().optional(),
+});
+export type UpdateReferenceInput = z.infer<typeof UpdateReferenceSchema>;
+
+/** "Build from my sources": creates the business, reads the references, then builds the profile. */
+export const CreateFromReferencesSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    language: z.string().trim().min(2).max(10).default('fa'),
+    website: z.string().trim().max(500).optional().default(''),
+    location: z.string().trim().max(200).optional().default(''),
+    urls: z.array(httpUrl).max(20).default([]),
+    text: z.string().trim().max(BUSINESS_REFERENCE_MAX_CHARS).optional().default(''),
+    textTitle: z.string().trim().max(300).optional().default(''),
+    scope: z.enum(BuildScope).default('REFERENCES'),
+    instruction: z.string().trim().max(2000).optional().default(''),
+  })
+  .refine((v) => v.urls.length > 0 || v.text.length > 0, 'Add at least one link or text');
+export type CreateFromReferencesInput = z.input<typeof CreateFromReferencesSchema>;
 
 export const AcceptSuggestionSchema = z.object({
   /** Edited text; omitted = accept the proposal as is. */
@@ -190,11 +364,72 @@ export const SelectCandidateSchema = z.object({
 });
 export type SelectCandidateInput = z.infer<typeof SelectCandidateSchema>;
 
+export const RemoveSourceSchema = z.object({
+  url: z.string().trim().min(1).max(2000),
+  /** Also block the page or its whole site in future research (admin only). */
+  block: z.enum(['NONE', 'URL', 'DOMAIN']).default('NONE'),
+});
+export type RemoveSourceInput = z.input<typeof RemoveSourceSchema>;
+
+export const CreateBlockedSourceSchema = z.object({
+  kind: z.enum(SourceBlockKind),
+  /** A URL, or for DOMAIN a bare host such as `example.com`. */
+  value: z.string().trim().min(3).max(2000),
+  note: z.string().trim().max(500).optional().default(''),
+});
+export type CreateBlockedSourceInput = z.input<typeof CreateBlockedSourceSchema>;
+
 // ---------- responses ----------
 
 export interface WebSource {
   url: string;
   title: string;
+}
+
+export interface BlockedSource {
+  id: string;
+  kind: SourceBlockKind;
+  /** Normalized: `host/path` for URL, `host` for DOMAIN (no scheme, no `www.`). */
+  value: string;
+  note: string;
+  createdAt: string;
+  createdBy?: { id: string; name: string } | null;
+}
+
+export interface BusinessReference {
+  id: string;
+  businessId: string;
+  kind: ReferenceKind;
+  url: string;
+  title: string;
+  status: ReferenceStatus;
+  error: string | null;
+  isActive: boolean;
+  fetchedAt: string | null;
+  createdAt: string;
+  /** Length of the stored text snapshot. */
+  chars: number;
+  /** Google account the file was read with (GOOGLE_DOC). */
+  googleAccount: { id: string; email: string } | null;
+  /** Only on the single-reference endpoint. */
+  content?: string;
+}
+
+export interface GoogleDriveAccount {
+  id: string;
+  email: string;
+  error: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  connectedBy: { id: string; name: string } | null;
+}
+
+export interface GoogleDriveStatus {
+  /** Google OAuth client configured (the same client as Google sign-in). */
+  configured: boolean;
+  /** Redirect URI that must be registered in Google Cloud. */
+  redirectUri: string | null;
+  accounts: GoogleDriveAccount[];
 }
 
 export interface BusinessSection {
@@ -203,8 +438,11 @@ export interface BusinessSection {
   key: BusinessSectionKey;
   content: string;
   source: SectionSource;
+  /** When a person confirmed the current text (null = AI text nobody has reviewed yet). */
+  reviewedAt: string | null;
   updatedAt: string;
   updatedBy?: { id: string; name: string } | null;
+  reviewedBy?: { id: string; name: string } | null;
 }
 
 export interface BusinessSectionRevision {
@@ -277,4 +515,106 @@ export interface BusinessDiscovery {
 export function businessCompleteness(sections: Pick<BusinessSection, 'content'>[]): number {
   const filled = sections.filter((s) => s.content.trim().length > 0).length;
   return filled / BusinessSectionKey.length;
+}
+
+// ---------- source blocklist ----------
+
+/** Parses a URL or bare host (`example.com/page`) — null when it is not a web address. */
+function parseWebUrl(input: string): URL | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (!url.hostname.includes('.')) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+const hostKey = (url: URL) => url.hostname.toLowerCase().replace(/^www\./, '');
+
+/**
+ * Canonical blocklist value of a URL: `host` for DOMAIN, `host/path` for URL (no scheme, `www.`,
+ * query, hash or trailing slash). Null when the input is not a web address.
+ */
+export function sourceBlockValue(input: string, kind: SourceBlockKind): string | null {
+  const url = parseWebUrl(input);
+  if (!url) return null;
+  const host = hostKey(url);
+  if (kind === 'DOMAIN') return host;
+  const path = url.pathname.replace(/\/+$/, '');
+  return `${host}${path}`;
+}
+
+/** Whether a research source URL matches any blocklist rule (a DOMAIN rule covers subdomains). */
+export function isSourceBlocked(
+  input: string,
+  rules: readonly Pick<BlockedSource, 'kind' | 'value'>[],
+): boolean {
+  if (!rules.length) return false;
+  const url = parseWebUrl(input);
+  if (!url) return false;
+  const host = hostKey(url);
+  const page = sourceBlockValue(input, 'URL');
+  return rules.some((r) =>
+    r.kind === 'DOMAIN' ? host === r.value || host.endsWith(`.${r.value}`) : page === r.value,
+  );
+}
+
+// ---------- Google Docs / Drive links ----------
+
+export type GoogleFileType = 'document' | 'spreadsheets' | 'presentation' | 'file';
+
+/**
+ * Recognizes Google Docs / Sheets / Slides / Drive file links and returns the file id.
+ * Null for any other URL (a folder link is not a file).
+ */
+export function parseGoogleFileUrl(input: string): { id: string; type: GoogleFileType } | null {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname;
+  if (host === 'docs.google.com') {
+    const m = /^\/(document|spreadsheets|presentation)\/(?:u\/\d+\/)?d\/([\w-]{10,})/.exec(path);
+    if (m) return { type: m[1] as GoogleFileType, id: m[2]! };
+    return null;
+  }
+  if (host === 'drive.google.com') {
+    const m = /^\/(?:u\/\d+\/)?file\/d\/([\w-]{10,})/.exec(path);
+    if (m) return { type: 'file', id: m[1]! };
+    const id = url.searchParams.get('id');
+    if ((path === '/open' || path === '/uc') && id && /^[\w-]{10,}$/.test(id)) {
+      return { type: 'file', id };
+    }
+  }
+  return null;
+}
+
+/** A Google Drive folder link → its id (every readable file inside becomes a reference). */
+export function parseGoogleFolderUrl(input: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    return null;
+  }
+  if (url.hostname.toLowerCase() !== 'drive.google.com') return null;
+  const m = /^\/drive\/(?:u\/\d+\/)?(?:mobile\/)?folders\/([\w-]{10,})/.exec(url.pathname);
+  return m ? m[1]! : null;
+}
+
+/** Any link on Google Docs / Drive (file, folder, or something else such as the Drive home). */
+export function isGoogleDriveUrl(input: string): boolean {
+  try {
+    const host = new URL(input.trim()).hostname.toLowerCase();
+    return host === 'drive.google.com' || host === 'docs.google.com';
+  } catch {
+    return false;
+  }
 }

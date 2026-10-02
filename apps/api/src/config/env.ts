@@ -44,6 +44,21 @@ const EnvSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   /**
+   * "Connect Google account" for reading private Google Docs (same OAuth client as sign-in).
+   * Default: GOOGLE_REDIRECT_URI with `/auth/google/callback` → `/google-drive/callback`.
+   */
+  GOOGLE_DRIVE_REDIRECT_URI: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** Encrypts stored OAuth refresh tokens. Default: derived from JWT_REFRESH_SECRET. */
+  DATA_ENCRYPTION_KEY: z
+    .string()
+    .min(16)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /**
    * mock = placeholder output, no vendor calls. Any other value = live: each task goes to the
    * vendor of the model chosen in the back office (`anthropic`/`openai` are kept as aliases).
    */
@@ -60,6 +75,10 @@ const EnvSchema = z.object({
   AI_DEFAULT_MODEL: z.string().default('claude-opus-5'),
   /** Server-side refusal fallback (beta `server-side-fallback-2026-07-01`). */
   AI_REFUSAL_FALLBACK: bool('true'),
+  /** Where uploaded brand assets are stored (a volume shared by api and worker in Docker). */
+  UPLOAD_DIR: z.string().default('uploads'),
+  /** Largest accepted upload (videos). Keep nginx `client_max_body_size` at least this big. */
+  UPLOAD_MAX_MB: z.coerce.number().int().min(1).default(200),
   FETCH_TIMEOUT_MS: z.coerce.number().int().default(15000),
   FETCH_MAX_BYTES: z.coerce.number().int().default(5_000_000),
   /** Allow fetching private-network URLs (never enable in production). */

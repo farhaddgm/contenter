@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Injectable,
@@ -18,25 +19,41 @@ import {
 import { Prisma } from '@prisma/client';
 import {
   AcceptSuggestionSchema,
+  AddReferenceSchema,
   BuildBusinessSchema,
   BusinessListQuerySchema,
   BusinessSectionKey,
+  CreateBlockedSourceSchema,
   CreateBusinessSchema,
+  CreateFromReferencesSchema,
   DiscoverBusinessesSchema,
+  isSourceBlocked,
+  RemoveSourceSchema,
   SelectCandidateSchema,
+  sourceBlockValue,
   SuggestBusinessSchema,
   SuggestionStatus,
+  suggestScope,
   UpdateBusinessSchema,
   UpdateBusinessSectionSchema,
+  UpdateReferenceSchema,
   type AcceptSuggestionInput,
+  type AddReferenceInput,
   type BuildBusinessInput,
   type BusinessCandidate,
+  type CreateBlockedSourceInput,
   type CreateBusinessInput,
+  type CreateFromReferencesInput,
   type DiscoverBusinessesInput,
+  type RemoveSourceInput,
+  type ResearchScope,
   type SelectCandidateInput,
+  type SourceBlockKind,
   type SuggestBusinessInput,
   type UpdateBusinessInput,
   type UpdateBusinessSectionInput,
+  type UpdateReferenceInput,
+  type WebSource,
 } from '@contenter/shared';
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -45,11 +62,25 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { GoogleDriveModule } from '../google-drive/google-drive.module';
+import { SamplesCoreModule } from '../samples/samples-core.module';
+import { FileStorageService } from '../../infra/storage/file-storage.service';
+import { BusinessNotesAssetsController } from './notes-assets.controller';
+import {
+  AssetUploadInterceptor,
+  BusinessAssetsService,
+  BusinessNotesService,
+} from './notes-assets.service';
+import { ProfileKnowledgeController } from './profile-knowledge.controller';
+import { ProfileKnowledgeService } from './profile-knowledge.service';
+import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
 
 const RECENT_DISCOVERIES = 20;
 const REVISIONS_LIMIT = 30;
 const USER_REF = { select: { id: true, name: true } } as const;
+
+const asJson = (v: unknown) => v as Prisma.InputJsonValue;
 
 /**
  * Businesses and their profile sections (docs/12-businesses.md). AI work — suggestions,
@@ -61,6 +92,9 @@ export class BusinessesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly jobs: AiJobsService,
+    private readonly references: ReferencesService,
+    private readonly assets: BusinessAssetsService,
+    private readonly storage: FileStorageService,
   ) {}
 
   // ---------- businesses ----------
@@ -114,7 +148,7 @@ export class BusinessesService {
     const b = await this.prisma.business.findUnique({
       where: { id },
       include: {
-        sections: { include: { updatedBy: USER_REF } },
+        sections: { include: { updatedBy: USER_REF, reviewedBy: USER_REF } },
         topics: { select: { id: true, title: true, status: true }, orderBy: { updatedAt: 'desc' } },
         _count: { select: { topics: true, suggestions: { where: { status: 'PENDING' } } } },
       },
@@ -166,7 +200,9 @@ export class BusinessesService {
   /** Linked topics keep existing; they are simply unlinked (onDelete: SetNull). */
   async remove(id: string, user: AuthUser) {
     await this.exists(id);
+    const files = await this.assets.fileKeysOf(id);
     await this.prisma.business.delete({ where: { id } });
+    await this.storage.remove(files);
     this.audit.log({
       userId: user.id,
       action: 'business.delete',
@@ -259,11 +295,13 @@ export class BusinessesService {
         'Every section already has content; choose the sections to improve.',
       );
     }
+    const scope = suggestScope(data);
+    await this.assertReadable(id, scope, data.referenceIds, b.website);
     const job = await this.jobs.enqueue({
       type: 'BUSINESS_SUGGEST',
       targetType: 'Business',
       targetId: id,
-      input: { keys, instruction: data.instruction, useWebSearch: data.useWebSearch },
+      input: { keys, instruction: data.instruction, scope, referenceIds: data.referenceIds },
       userId: user.id,
     });
     return { jobId: job.id, keys };
@@ -285,6 +323,8 @@ export class BusinessesService {
         content,
         source,
         userId: user.id,
+        // The admin read and accepted it.
+        reviewed: true,
       });
     });
     await this.touch(s.businessId);
@@ -329,15 +369,43 @@ export class BusinessesService {
     if (b.buildState === 'BUILDING') {
       throw new BadRequestException('A research build is already running for this business');
     }
-    return this.enqueueBuild(id, BuildBusinessSchema.parse(input).instruction, user);
+    const data = BuildBusinessSchema.parse(input);
+    await this.assertReadable(id, data.scope, data.referenceIds, b.website);
+    return this.enqueueBuild(id, data, user);
   }
 
-  private async enqueueBuild(id: string, instruction: string, user: AuthUser) {
+  /**
+   * Rejects a job that is limited to the admin's references when none of them is readable
+   * (a REFERENCE_SITES job can still search the business's own website).
+   */
+  private async assertReadable(
+    id: string,
+    scope: ResearchScope,
+    referenceIds: string[] | undefined,
+    website: string,
+  ) {
+    if (scope === 'NONE' || scope === 'WEB') return;
+    if (await this.references.readyCount(id, referenceIds)) return;
+    if (scope === 'REFERENCE_SITES' && website) return;
+    throw new BadRequestException(
+      'No readable reference: add a link, a Google Doc or a text first (or fix the failed ones).',
+    );
+  }
+
+  private async enqueueBuild(
+    id: string,
+    input: { instruction: string; scope?: ResearchScope; referenceIds?: string[] },
+    user: AuthUser,
+  ) {
     const job = await this.jobs.enqueue({
       type: 'BUSINESS_BUILD',
       targetType: 'Business',
       targetId: id,
-      input: { instruction },
+      input: {
+        instruction: input.instruction,
+        scope: input.scope ?? 'WEB',
+        referenceIds: input.referenceIds,
+      },
       userId: user.id,
     });
     await this.prisma.business.update({
@@ -423,7 +491,207 @@ export class BusinessesService {
       entityId: business.id,
       meta: { discoveryId, index: input.index, keyword: d.keyword },
     });
-    return this.enqueueBuild(business.id, '', user);
+    return this.enqueueBuild(business.id, { instruction: '' }, user);
+  }
+
+  // ---------- build from the admin's own sources ----------
+
+  /**
+   * Creates a business from references the admin supplies (links, Google Docs, a pasted text),
+   * reads them, and — only when every one of them was readable — queues the build. Otherwise the
+   * business is kept with its references so the admin can fix them and start the build.
+   */
+  async createFromReferences(input: CreateFromReferencesInput, user: AuthUser) {
+    const data = CreateFromReferencesSchema.parse(input);
+    const business = await this.prisma.business.create({
+      data: {
+        name: data.name,
+        language: data.language,
+        website: data.website,
+        location: data.location,
+        origin: 'SOURCES',
+        createdById: user.id,
+      },
+    });
+    this.audit.log({
+      userId: user.id,
+      action: 'business.create_from_references',
+      entityType: 'Business',
+      entityId: business.id,
+      meta: { links: data.urls.length, text: data.text.length, scope: data.scope },
+    });
+
+    const inputs: AddReferenceInput[] = [
+      ...[...new Set(data.urls)].map((url) => ({ url })),
+      ...(data.text ? [{ content: data.text, title: data.textTitle }] : []),
+    ];
+    const results = await Promise.allSettled(
+      inputs.map((ref) => this.references.add(business.id, ref, user)),
+    );
+    const failed = results.filter(
+      (r) => r.status === 'rejected' || r.value.references.some((ref) => ref.status !== 'READY'),
+    ).length;
+    if (failed) return { businessId: business.id, jobId: null, failed };
+
+    const { jobId } = await this.enqueueBuild(
+      business.id,
+      { instruction: data.instruction, scope: data.scope },
+      user,
+    );
+    return { businessId: business.id, jobId, failed: 0 };
+  }
+
+  // ---------- research sources & blocklist ----------
+
+  /** Removes one research source from a business, optionally blacklisting it everywhere. */
+  async removeSource(id: string, input: RemoveSourceInput, user: AuthUser) {
+    const b = await this.exists(id);
+    const data = RemoveSourceSchema.parse(input);
+    const sources = b.sources as unknown as WebSource[];
+    const kept = sources.filter((s) => s.url !== data.url);
+    if (kept.length === sources.length) throw new NotFoundException('Source not found');
+    const blocked = await this.blockFromRemoval(data, user);
+    // A new rule already purged the source everywhere; otherwise remove just this one.
+    if (!blocked) {
+      await this.prisma.business.update({ where: { id }, data: { sources: asJson(kept) } });
+    }
+    this.audit.log({
+      userId: user.id,
+      action: 'business.source_remove',
+      entityType: 'Business',
+      entityId: id,
+      meta: { url: data.url, block: data.block },
+    });
+    return { removed: data.url, blocked };
+  }
+
+  /** Same as removeSource, for the sources of a keyword discovery. */
+  async removeDiscoverySource(discoveryId: string, input: RemoveSourceInput, user: AuthUser) {
+    const d = await this.discovery(discoveryId);
+    const data = RemoveSourceSchema.parse(input);
+    const sources = d.sources as unknown as WebSource[];
+    const kept = sources.filter((s) => s.url !== data.url);
+    if (kept.length === sources.length) throw new NotFoundException('Source not found');
+    const blocked = await this.blockFromRemoval(data, user);
+    if (!blocked) {
+      await this.prisma.businessDiscovery.update({
+        where: { id: discoveryId },
+        data: { sources: asJson(kept) },
+      });
+    }
+    this.audit.log({
+      userId: user.id,
+      action: 'business.discovery_source_remove',
+      entityType: 'BusinessDiscovery',
+      entityId: discoveryId,
+      meta: { url: data.url, block: data.block },
+    });
+    return { removed: data.url, blocked };
+  }
+
+  private async blockFromRemoval(data: z.infer<typeof RemoveSourceSchema>, user: AuthUser) {
+    if (data.block === 'NONE') return null;
+    if (user.role !== 'ADMIN') throw new ForbiddenException('Only admins can block sources');
+    return this.addBlock(data.block, data.url, '', user);
+  }
+
+  blocklist() {
+    return this.prisma.blockedSource.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { createdBy: USER_REF },
+    });
+  }
+
+  block(input: CreateBlockedSourceInput, user: AuthUser) {
+    const data = CreateBlockedSourceSchema.parse(input);
+    return this.addBlock(data.kind, data.value, data.note, user);
+  }
+
+  async unblock(id: string, user: AuthUser) {
+    const rule = await this.prisma.blockedSource.findUnique({ where: { id } });
+    if (!rule) throw new NotFoundException('Blocked source not found');
+    await this.prisma.blockedSource.delete({ where: { id } });
+    this.audit.log({
+      userId: user.id,
+      action: 'business.source_unblock',
+      entityType: 'BlockedSource',
+      entityId: id,
+      meta: { kind: rule.kind, value: rule.value },
+    });
+  }
+
+  /**
+   * Adds (or updates) a blocklist rule and purges every stored source it matches — from all
+   * businesses and discoveries, including candidates' source links. Future research excludes
+   * it (AiExecutor.research).
+   */
+  private async addBlock(kind: SourceBlockKind, raw: string, note: string, user: AuthUser) {
+    const value = sourceBlockValue(raw, kind);
+    if (!value) throw new BadRequestException('Not a valid web address');
+    const rule = await this.prisma.blockedSource.upsert({
+      where: { kind_value: { kind, value } },
+      create: { kind, value, note, createdById: user.id },
+      update: note ? { note } : {},
+      include: { createdBy: USER_REF },
+    });
+    const purged = await this.purgeBlocked([{ kind, value }]);
+    this.audit.log({
+      userId: user.id,
+      action: 'business.source_block',
+      entityType: 'BlockedSource',
+      entityId: rule.id,
+      meta: { kind, value, ...purged },
+    });
+    return rule;
+  }
+
+  private async purgeBlocked(rules: { kind: SourceBlockKind; value: string }[]) {
+    const blocked = (url: string) => isSourceBlocked(url, rules);
+    const clean = (sources: unknown) => {
+      const list = (sources ?? []) as WebSource[];
+      const kept = list.filter((s) => !blocked(s.url));
+      return kept.length === list.length ? null : kept;
+    };
+    const [businesses, discoveries] = await Promise.all([
+      this.prisma.business.findMany({ select: { id: true, sources: true } }),
+      this.prisma.businessDiscovery.findMany({
+        select: { id: true, sources: true, candidates: true },
+      }),
+    ]);
+    const updates: Prisma.PrismaPromise<unknown>[] = [];
+    let businessesTouched = 0;
+    for (const b of businesses) {
+      const kept = clean(b.sources);
+      if (!kept) continue;
+      businessesTouched++;
+      updates.push(
+        this.prisma.business.update({ where: { id: b.id }, data: { sources: asJson(kept) } }),
+      );
+    }
+    let discoveriesTouched = 0;
+    for (const d of discoveries) {
+      const kept = clean(d.sources);
+      const candidates = (d.candidates ?? []) as unknown as BusinessCandidate[];
+      let candidatesChanged = false;
+      const cleanCandidates = candidates.map((c) => {
+        const sourceUrls = (c.sourceUrls ?? []).filter((u) => !blocked(u));
+        if (sourceUrls.length !== (c.sourceUrls ?? []).length) candidatesChanged = true;
+        return { ...c, sourceUrls };
+      });
+      if (!kept && !candidatesChanged) continue;
+      discoveriesTouched++;
+      updates.push(
+        this.prisma.businessDiscovery.update({
+          where: { id: d.id },
+          data: {
+            ...(kept ? { sources: asJson(kept) } : {}),
+            ...(candidatesChanged ? { candidates: asJson(cleanCandidates) } : {}),
+          },
+        }),
+      );
+    }
+    if (updates.length) await this.prisma.$transaction(updates);
+    return { businesses: businessesTouched, discoveries: discoveriesTouched };
   }
 
   private touch(id: string) {
@@ -435,7 +703,10 @@ const SectionKeyPipe = new ParseEnumPipe(Object.fromEntries(BusinessSectionKey.m
 
 @Controller('businesses')
 export class BusinessesController {
-  constructor(private readonly businesses: BusinessesService) {}
+  constructor(
+    private readonly businesses: BusinessesService,
+    private readonly refs: ReferencesService,
+  ) {}
 
   @Get()
   list(
@@ -459,9 +730,34 @@ export class BusinessesController {
     return this.businesses.create(body, user);
   }
 
+  @Post('from-references')
+  @Roles('ADMIN', 'EDITOR')
+  createFromReferences(
+    @Body(new ZodValidationPipe(CreateFromReferencesSchema)) body: CreateFromReferencesInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.businesses.createFromReferences(body, user);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.businesses.get(id);
+  }
+
+  @Get(':id/references')
+  references(@Param('id') id: string) {
+    return this.refs.list(id);
+  }
+
+  @Post(':id/references')
+  @Roles('ADMIN', 'EDITOR')
+  async addReference(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(AddReferenceSchema)) body: AddReferenceInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.businesses.get(id);
+    return this.refs.add(id, body, user);
   }
 
   @Patch(':id')
@@ -521,6 +817,17 @@ export class BusinessesController {
     return this.businesses.suggest(id, body, user);
   }
 
+  @Post(':id/sources/remove')
+  @Roles('ADMIN', 'EDITOR')
+  @HttpCode(200)
+  removeSource(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(RemoveSourceSchema)) body: RemoveSourceInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.businesses.removeSource(id, body, user);
+  }
+
   @Post(':id/build')
   @Roles('ADMIN', 'EDITOR')
   build(
@@ -534,7 +841,39 @@ export class BusinessesController {
 
 @Controller()
 export class BusinessItemsController {
-  constructor(private readonly businesses: BusinessesService) {}
+  constructor(
+    private readonly businesses: BusinessesService,
+    private readonly refs: ReferencesService,
+  ) {}
+
+  @Get('business-references/:id')
+  reference(@Param('id') id: string) {
+    return this.refs.get(id);
+  }
+
+  @Patch('business-references/:id')
+  @Roles('ADMIN', 'EDITOR')
+  updateReference(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateReferenceSchema)) body: UpdateReferenceInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.refs.update(id, body, user);
+  }
+
+  @Post('business-references/:id/refresh')
+  @Roles('ADMIN', 'EDITOR')
+  @HttpCode(200)
+  refreshReference(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.refs.refresh(id, user);
+  }
+
+  @Delete('business-references/:id')
+  @Roles('ADMIN', 'EDITOR')
+  @HttpCode(204)
+  removeReference(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.refs.remove(id, user);
+  }
 
   @Post('business-revisions/:id/restore')
   @Roles('ADMIN', 'EDITOR')
@@ -586,11 +925,56 @@ export class BusinessItemsController {
   ) {
     return this.businesses.selectCandidate(id, body, user);
   }
+
+  @Post('business-discoveries/:id/sources/remove')
+  @Roles('ADMIN', 'EDITOR')
+  @HttpCode(200)
+  removeDiscoverySource(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(RemoveSourceSchema)) body: RemoveSourceInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.businesses.removeDiscoverySource(id, body, user);
+  }
+
+  @Get('source-blocklist')
+  blocklist() {
+    return this.businesses.blocklist();
+  }
+
+  @Post('source-blocklist')
+  @Roles('ADMIN')
+  block(
+    @Body(new ZodValidationPipe(CreateBlockedSourceSchema)) body: CreateBlockedSourceInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.businesses.block(body, user);
+  }
+
+  @Delete('source-blocklist/:id')
+  @Roles('ADMIN')
+  @HttpCode(204)
+  unblock(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.businesses.unblock(id, user);
+  }
 }
 
 @Module({
-  controllers: [BusinessesController, BusinessItemsController],
-  providers: [BusinessesService],
+  imports: [SamplesCoreModule, GoogleDriveModule],
+  controllers: [
+    BusinessesController,
+    BusinessItemsController,
+    BusinessNotesAssetsController,
+    ProfileKnowledgeController,
+  ],
+  providers: [
+    BusinessesService,
+    ReferencesService,
+    BusinessNotesService,
+    BusinessAssetsService,
+    AssetUploadInterceptor,
+    ProfileKnowledgeService,
+  ],
   exports: [BusinessesService],
 })
 export class BusinessesModule {}

@@ -43,8 +43,23 @@
 | GET | `/businesses/:id/suggestions` | پیشنهادهای AI در انتظار |
 | POST | `/businesses/:id/suggest`، `/businesses/:id/build` | کار `BUSINESS_SUGGEST` / `BUSINESS_BUILD` ← `{ jobId }` |
 | POST | `/business-suggestions/:id/accept`، `/business-suggestions/:id/dismiss` | پذیرش (با ویرایش اختیاری) / رد |
+| POST | `/businesses/:id/sections/:key/review` | تأیید متن بخش |
+| GET / POST · PATCH / DELETE | `/businesses/:id/facts` · `/business-facts/:id` | واقعیت‌های کلیدی |
+| GET / POST · PATCH / DELETE | `/businesses/:id/terms` · `/business-terms/:id` | واژه‌نامهٔ برند |
+| GET / POST | `/businesses/:id/audit` | آخرین بررسی کیفیت / شروع `BUSINESS_AUDIT` |
+| POST | `/business-audits/:id/issues/:index/fix`، `…/dismiss` | رفع مشکل با AI (پیشنهاد) / نادیده گرفتن ([16-business-profile-quality.md](16-business-profile-quality.md)) |
 | GET / POST | `/business-discoveries`، GET `/business-discoveries/:id` | تحقیق کلیدواژه (`BUSINESS_DISCOVER`) |
 | POST | `/business-discoveries/:id/select` | `{ index }` — تأیید کاندیدا، ساخت کسب‌وکار و شروع `BUSINESS_BUILD` |
+| POST | `/businesses/:id/sources/remove`، `/business-discoveries/:id/sources/remove` | `{ url, block }` — حذف منبع تحقیق و در صورت نیاز افزودن به فهرست سیاه (مسدودسازی فقط ADMIN) |
+| GET / POST / DELETE | `/source-blocklist`، `/source-blocklist/:id` | فهرست سیاه منابع تحقیق (تغییر فقط ADMIN) |
+| POST | `/businesses/from-references` | ساخت کسب‌وکار از لینک‌ها/متن ادمین و شروع `BUSINESS_BUILD` ([14-business-references.md](14-business-references.md)) |
+| GET / POST | `/businesses/:id/references` | منابع مرجع AI: فهرست / افزودن لینک یا متن |
+| GET / PATCH / DELETE | `/business-references/:id`، POST `…/refresh` | متن ذخیره‌شده، فعال/غیرفعال، خواندن دوباره، حذف |
+| GET | `/google-drive`، POST `/google-drive/connect`، DELETE `/google-drive/accounts/:id` | حساب‌های گوگل متصل برای اسناد خصوصی (اتصال/قطع فقط ADMIN) |
+| GET / POST | `/businesses/:id/notes`، PATCH / DELETE `/business-notes/:id` | توضیح ادمین؛ ثبت آن `BUSINESS_REVISE` را در صف می‌گذارد ([15-business-notes-and-assets.md](15-business-notes-and-assets.md)) |
+| GET / POST | `/businesses/:id/assets` | محتواهای کسب‌وکار؛ افزودن با `multipart/form-data` و شروع `BUSINESS_ASSET_ANALYZE` |
+| GET / PATCH / DELETE | `/business-assets/:id`، POST `…/analyze` | جزئیات، ویرایش، حذف، تحلیل دوباره |
+| GET | `/files/:key?exp&sig` | فایل بارگذاری‌شده با نشانی امضاشدهٔ موقت |
 
 جزئیات بدنه‌ها و پاسخ‌ها: [12-businesses.md](12-businesses.md).
 

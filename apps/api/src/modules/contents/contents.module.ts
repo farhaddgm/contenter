@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  checkTerms,
   ContentListQuerySchema,
   EditContentVersionSchema,
   GenerateContentSchema,
@@ -78,6 +79,23 @@ export class ContentsService {
     });
     if (!c) throw new NotFoundException('Content not found');
     return c;
+  }
+
+  /**
+   * Content with its versions plus the brand terminology check of the current version: the
+   * linked business's USE/AVOID terms matched by code (checkTerms), never by the model.
+   */
+  async detail(id: string) {
+    const c = await this.get(id);
+    const v = c.currentVersion;
+    if (!v) return { ...c, termIssues: [] };
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: c.topicId },
+      select: { business: { select: { terms: { where: { isActive: true } } } } },
+    });
+    const terms = topic?.business?.terms ?? [];
+    const text = [v.title, v.body, v.hashtags.join(' '), v.cta].join('\n');
+    return { ...c, termIssues: terms.length ? checkTerms(text, terms) : [] };
   }
 
   /** Creates the content shell (status GENERATING) and queues the AI draft. */
@@ -227,7 +245,7 @@ export class ContentsController {
 
   @Get('contents/:id')
   get(@Param('id') id: string) {
-    return this.contents.get(id);
+    return this.contents.detail(id);
   }
 
   @Patch('contents/:id')

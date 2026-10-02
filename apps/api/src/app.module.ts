@@ -6,6 +6,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { QueueModule } from './infra/queue/queue.service';
+import { StorageModule } from './infra/storage/file-storage.service';
 import { AiModule } from './modules/ai/ai.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -18,6 +19,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { SamplesModule } from './modules/samples/samples.module';
 import { GoogleAccessModule } from './modules/google-access/google-access.module';
+import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { TopicsModule } from './modules/topics/topics.module';
 import { UsersModule } from './modules/users/users.module';
@@ -29,6 +31,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     ConfigModule,
     PrismaModule,
     QueueModule,
+    StorageModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 600 }]),
     AuditModule,
     SmartCoreModule,
@@ -37,6 +40,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     AiModule,
     UsersModule,
     GoogleAccessModule,
+    GoogleDriveModule,
     BusinessesModule,
     TopicsModule,
     SamplesModule,

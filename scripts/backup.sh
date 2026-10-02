@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Contenter — backups of the database and apps/api/.env (run on the server, inside the repo folder).
+# Contenter — backups of the database, apps/api/.env and uploaded files (run on the server, inside the repo folder).
 #
 #   bash scripts/backup.sh                 back up now: local copy + encrypted off-site copy
 #   bash scripts/backup.sh setup           one-time: create the encryption key and the settings file
@@ -8,9 +8,9 @@
 #   bash scripts/backup.sh fetch [file]    download and unpack an off-site backup (default: newest)
 #   bash scripts/backup.sh install-cron    back up automatically every night at 03:17
 #
-# Local copies go to ~/contenter-backups (newest $KEEP_BACKUPS kept). The off-site copy is one
-# file per run, contenter-<time>.tar.gz.enc (AES-256, key in ~/.contenter-backup-key), uploaded
-# with rclone to $BACKUP_REMOTE; copies older than $KEEP_OFFSITE_DAYS days are deleted there.
+# Local copies go to ~/contenter-backups (newest $KEEP_BACKUPS kept; uploaded files: newest
+# $KEEP_UPLOAD_BACKUPS). The off-site copy is one file per run, contenter-<time>.tar.gz.enc
+# (AES-256, key in ~/.contenter-backup-key), uploaded with rclone to $BACKUP_REMOTE; copies older than $KEEP_OFFSITE_DAYS days are deleted there.
 # Settings live in ~/.contenter-backup.env (outside git). docs/13-operations.md explains it all.
 set -euo pipefail
 
@@ -25,6 +25,7 @@ main() {
   ENV_FILE="apps/api/.env"
   BACKUP_DIR="${BACKUP_DIR:-$HOME/contenter-backups}"
   KEEP_BACKUPS="${KEEP_BACKUPS:-14}"
+  KEEP_UPLOAD_BACKUPS="${KEEP_UPLOAD_BACKUPS:-3}"
   BACKUP_REMOTE="${BACKUP_REMOTE:-}"
   BACKUP_REMOTE="${BACKUP_REMOTE%/}"
   BACKUP_KEY_FILE="${BACKUP_KEY_FILE:-$HOME/.contenter-backup-key}"
@@ -52,7 +53,7 @@ backup_now() {
   STAMP="$(date +%Y%m%d-%H%M%S)"
   [ -f docker-compose.yml ] || fail "Run this inside the contenter folder (cd ~/contenter)."
 
-  say "Backing up database and settings to $BACKUP_DIR"
+  say "Backing up database, settings and uploaded files to $BACKUP_DIR"
   if [ -s "$ENV_FILE" ]; then
     cp "$ENV_FILE" "$BACKUP_DIR/env-$STAMP"
     files+=("env-$STAMP")
@@ -67,10 +68,24 @@ backup_now() {
   else
     echo "postgres is not running — skipping database backup"
   fi
-  chmod 600 "$BACKUP_DIR"/* 2>/dev/null || true
-  # keep only the newest local backups
+  # uploaded files (brand assets) live in the api container's "uploads" volume
+  if docker compose ps --status running --services 2>/dev/null | grep -qx api; then
+    if docker compose exec -T api sh -c 'cd "${UPLOAD_DIR:-uploads}" 2>/dev/null && tar -czf - .' > "$BACKUP_DIR/uploads-$STAMP.tar.gz" &&
+      [ -s "$BACKUP_DIR/uploads-$STAMP.tar.gz" ]; then
+      files+=("uploads-$STAMP.tar.gz")
+      ok "Uploaded files: $BACKUP_DIR/uploads-$STAMP.tar.gz ($(du -h "$BACKUP_DIR/uploads-$STAMP.tar.gz" | cut -f1))"
+    else
+      rm -f "$BACKUP_DIR/uploads-$STAMP.tar.gz"
+      warn "Could not back up uploaded files (the database backup is fine)."
+    fi
+  else
+    echo "api is not running — skipping uploaded files"
+  fi
+  find "$BACKUP_DIR" -maxdepth 1 -type f -exec chmod 600 {} + 2>/dev/null || true
+  # keep only the newest local backups (uploaded files can be large: fewer copies)
   ls -1t "$BACKUP_DIR"/db-*.sql.gz 2>/dev/null | tail -n +"$((KEEP_BACKUPS + 1))" | xargs -r rm -f
   ls -1t "$BACKUP_DIR"/env-* 2>/dev/null | tail -n +"$((KEEP_BACKUPS + 1))" | xargs -r rm -f
+  ls -1t "$BACKUP_DIR"/uploads-*.tar.gz 2>/dev/null | tail -n +"$((KEEP_UPLOAD_BACKUPS + 1))" | xargs -r rm -f
 
   # ── Off-site copy ──────────────────────────────────────────────────────────
   if [ -z "$BACKUP_REMOTE" ]; then
@@ -132,7 +147,7 @@ fetch_into() {
   decrypt < "$dir/$name" | tar -C "$dir" -xzf - || fail "Could not decrypt/unpack $name — wrong key in $BACKUP_KEY_FILE?"
   rm -f "$dir/$name"
   local f
-  for f in "$dir"/db-*.sql.gz; do
+  for f in "$dir"/db-*.sql.gz "$dir"/uploads-*.tar.gz; do
     [ -e "$f" ] || continue
     gzip -t "$f" || fail "$(basename "$f") inside $name is damaged."
   done

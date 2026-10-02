@@ -64,6 +64,7 @@ export const POLICIES = {
   'backoffice:access': (role: Role) => role === 'ADMIN',
   'topic:delete': (role: Role) => role === 'ADMIN',
   'business:delete': (role: Role) => role === 'ADMIN',
+  'source:block': (role: Role) => role === 'ADMIN',
 } as const;
 
 export type Policy = keyof typeof POLICIES;

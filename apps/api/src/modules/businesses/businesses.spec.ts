@@ -1,21 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import {
+  BusinessAuditResultSchema,
   BusinessBuildResultSchema,
   BusinessDiscoveryResultSchema,
   BusinessSectionKey,
   BusinessSuggestResultSchema,
+  isSourceBlocked,
+  sourceBlockValue,
   type AiJobType,
 } from '@contenter/shared';
 import type { ZodType } from 'zod';
 import { appendMissingBlocks } from '../ai/ai-executor.service';
-import { formatBusiness, formatSectionSpec, formatTopic, NO_BUSINESS } from '../ai/context';
+import {
+  formatBusiness,
+  formatBusinessFacts,
+  formatBusinessTerms,
+  formatSectionSpec,
+  formatTopic,
+  NO_BUSINESS,
+  UNREVIEWED_MARK,
+} from '../ai/context';
 import { estimateCostUsd } from '../ai/pricing';
 import { DEFAULT_PROMPTS } from '../ai/prompts/defaults';
 import { templateVariables } from '../ai/prompts/render';
-import { mergeSources, sumUsage } from '../ai/provider/ai-provider';
+import { mergeSources, researchSources, sumUsage } from '../ai/provider/ai-provider';
 import { collectResearch, webSearchToolType } from '../ai/provider/anthropic.provider';
 import { MockProvider } from '../ai/provider/mock.provider';
+import { blocklistNote, filterSources, searchToolBlocklist } from '../ai/source-blocklist';
 import { toStrictJsonSchema } from '../ai/provider/openai.provider';
 import { cleanUrl } from './section-writer';
 
@@ -32,6 +44,80 @@ const business = {
     { key: 'PERSONAS' as const, content: '   ' },
   ],
 };
+
+describe('business knowledge in the prompt', () => {
+  it('marks AI text nobody confirmed, but not reviewed or admin text', () => {
+    const out = formatBusiness({
+      ...business,
+      sections: [
+        { key: 'OVERVIEW', content: 'AI draft', source: 'AI', reviewedAt: null },
+        { key: 'SERVICES', content: 'AI ok', source: 'AI', reviewedAt: new Date() },
+        { key: 'GOALS', content: 'admin', source: 'ADMIN', reviewedAt: null },
+      ],
+    });
+    expect(out).toContain(`[OVERVIEW] ${UNREVIEWED_MARK}`);
+    expect(out).toContain('[SERVICES]\nAI ok');
+    expect(out).toContain('[GOALS]\nadmin');
+  });
+
+  it('sends valid facts exactly, marks unverified ones and drops expired ones', () => {
+    const out = formatBusinessFacts(
+      [
+        {
+          label: 'کارمزد',
+          value: 'رایگان',
+          category: 'PRICING',
+          verified: true,
+          validUntil: '2026-12-01',
+        },
+        {
+          label: 'سقف وام',
+          value: '۳۰۰ میلیون',
+          category: 'OFFER',
+          verified: false,
+          validUntil: null,
+        },
+        {
+          label: 'کمپین قدیمی',
+          value: 'x',
+          category: 'OFFER',
+          verified: true,
+          validUntil: '2020-01-01',
+        },
+      ],
+      new Date('2026-09-30'),
+    );
+    expect(out).toContain('[FACTS]');
+    expect(out).toContain('- [PRICING] کارمزد: رایگان (valid until 2026-12-01)');
+    expect(out).toMatch(/سقف وام: ۳۰۰ میلیون \(unverified/);
+    expect(out).not.toContain('کمپین قدیمی');
+    expect(formatBusinessFacts([], new Date())).toBe('');
+  });
+
+  it('turns terminology into binding rules', () => {
+    const out = formatBusinessTerms([
+      { term: 'ویپاد', kind: 'USE', alternatives: ['وی پاد'], note: 'نام برند' },
+      { term: 'بانک ویپاد', kind: 'AVOID', alternatives: ['شعبهٔ دیجیتال'], note: '' },
+    ]);
+    expect(out).toContain('- ALWAYS write "ویپاد" (never: "وی پاد") — نام برند');
+    expect(out).toContain('- NEVER write "بانک ویپاد"; use instead: "شعبهٔ دیجیتال"');
+  });
+
+  it('places facts and terms after the sections, before the assets', () => {
+    const out = formatBusiness({
+      ...business,
+      facts: [{ label: 'a', value: 'b', category: 'OTHER', verified: true, validUntil: null }],
+      terms: [{ term: 'ویپاد', kind: 'USE', alternatives: [], note: '' }],
+    });
+    expect(out.indexOf('[SERVICES]')).toBeLessThan(out.indexOf('[FACTS]'));
+    expect(out.indexOf('[FACTS]')).toBeLessThan(out.indexOf('[TERMINOLOGY]'));
+  });
+
+  it('tells section writers which sections are factual', () => {
+    expect(formatSectionSpec(['SERVICES'])).toContain('factual');
+    expect(formatSectionSpec(['PERSONAS'])).toContain('strategic');
+  });
+});
 
 describe('business context', () => {
   it('formats filled sections in the canonical order and skips empty ones', () => {
@@ -56,7 +142,8 @@ describe('business context', () => {
     const out = formatBusiness(long, { budget: 15_000 });
     expect(out).toContain('[truncated]');
     expect(out).toContain('[omitted — business profile budget exhausted]');
-    expect(out.length).toBeLessThan(16_000);
+    // Budget covers section text; headers and omission markers add a little on top.
+    expect(out.length).toBeLessThan(16_500);
   });
 
   it('names the business in the topic block', () => {
@@ -105,7 +192,7 @@ describe('web research helpers', () => {
     expect(webSearchToolType('claude-haiku-4-5')).toBe('web_search_20250305');
   });
 
-  it('keeps the final notes and collects searched and cited sources', () => {
+  it('keeps the final notes and lists only the sources the notes rely on', () => {
     const blocks = [
       { type: 'text', text: 'Let me search.', citations: null },
       { type: 'server_tool_use', id: 's1', name: 'web_search', input: {} },
@@ -120,11 +207,18 @@ describe('web research helpers', () => {
             encrypted_content: '',
             page_age: null,
           },
+          {
+            type: 'web_search_result',
+            url: 'https://unrelated.com/x',
+            title: 'Seen but never used',
+            encrypted_content: '',
+            page_age: null,
+          },
         ],
       },
       {
         type: 'text',
-        text: 'Found A.',
+        text: 'Found A (https://a.com).',
         citations: [
           {
             type: 'web_search_result_location',
@@ -138,8 +232,16 @@ describe('web research helpers', () => {
       { type: 'text', text: ' More.', citations: null },
     ] as unknown as Anthropic.Beta.BetaContentBlock[];
     const out = collectResearch(blocks);
-    expect(out.text).toBe('Found A. More.');
-    expect(out.sources.map((s) => s.url)).toEqual(['https://b.com', 'https://a.com']);
+    expect(out.text).toBe('Found A (https://a.com). More.');
+    // cited (b) + named in the notes (a); the unused search hit is not a source
+    expect(out.sources).toEqual([
+      { url: 'https://b.com', title: 'B' },
+      { url: 'https://a.com', title: 'A' },
+    ]);
+    // nothing cited or named → the raw hits stand in
+    expect(researchSources([], [{ url: 'https://c.com', title: 'C' }]).map((s) => s.url)).toEqual([
+      'https://c.com',
+    ]);
   });
 
   it('sums usage and de-duplicates sources', () => {
@@ -198,6 +300,7 @@ describe('business AI schemas', () => {
   const cases: [AiJobType, ZodType<unknown>, string][] = [
     ['BUSINESS_DISCOVER', BusinessDiscoveryResultSchema, '<count>2</count>'],
     ['BUSINESS_BUILD', BusinessBuildResultSchema, '<business_name>ویپاد</business_name>'],
+    ['BUSINESS_AUDIT', BusinessAuditResultSchema, '<business>x</business>'],
     [
       'BUSINESS_SUGGEST',
       BusinessSuggestResultSchema,
@@ -235,5 +338,46 @@ describe('business AI schemas', () => {
     });
     expect(res.text).toContain('mock');
     expect(res.sources.length).toBeGreaterThan(0);
+  });
+});
+
+describe('research source blocklist', () => {
+  const rules = [
+    { kind: 'DOMAIN' as const, value: 'spam.com' },
+    { kind: 'URL' as const, value: 'news.ir/article/12' },
+    { kind: 'URL' as const, value: 'root.org' },
+  ];
+
+  it('normalizes block values', () => {
+    expect(sourceBlockValue('https://www.Spam.com/a/b?x=1', 'DOMAIN')).toBe('spam.com');
+    expect(sourceBlockValue('https://www.news.ir/article/12/?utm=1#top', 'URL')).toBe(
+      'news.ir/article/12',
+    );
+    expect(sourceBlockValue('example.com', 'DOMAIN')).toBe('example.com');
+    expect(sourceBlockValue('not a url', 'URL')).toBeNull();
+    expect(sourceBlockValue('javascript:alert(1)', 'DOMAIN')).toBeNull();
+  });
+
+  it('matches whole sites with subdomains, and single pages exactly', () => {
+    expect(isSourceBlocked('https://blog.spam.com/post', rules)).toBe(true);
+    expect(isSourceBlocked('http://spam.com', rules)).toBe(true);
+    expect(isSourceBlocked('https://notspam.com', rules)).toBe(false);
+    expect(isSourceBlocked('https://news.ir/article/12/', rules)).toBe(true);
+    expect(isSourceBlocked('https://news.ir/article/13', rules)).toBe(false);
+    expect(isSourceBlocked('https://root.org/', rules)).toBe(true);
+    expect(isSourceBlocked('https://root.org/other', rules)).toBe(false);
+    expect(isSourceBlocked('https://spam.com', [])).toBe(false);
+  });
+
+  it('filters sources and builds the search-tool list and prompt note', () => {
+    const sources = [
+      { url: 'https://a.spam.com/x', title: 'A' },
+      { url: 'https://ok.com', title: 'OK' },
+    ];
+    expect(filterSources(sources, rules)).toEqual([{ url: 'https://ok.com', title: 'OK' }]);
+    // A site-root URL rule must not block the whole host at the vendor.
+    expect(searchToolBlocklist(rules)).toEqual(['spam.com', 'news.ir/article/12']);
+    expect(blocklistNote([])).toBe('');
+    expect(blocklistNote(rules)).toContain('- spam.com (whole site');
   });
 });
