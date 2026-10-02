@@ -1,0 +1,43 @@
+# Tags each release on main: when package.json carries a version that has no `v<version>` tag
+# yet, the `chore(release): v<version> …` commit is tagged (annotated, with its message).
+# Runs after every push to main; does nothing when the tag exists or no release commit is found.
+name: Release tag
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag the release commit of the current version
+        run: |
+          set -euo pipefail
+          VERSION="v$(node -p "require('./package.json').version")"
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null; then
+            echo "$VERSION is already tagged"
+            exit 0
+          fi
+          # The trailing space keeps v0.5.1 from matching v0.5.10.
+          SHA="$(git log -1 --format=%H --fixed-strings --grep="chore(release): $VERSION " HEAD)"
+          if [ -z "$SHA" ]; then
+            echo "No 'chore(release): $VERSION' commit on main yet — nothing to tag"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git log -1 --format=%B "$SHA" | git tag -a "$VERSION" "$SHA" -F -
+          git push origin "refs/tags/$VERSION"
+          echo "Tagged $VERSION at $SHA"
