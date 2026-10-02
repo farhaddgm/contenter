@@ -61,6 +61,10 @@ main() {
   # ── 2. Backups ─────────────────────────────────────────────────────────────
   # stops the deploy if the database backup fails; an unreachable off-site storage only warns
   BACKUP_DIR="$BACKUP_DIR" BACKUP_FROM_DEPLOY=1 bash scripts/backup.sh
+  # nightly backups too (idempotent: replaces its own crontab line, keeps every other one)
+  if ! crontab -l 2>/dev/null | grep -qF 'scripts/backup.sh'; then
+    BACKUP_DIR="$BACKUP_DIR" bash scripts/backup.sh install-cron || echo "Could not schedule the nightly backup (docs/13-operations.md, section 8)"
+  fi
 
   # ── 3. Code ────────────────────────────────────────────────────────────────
   say "Getting the latest version from GitHub"
