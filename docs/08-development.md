@@ -55,3 +55,11 @@ AI_DEFAULT_MODEL=openai:gpt-5.4
 - هیچ فراخوانی AI درون درخواست HTTP انجام نمی‌شود؛ همیشه از `AiJobsService.enqueue()` استفاده کنید.
 - تغییر schema با `npm run db:migrate` (یک مایگریشن جدید) همراه است.
 - پیام‌های commit: [Conventional Commits](https://www.conventionalcommits.org/).
+
+## انتشار نسخه
+
+1. نسخه را در همهٔ `package.json`ها بالا ببرید (`npm version <x.y.z> --no-git-tag-version --workspaces --include-workspace-root`) و بخش همان نسخه را در `CHANGELOG.md` بنویسید.
+2. commit با عنوان `chore(release): v<x.y.z> — <خلاصه>` بسازید و به `main` برسانید (مستقیم یا با PR).
+3. تگ را دستی نسازید: workflow «Release tag» (`.github/workflows/release-tag.yml`) بعد از هر push به `main`، اگر تگ `v<نسخهٔ package.json>` وجود نداشته باشد، همان commit انتشار را با تگ annotated علامت می‌زند. از Actions هم دستی قابل اجراست (`workflow_dispatch`).
+4. روی سرور `bash scripts/deploy.sh` ([13-operations.md](13-operations.md)) — پیام پایانی نام تگ را نشان می‌دهد.
+
