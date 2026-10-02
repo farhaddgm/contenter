@@ -8,6 +8,7 @@
 - **انتشار خودکار** (`.github/workflows/deploy.yml`): پس از سبز شدن CI روی `main`، GitHub Actions با SSH همان commit تست‌شده را با `scripts/deploy.sh` منتشر می‌کند. کلید SSH فقط اجازهٔ اجرای `deploy.sh` را دارد. راه‌اندازی یک‌باره با `scripts/setup-auto-deploy.sh` ([docs/13-operations.md §۹](docs/13-operations.md)).
 - **پشتیبان بیرون از سرور** (`scripts/backup.sh`): پشتیبان شبانه (cron) و در هر انتشار از پایگاه داده، `.env` و فایل‌های بارگذاری‌شده (ولوم `uploads` که تا حالا پشتیبان نداشت)، رمزنگاری با AES-256 و ارسال با rclone به S3/SFTP/... با نگهداری ۳۰ روزه. `backup.sh test` بازگردانی آخرین نسخه را امتحان می‌کند ([docs/13-operations.md §۸](docs/13-operations.md)).
 - `deploy.sh <commit>`: انتشار تا یک commit مشخص (هیچ‌وقت به عقب برنمی‌گردد).
+- `deploy.sh` پشتیبان شبانه (cron) را اگر فعال نباشد خودش فعال می‌کند.
 
 ### تغییر کرد
 - پشتیبان‌گیری `deploy.sh` به `scripts/backup.sh` منتقل شد. اگر مقصد بیرونی در دسترس نباشد، انتشار فقط هشدار می‌دهد و متوقف نمی‌شود.

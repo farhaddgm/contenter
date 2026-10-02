@@ -150,15 +150,14 @@ nano ~/.contenter-backup.env
 BACKUP_REMOTE=offsite:<bucket>/contenter
 ```
 
-۴. یک پشتیبان بگیرید، بررسی کنید که باز می‌شود، و پشتیبان شبانه را فعال کنید:
+۴. یک پشتیبان بگیرید و بررسی کنید که باز می‌شود:
 
 ```bash
 bash scripts/backup.sh
 bash scripts/backup.sh test
-bash scripts/backup.sh install-cron
 ```
 
-پیام سبز `can be restored` یعنی همه‌چیز درست است. از این پس هر شب ساعت ۳:۱۷ پشتیبان گرفته می‌شود و گزارشش در `~/contenter-backups/backup.log` است. هر چند وقت یک بار `bash scripts/backup.sh test` را اجرا کنید.
+پیام سبز `It can be restored` یعنی همه‌چیز درست است. پشتیبان شبانه (ساعت ۳:۱۷) را `deploy.sh` در اولین انتشار خودش فعال می‌کند (`bash scripts/backup.sh install-cron`)؛ حتی بدون مقصد بیرونی هم هر شب یک پشتیبان محلی گرفته می‌شود و گزارشش در `~/contenter-backups/backup.log` است. هر چند وقت یک بار `bash scripts/backup.sh test` را اجرا کنید.
 
 ### اگر ارسال شکست خورد
 در انتشار (`deploy.sh`) فقط هشدار زرد `Off-site upload FAILED` نشان داده می‌شود و انتشار ادامه می‌یابد. تاریخ آخرین ارسال موفق در `~/contenter-backups/offsite-last-ok` است. آخر `backup.log` را برای Claude بفرستید:
