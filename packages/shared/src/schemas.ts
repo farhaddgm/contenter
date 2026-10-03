@@ -14,6 +14,7 @@ import {
   Platform,
   PrincipleKind,
   Role,
+  TopicAccess,
   TopicStatus,
   TraitCategory,
   TraitStatus,
@@ -180,6 +181,12 @@ export const TopicListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(TopicStatus).optional(),
   businessId: z.string().optional(),
 });
+
+/** Admin sets a user's access to one project; null removes the grant (docs/17). */
+export const SetTopicAccessSchema = z.object({
+  access: z.enum(TopicAccess).nullable(),
+});
+export type SetTopicAccessInput = z.infer<typeof SetTopicAccessSchema>;
 
 // ---------- principles ----------
 export const CreatePrincipleSchema = z.object({

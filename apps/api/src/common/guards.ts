@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { normalizeGmail, type Role } from '@contenter/shared';
 import { ENV, type Env } from '../config/env';
 import { IS_PUBLIC_KEY, ROLES_KEY, type AuthUser } from './auth.decorators';
+import { TOPIC_SCOPE_KEY } from './topic-access';
 
 interface AccessPayload {
   sub: string;
@@ -72,6 +73,9 @@ export class RolesGuard implements CanActivate {
       if (!required.includes(user.role)) throw new ForbiddenException('Insufficient role');
       return true;
     }
+
+    // project routes: the per-project grant decides (TopicAccessGuard), not the global role
+    if (this.reflector.get(TOPIC_SCOPE_KEY, ctx.getHandler())) return true;
 
     if (req.method !== 'GET' && user.role === 'VIEWER') {
       throw new ForbiddenException('Read-only account');

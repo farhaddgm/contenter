@@ -6,6 +6,7 @@ import {
 } from '@contenter/shared';
 import { z } from 'zod';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { TopicAccessService } from '../../common/topic-access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { QueueService } from '../../infra/queue/queue.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
@@ -13,14 +14,19 @@ import { PromptService } from '../ai/prompts/prompt.service';
 
 const JobQuery = JobListQuerySchema.extend({ topicId: z.string().optional() });
 
-/** Any signed-in user can poll a job they triggered. */
+/** Any signed-in user can poll a job; a project job needs access to that project (docs/17). */
 @Controller('jobs')
 export class JobsController {
-  constructor(private readonly jobs: AiJobsService) {}
+  constructor(
+    private readonly jobs: AiJobsService,
+    private readonly access: TopicAccessService,
+  ) {}
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.jobs.get(id);
+  async get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    const job = await this.jobs.get(id);
+    if (job.topicId) await this.access.assert(user, job.topicId, 'VIEW');
+    return job;
   }
 }
 

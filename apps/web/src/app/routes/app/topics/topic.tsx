@@ -79,43 +79,46 @@ export default function TopicRoute() {
                 </Badge>
               </Link>
             )}
+            {topic.access === 'VIEW' && <Badge tone="outline">{t('topics.readOnly')}</Badge>}
             <Badge tone={topic.activeProfileId ? 'success' : 'neutral'}>
               {topic.activeProfileId ? t('topics.activeProfile') : t('topics.noActiveProfile')}
             </Badge>
           </span>
         }
         actions={
-          <Authorization policy="content:write">
-            <Button icon={<PenLine />} onClick={generateDialog.open}>
-              {t('contents.generate')}
-            </Button>
-            <Button variant="outline" icon={<Pencil />} onClick={editDrawer.open}>
-              {t('common.edit')}
-            </Button>
-            <Button
-              variant="outline"
-              icon={topic.status === 'ACTIVE' ? <Archive /> : <ArchiveRestore />}
-              isLoading={update.isPending}
-              onClick={() =>
-                update.mutate({ status: topic.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE' })
-              }
-            >
-              {topic.status === 'ACTIVE' ? t('topics.archive') : t('topics.unarchive')}
-            </Button>
-            <Authorization policy="topic:delete">
-              <ConfirmationDialog
-                trigger={
-                  <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
-                    <Trash2 />
-                  </Button>
+          topic.access === 'EDIT' && (
+            <>
+              <Button icon={<PenLine />} onClick={generateDialog.open}>
+                {t('contents.generate')}
+              </Button>
+              <Button variant="outline" icon={<Pencil />} onClick={editDrawer.open}>
+                {t('common.edit')}
+              </Button>
+              <Button
+                variant="outline"
+                icon={topic.status === 'ACTIVE' ? <Archive /> : <ArchiveRestore />}
+                isLoading={update.isPending}
+                onClick={() =>
+                  update.mutate({ status: topic.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE' })
                 }
-                onConfirm={() =>
-                  remove.mutateAsync(topic.id).then(() => navigate(paths.app.topics.getHref()))
-                }
-                isLoading={remove.isPending}
-              />
-            </Authorization>
-          </Authorization>
+              >
+                {topic.status === 'ACTIVE' ? t('topics.archive') : t('topics.unarchive')}
+              </Button>
+              <Authorization policy="topic:delete">
+                <ConfirmationDialog
+                  trigger={
+                    <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
+                      <Trash2 />
+                    </Button>
+                  }
+                  onConfirm={() =>
+                    remove.mutateAsync(topic.id).then(() => navigate(paths.app.topics.getHref()))
+                  }
+                  isLoading={remove.isPending}
+                />
+              </Authorization>
+            </>
+          )
         }
       />
 

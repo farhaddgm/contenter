@@ -19,7 +19,7 @@ import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-con
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/table';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
+import { useCanEditTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { formatDate, formatNumber } from '@/utils/format';
@@ -255,8 +255,7 @@ function BrandDocRow({
 /** Topic-level brand book / writing rules that are passed to the AI jobs. */
 export function BrandDocsPanel({ topicId }: { topicId: string }) {
   const t = useT();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
+  const editable = useCanEditTopic(topicId);
   const { data, isLoading } = useBrandDocs(topicId);
   const addDialog = useDisclosure();
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -58,6 +58,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { TopicAccessService } from '../../common/topic-access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -95,6 +96,7 @@ export class BusinessesService {
     private readonly references: ReferencesService,
     private readonly assets: BusinessAssetsService,
     private readonly storage: FileStorageService,
+    private readonly access: TopicAccessService,
   ) {}
 
   // ---------- businesses ----------
@@ -144,12 +146,17 @@ export class BusinessesService {
     });
   }
 
-  async get(id: string) {
+  async get(id: string, user: AuthUser) {
     const b = await this.prisma.business.findUnique({
       where: { id },
       include: {
         sections: { include: { updatedBy: USER_REF, reviewedBy: USER_REF } },
-        topics: { select: { id: true, title: true, status: true }, orderBy: { updatedAt: 'desc' } },
+        // only the projects this user may open (docs/17)
+        topics: {
+          where: this.access.visibleWhere(user),
+          select: { id: true, title: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
         _count: { select: { topics: true, suggestions: { where: { status: 'PENDING' } } } },
       },
     });
@@ -740,8 +747,8 @@ export class BusinessesController {
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.businesses.get(id);
+  get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.businesses.get(id, user);
   }
 
   @Get(':id/references')
@@ -756,7 +763,7 @@ export class BusinessesController {
     @Body(new ZodValidationPipe(AddReferenceSchema)) body: AddReferenceInput,
     @CurrentUser() user: AuthUser,
   ) {
-    await this.businesses.get(id);
+    await this.businesses.get(id, user);
     return this.refs.add(id, body, user);
   }
 

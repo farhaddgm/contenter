@@ -20,6 +20,7 @@ import {
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { TopicScoped } from '../../common/topic-access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
@@ -135,11 +136,13 @@ export class SamplesService {
 export class SamplesController {
   constructor(private readonly samples: SamplesService) {}
 
+  @TopicScoped('topic', 'topicId')
   @Get('topics/:topicId/samples')
   list(@Param('topicId') topicId: string) {
     return this.samples.list(topicId);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Post('topics/:topicId/samples')
   create(
     @Param('topicId') topicId: string,
@@ -149,11 +152,13 @@ export class SamplesController {
     return this.samples.create(topicId, body, user);
   }
 
+  @TopicScoped('sample')
   @Get('samples/:id')
   get(@Param('id') id: string) {
     return this.samples.get(id);
   }
 
+  @TopicScoped('sample')
   @Patch('samples/:id')
   update(
     @Param('id') id: string,
@@ -163,17 +168,20 @@ export class SamplesController {
     return this.samples.update(id, body, user);
   }
 
+  @TopicScoped('sample')
   @Post('samples/:id/refetch')
   refetch(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.samples.refetch(id, user);
   }
 
+  @TopicScoped('sample')
   @Post('samples/:id/analyze')
   @HttpCode(202)
   analyze(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.samples.analyze(id, user);
   }
 
+  @TopicScoped('sample')
   @Delete('samples/:id')
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {

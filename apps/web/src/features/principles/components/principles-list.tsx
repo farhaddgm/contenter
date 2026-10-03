@@ -12,6 +12,7 @@ import { useT } from '@/i18n';
 import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import {
+  useCanEditTopic,
   useCreatePrinciple,
   useDeletePrinciple,
   usePrinciples,
@@ -36,7 +37,8 @@ export function PrinciplesList({
 }) {
   const t = useT();
   const { can } = useAuthorization();
-  const editable = topicId ? can('content:write') : can('backoffice:access');
+  const canEditTopic = useCanEditTopic(topicId ?? undefined);
+  const editable = topicId ? canEditTopic : can('backoffice:access');
   const { data, isLoading } = usePrinciples(topicId);
   const create = useCreatePrinciple(topicId);
   const update = useUpdatePrinciple(topicId);

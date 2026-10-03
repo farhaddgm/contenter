@@ -29,6 +29,10 @@ export type Platform = (typeof Platform)[number];
 export const TopicStatus = ['ACTIVE', 'ARCHIVED'] as const;
 export type TopicStatus = (typeof TopicStatus)[number];
 
+/** Per-project access of an EDITOR/VIEWER account; admins always have EDIT (docs/17). */
+export const TopicAccess = ['VIEW', 'EDIT'] as const;
+export type TopicAccess = (typeof TopicAccess)[number];
+
 export const PrincipleKind = ['MUST', 'AVOID', 'PREFER'] as const;
 export type PrincipleKind = (typeof PrincipleKind)[number];
 

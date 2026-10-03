@@ -28,6 +28,7 @@ import {
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { TopicScoped } from '../../common/topic-access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
@@ -327,11 +328,13 @@ export class ProfilesService {
 export class ProfilesController {
   constructor(private readonly profiles: ProfilesService) {}
 
+  @TopicScoped('topic', 'topicId')
   @Get('topics/:topicId/profiles')
   list(@Param('topicId') topicId: string) {
     return this.profiles.list(topicId);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Post('topics/:topicId/profiles/build')
   @HttpCode(202)
   build(
@@ -342,6 +345,7 @@ export class ProfilesController {
     return this.profiles.build(topicId, body, user);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Post('topics/:topicId/profiles')
   create(
     @Param('topicId') topicId: string,
@@ -351,16 +355,19 @@ export class ProfilesController {
     return this.profiles.create(topicId, body, user);
   }
 
+  @TopicScoped('profile')
   @Post('profiles/:id/duplicate')
   duplicate(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.profiles.duplicate(id, user);
   }
 
+  @TopicScoped('profile')
   @Get('profiles/:id')
   get(@Param('id') id: string) {
     return this.profiles.get(id);
   }
 
+  @TopicScoped('profile')
   @Patch('profiles/:id')
   update(
     @Param('id') id: string,
@@ -370,16 +377,19 @@ export class ProfilesController {
     return this.profiles.update(id, body, user);
   }
 
+  @TopicScoped('profile')
   @Post('profiles/:id/approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.profiles.approve(id, user);
   }
 
+  @TopicScoped('profile')
   @Post('profiles/:id/archive')
   archive(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.profiles.archive(id, user);
   }
 
+  @TopicScoped('profile')
   @Post('profiles/:id/traits')
   addTrait(
     @Param('id') id: string,
@@ -389,6 +399,7 @@ export class ProfilesController {
     return this.profiles.addTrait(id, body, user);
   }
 
+  @TopicScoped('trait')
   @Patch('traits/:id')
   updateTrait(
     @Param('id') id: string,
@@ -398,6 +409,7 @@ export class ProfilesController {
     return this.profiles.updateTrait(id, body, user);
   }
 
+  @TopicScoped('trait')
   @Delete('traits/:id')
   @HttpCode(204)
   removeTrait(@Param('id') id: string, @CurrentUser() user: AuthUser) {

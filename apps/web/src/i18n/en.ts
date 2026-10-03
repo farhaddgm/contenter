@@ -293,6 +293,7 @@ export const en: DeepStrings<Dictionary> = {
     subtitle: 'Each topic has its own samples, style profile, ideas and contents.',
     new: 'New topic',
     editTopic: 'Edit topic',
+    readOnly: 'View only',
     fields: {
       title: 'Title',
       description: 'Description',
@@ -597,6 +598,16 @@ export const en: DeepStrings<Dictionary> = {
     deleteBody:
       '"{{name}}" will be permanently deleted and signed out everywhere. Content they created stays. This cannot be undone; to remove access temporarily, deactivate the user instead.',
     deleted: 'User deleted',
+    projects: 'Topic access',
+    projectsTitle: "{{name}}'s topic access",
+    projectsHint:
+      'Editors and viewers only see topics (projects) they created or that you grant here. For each topic choose whether they can only view it or also edit it.',
+    projectsEmpty: 'No topics yet.',
+    projectsAdmin: 'Admins have full access to every topic.',
+    access: { NONE: 'No access', VIEW: 'View only', EDIT: 'Edit' },
+    creator: 'Creator',
+    archived: 'Archived',
+    accessSaved: 'Access saved',
   },
   googleAccess: {
     title: 'Gmail sign-in',
