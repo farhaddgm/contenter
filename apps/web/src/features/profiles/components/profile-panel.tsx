@@ -29,7 +29,7 @@ import { MarkdownView } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/table';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
+import { useCanEditTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -336,8 +336,7 @@ export function ProfilePanel({
 }) {
   const t = useT();
   const origin = useOrigin();
-  const { can } = useAuthorization();
-  const canWrite = can('content:write');
+  const canWrite = useCanEditTopic(topicId);
   const profiles = useProfiles(topicId);
   const samples = useSamples(topicId);
   const brandDocs = useBrandDocs(topicId);

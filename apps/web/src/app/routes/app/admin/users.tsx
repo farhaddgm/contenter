@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { FolderKey, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import {
   CreateUserSchema,
   LoginMethod,
@@ -26,6 +26,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { notify } from '@/stores/notifications';
 import { formatDate, formatRelative } from '@/utils/format';
 import { useCreateUser, useDeleteUser, useUpdateUser, useUsers } from '@/features/admin/api';
+import { TopicAccessDialog } from '@/features/users/components/topic-access-dialog';
 
 type FormValues = CreateUserInput & UpdateUserInput;
 
@@ -189,6 +190,7 @@ export default function UsersRoute() {
   const debouncedQ = useDebounce(q);
   const me = useUser();
   const [drawer, setDrawer] = useState<{ user: User | null } | null>(null);
+  const [accessFor, setAccessFor] = useState<User | null>(null);
   const remove = useDeleteUser();
   const { data, isLoading } = useUsers({ page, q: debouncedQ });
 
@@ -258,6 +260,16 @@ export default function UsersRoute() {
       className: 'text-end',
       cell: (u) => (
         <div className="flex justify-end">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            disabled={u.role === 'ADMIN'}
+            title={u.role === 'ADMIN' ? t('users.projectsAdmin') : t('users.projects')}
+            aria-label={t('users.projects')}
+            onClick={() => setAccessFor(u)}
+          >
+            <FolderKey />
+          </Button>
           <Button
             size="icon-sm"
             variant="ghost"
@@ -331,6 +343,7 @@ export default function UsersRoute() {
         )}
       </Card>
       {drawer && <UserDrawer user={drawer.user} onClose={() => setDrawer(null)} />}
+      {accessFor && <TopicAccessDialog user={accessFor} onClose={() => setAccessFor(null)} />}
     </>
   );
 }

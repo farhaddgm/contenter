@@ -13,20 +13,25 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   CreateUserSchema,
   PaginationQuerySchema,
+  SetTopicAccessSchema,
   UpdateUserSchema,
   isGmail,
   type CreateUserInput,
   type PaginationQuery,
+  type SetTopicAccessInput,
   type UpdateUserInput,
+  type UserTopicAccess,
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { accessOf } from '../../common/topic-access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -154,6 +159,61 @@ export class UsersService {
     return this.auth.toPublic(user);
   }
 
+  /** Every project with this user's access to it, for the admin's access dialog (docs/17). */
+  async topicAccess(id: string): Promise<UserTopicAccess[]> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Not found');
+    const topics = await this.prisma.topic.findMany({
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdById: true,
+        members: { where: { userId: id }, select: { access: true } },
+      },
+    });
+    return topics.map((t) => {
+      const granted = t.members[0]?.access ?? null;
+      return {
+        topicId: t.id,
+        title: t.title,
+        status: t.status,
+        isCreator: t.createdById === id,
+        granted,
+        effective: accessOf(user, t, granted),
+      };
+    });
+  }
+
+  /** Grants VIEW/EDIT on one project, or removes the grant (null). Admins need no grants. */
+  async setTopicAccess(id: string, topicId: string, input: SetTopicAccessInput, actor: AuthUser) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Not found');
+    if (user.role === 'ADMIN') {
+      throw new BadRequestException('Admins already have access to every project');
+    }
+    const topic = await this.prisma.topic.findUnique({ where: { id: topicId } });
+    if (!topic) throw new NotFoundException('Topic not found');
+    if (input.access) {
+      await this.prisma.topicMember.upsert({
+        where: { topicId_userId: { topicId, userId: id } },
+        create: { topicId, userId: id, access: input.access, grantedById: actor.id },
+        update: { access: input.access, grantedById: actor.id },
+      });
+    } else {
+      await this.prisma.topicMember.deleteMany({ where: { topicId, userId: id } });
+    }
+    this.audit.log({
+      userId: actor.id,
+      action: 'topic_access.set',
+      entityType: 'Topic',
+      entityId: topicId,
+      meta: { userId: id, email: user.email, access: input.access },
+    });
+    return { topicId, granted: input.access, effective: accessOf(user, topic, input.access) };
+  }
+
   /**
    * Permanently deletes a user. Their sessions and Smart conversations go with them; content
    * they created stays, with its author cleared (onDelete: SetNull).
@@ -207,6 +267,21 @@ export class UsersController {
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
     return this.users.remove(id, actor);
+  }
+
+  @Get(':id/topics')
+  topicAccess(@Param('id') id: string) {
+    return this.users.topicAccess(id);
+  }
+
+  @Put(':id/topics/:topicId')
+  setTopicAccess(
+    @Param('id') id: string,
+    @Param('topicId') topicId: string,
+    @Body(new ZodValidationPipe(SetTopicAccessSchema)) body: SetTopicAccessInput,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.users.setTopicAccess(id, topicId, body, actor);
   }
 }
 

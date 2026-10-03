@@ -31,8 +31,21 @@ export function useTopics(params: {
   });
 }
 
-export function useTopic(id: string) {
-  return useQuery({ queryKey: topicKeys.one(id), queryFn: () => api.get<Topic>(`/topics/${id}`) });
+export function useTopic(id: string | undefined) {
+  return useQuery({
+    queryKey: topicKeys.one(id ?? ''),
+    queryFn: () => api.get<Topic>(`/topics/${id}`),
+    enabled: !!id,
+  });
+}
+
+/**
+ * Whether the current user may change this project: admins always, others with an EDIT grant or
+ * as its creator (docs/17). Reuses the cached project, so it is cheap to call per panel.
+ */
+export function useCanEditTopic(topicId: string | undefined) {
+  const { data } = useTopic(topicId);
+  return data?.access === 'EDIT';
 }
 
 export function useCreateTopic() {

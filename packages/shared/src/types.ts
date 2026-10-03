@@ -17,6 +17,7 @@ import type {
   PrincipleKind,
   ProfileStatus,
   Role,
+  TopicAccess,
   TopicStatus,
   TraitCategory,
   TraitSource,
@@ -80,6 +81,21 @@ export interface Topic {
   createdAt: ISODate;
   updatedAt: ISODate;
   _count?: { samples: number; ideas: number; contents: number; profiles: number };
+  /** The current user's access to this project (admins: EDIT). */
+  access?: TopicAccess;
+}
+
+/** One row of the admin "projects of this user" dialog. */
+export interface UserTopicAccess {
+  topicId: string;
+  title: string;
+  status: TopicStatus;
+  /** The user created this project (EDIT unless a grant says otherwise). */
+  isCreator: boolean;
+  /** Explicit grant, if any. */
+  granted: TopicAccess | null;
+  /** What the user can actually do (null = no access). */
+  effective: TopicAccess | null;
 }
 
 export interface Principle {

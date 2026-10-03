@@ -24,7 +24,7 @@ import { CopyButton, MarkdownView, PageHeader } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
+import { useCanEditTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -331,9 +331,8 @@ function SelfCheckCard({ version }: { version: ContentVersion }) {
 export function ContentView({ contentId }: { contentId: string }) {
   const t = useT();
   const navigate = useNavigate();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
   const { data: content, isLoading } = useContent(contentId);
+  const editable = useCanEditTopic(content?.topicId);
   const lastJob = useJob(
     content?.status === 'FAILED' || content?.status === 'GENERATING' ? content.lastJobId : null,
   );

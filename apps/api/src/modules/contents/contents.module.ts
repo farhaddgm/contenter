@@ -30,6 +30,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { TopicAccessService, TopicScoped } from '../../common/topic-access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -47,10 +48,13 @@ export class ContentsService {
     private readonly prisma: PrismaService,
     private readonly jobs: AiJobsService,
     private readonly audit: AuditService,
+    private readonly access: TopicAccessService,
   ) {}
 
-  async list(query: z.infer<typeof ContentListQuerySchema>) {
+  async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
+    const visible = this.access.visibleWhere(user);
     const where: Prisma.ContentWhereInput = {
+      ...(visible ? { topic: visible } : {}),
       ...(query.topicId ? { topicId: query.topicId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
@@ -229,10 +233,12 @@ export class ContentsController {
   list(
     @Query(new ZodValidationPipe(ContentListQuerySchema))
     query: z.infer<typeof ContentListQuerySchema>,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.contents.list(query);
+    return this.contents.list(query, user);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Post('topics/:topicId/contents/generate')
   @HttpCode(202)
   generate(
@@ -243,11 +249,13 @@ export class ContentsController {
     return this.contents.generate(topicId, body, user);
   }
 
+  @TopicScoped('content')
   @Get('contents/:id')
   get(@Param('id') id: string) {
     return this.contents.detail(id);
   }
 
+  @TopicScoped('content')
   @Patch('contents/:id')
   update(
     @Param('id') id: string,
@@ -257,6 +265,7 @@ export class ContentsController {
     return this.contents.update(id, body, user);
   }
 
+  @TopicScoped('content')
   @Post('contents/:id/revise')
   @HttpCode(202)
   revise(
@@ -267,6 +276,7 @@ export class ContentsController {
     return this.contents.revise(id, body, user);
   }
 
+  @TopicScoped('content')
   @Put('contents/:id/current')
   edit(
     @Param('id') id: string,
@@ -276,6 +286,7 @@ export class ContentsController {
     return this.contents.editVersion(id, body, user);
   }
 
+  @TopicScoped('content')
   @Post('contents/:id/versions/:versionId/restore')
   restore(
     @Param('id') id: string,
@@ -285,6 +296,7 @@ export class ContentsController {
     return this.contents.restoreVersion(id, versionId, user);
   }
 
+  @TopicScoped('content')
   @Delete('contents/:id')
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {

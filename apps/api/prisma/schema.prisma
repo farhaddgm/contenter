@@ -60,6 +60,8 @@ model User {
   googleDriveAccounts GoogleDriveAccount[]
   businessNotes       BusinessNote[]
   businessAssets      BusinessAsset[]
+  topicMemberships    TopicMember[]             @relation("TopicMemberUser")
+  topicGrants         TopicMember[]             @relation("TopicMemberGrantedBy")
 }
 
 model RefreshToken {
@@ -515,6 +517,12 @@ enum TopicStatus {
   ARCHIVED
 }
 
+/// Per-project access for EDITOR/VIEWER accounts (admins see every project)
+enum TopicAccess {
+  VIEW
+  EDIT
+}
+
 model Topic {
   id              String      @id @default(cuid())
   title           String
@@ -540,9 +548,29 @@ model Topic {
   ideas         Idea[]
   contents      Content[]
   brandDocs     BrandDocument[]
+  members       TopicMember[]
 
   @@index([status, createdAt])
   @@index([businessId])
+}
+
+/// Grants a non-admin user access to a project. The creator has EDIT without a row; a row
+/// overrides that (e.g. VIEW). See docs/17-project-access.md.
+model TopicMember {
+  id          String      @id @default(cuid())
+  topicId     String
+  userId      String
+  access      TopicAccess
+  grantedById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  topic     Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user      User  @relation("TopicMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("TopicMemberGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([topicId, userId])
+  @@index([userId])
 }
 
 enum PrincipleKind {

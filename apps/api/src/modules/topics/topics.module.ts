@@ -29,6 +29,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { TopicAccessService, TopicScoped } from '../../common/topic-access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -43,10 +44,13 @@ export class TopicsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly access: TopicAccessService,
   ) {}
 
-  async list(query: z.infer<typeof TopicListQuerySchema>) {
+  async list(query: z.infer<typeof TopicListQuerySchema>, user: AuthUser) {
+    const visible = this.access.visibleWhere(user);
     const where: Prisma.TopicWhereInput = {
+      ...(visible ? { AND: [visible] } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.businessId ? { businessId: query.businessId } : {}),
       ...(query.q
@@ -62,18 +66,25 @@ export class TopicsService {
       this.prisma.topic.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
-        include: COUNTS,
+        include: { ...COUNTS, ...this.access.memberInclude(user) },
         ...paginate(query),
       }),
       this.prisma.topic.count({ where }),
     ]);
-    return toPage(items, total, query);
+    return toPage(
+      items.map((t) => this.access.withAccess(user, t)),
+      total,
+      query,
+    );
   }
 
-  async get(id: string) {
-    const topic = await this.prisma.topic.findUnique({ where: { id }, include: COUNTS });
+  async get(id: string, user?: AuthUser) {
+    const topic = await this.prisma.topic.findUnique({
+      where: { id },
+      include: { ...COUNTS, ...(user ? this.access.memberInclude(user) : {}) },
+    });
     if (!topic) throw new NotFoundException('Topic not found');
-    return topic;
+    return user ? this.access.withAccess(user, topic) : topic;
   }
 
   /** A topic may only be linked to an existing business. */
@@ -181,8 +192,9 @@ export class TopicsController {
   @Get()
   list(
     @Query(new ZodValidationPipe(TopicListQuerySchema)) query: z.infer<typeof TopicListQuerySchema>,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.topics.list(query);
+    return this.topics.list(query, user);
   }
 
   @Post()
@@ -193,11 +205,13 @@ export class TopicsController {
     return this.topics.create(body, user);
   }
 
+  @TopicScoped('topic')
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.topics.get(id);
+  get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.topics.get(id, user);
   }
 
+  @TopicScoped('topic')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -214,11 +228,13 @@ export class TopicsController {
     return this.topics.remove(id, user);
   }
 
+  @TopicScoped('topic')
   @Get(':id/principles')
   principles(@Param('id') id: string) {
     return this.topics.listPrinciples(id);
   }
 
+  @TopicScoped('topic')
   @Post(':id/principles')
   addPrinciple(
     @Param('id') id: string,
@@ -248,6 +264,7 @@ export class PrinciplesController {
     return this.topics.createPrinciple(null, body, user);
   }
 
+  @TopicScoped('principle')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -257,6 +274,7 @@ export class PrinciplesController {
     return this.topics.updatePrinciple(id, body, user);
   }
 
+  @TopicScoped('principle')
   @Delete(':id')
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {

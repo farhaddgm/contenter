@@ -11,9 +11,11 @@ import type {
   DashboardStats,
   Paginated,
   PromptTemplate,
+  SetTopicAccessInput,
   UpdateGoogleAccessInput,
   UpdateUserInput,
   User,
+  UserTopicAccess,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
 
@@ -63,6 +65,23 @@ export function useDeleteUser() {
       void qc.invalidateQueries({ queryKey: ['users'] });
       void qc.invalidateQueries({ queryKey: ['google-access'] });
     },
+  });
+}
+
+// ---------- per-project access (docs/17) ----------
+export function useUserTopicAccess(userId: string) {
+  return useQuery({
+    queryKey: ['user-topics', userId],
+    queryFn: () => api.get<UserTopicAccess[]>(`/admin/users/${userId}/topics`),
+  });
+}
+
+export function useSetTopicAccess(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ topicId, data }: { topicId: string; data: SetTopicAccessInput }) =>
+      api.put(`/admin/users/${userId}/topics/${topicId}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['user-topics', userId] }),
   });
 }
 

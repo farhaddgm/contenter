@@ -119,6 +119,7 @@ export default function TopicsRoute() {
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <Badge tone="primary">{t(`enums.platform.${topic.platform}`)}</Badge>
+                  {topic.access === 'VIEW' && <Badge tone="outline">{t('topics.readOnly')}</Badge>}
                   {topic.business && (
                     <Badge tone="outline">
                       <Building2 />

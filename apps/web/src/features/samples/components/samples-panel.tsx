@@ -20,7 +20,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/table';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
+import { useCanEditTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -40,7 +40,7 @@ const mediaIcon: Record<MediaType, React.ReactNode> = {
 
 function SampleCard({ sample, topicId }: { sample: SampleContent; topicId: string }) {
   const t = useT();
-  const { can } = useAuthorization();
+  const editable = useCanEditTopic(topicId);
   const [open, setOpen] = useState(false);
   const analyze = useAnalyzeSample(topicId);
   const refetch = useRefetchSample(topicId);
@@ -110,7 +110,7 @@ function SampleCard({ sample, topicId }: { sample: SampleContent; topicId: strin
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-4 py-2">
         <div className="flex flex-wrap gap-1">
-          {can('content:write') && (
+          {editable && (
             <>
               <Button
                 size="sm"
@@ -181,7 +181,7 @@ function SampleCard({ sample, topicId }: { sample: SampleContent; topicId: strin
 export function SamplesPanel({ topicId }: { topicId: string }) {
   const t = useT();
   const drawer = useDisclosure();
-  const { can } = useAuthorization();
+  const editable = useCanEditTopic(topicId);
   const { data, isLoading } = useSamples(topicId);
 
   return (
@@ -191,7 +191,7 @@ export function SamplesPanel({ topicId }: { topicId: string }) {
           <h2 className="text-lg font-semibold">{t('samples.title')}</h2>
           <p className="text-sm text-muted-foreground">{t('samples.subtitle')}</p>
         </div>
-        {can('content:write') && (
+        {editable && (
           <Button icon={<Plus />} onClick={drawer.open}>
             {t('samples.add')}
           </Button>
@@ -206,7 +206,7 @@ export function SamplesPanel({ topicId }: { topicId: string }) {
             title={t('samples.empty')}
             description={t('samples.emptyHint')}
             action={
-              can('content:write') && (
+              editable && (
                 <Button icon={<Plus />} onClick={drawer.open}>
                   {t('samples.add')}
                 </Button>
