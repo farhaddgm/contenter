@@ -15,8 +15,19 @@ type OpenAiEffort = NonNullable<OpenAI.Reasoning['effort']>;
 
 /** Reasoning models accept `reasoning.effort`; older chat models reject it. */
 export function isReasoningModel(model: string): boolean {
-  return /^(gpt-5|o\d)/i.test(model) && !/-chat(-latest)?$/i.test(model);
+  return /^(gpt-([5-9]|\d{2,})|o\d)/i.test(model) && !/-chat(-latest)?$/i.test(model);
 }
+
+/** Ids from `GET /v1/models` that can run Contenter's text tasks (no audio/image/embedding…). */
+export function isTextModel(id: string): boolean {
+  return (
+    /^(gpt-\d|o\d|chatgpt-)/i.test(id) &&
+    !/(audio|realtime|tts|transcribe|image|embedding|instruct|moderation|search|codex)/i.test(id) &&
+    !/-\d{4}-\d{2}-\d{2}$/.test(id)
+  );
+}
+
+const MODELS_TTL_MS = 60 * 60 * 1000;
 
 /**
  * OpenAI implementation of AiProvider (Responses API).
@@ -38,6 +49,31 @@ export class OpenAiProvider implements AiProvider {
 
   get configured(): boolean {
     return this.client !== null;
+  }
+
+  private modelsCache: { at: number; ids: string[] } | null = null;
+
+  /**
+   * Text models the account can use, straight from the API, so new releases show up in
+   * Settings without a code change. Cached for an hour; `undefined` if the list can't be read.
+   */
+  async listModels(): Promise<string[] | undefined> {
+    if (!this.client) return undefined;
+    if (this.modelsCache && Date.now() - this.modelsCache.at < MODELS_TTL_MS) {
+      return this.modelsCache.ids;
+    }
+    try {
+      const ids: string[] = [];
+      for await (const m of this.client.models.list({ timeout: 10_000, maxRetries: 0 })) {
+        if (isTextModel(m.id)) ids.push(m.id);
+      }
+      ids.sort((a, b) => b.localeCompare(a, 'en', { numeric: true }));
+      this.modelsCache = { at: Date.now(), ids };
+      return ids;
+    } catch (err) {
+      this.logger.warn(`Could not list OpenAI models: ${(err as Error).message}`);
+      return this.modelsCache?.ids;
+    }
   }
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {

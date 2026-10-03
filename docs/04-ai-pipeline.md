@@ -19,10 +19,10 @@
 
 ## مدل و تنظیمات
 
-- **چند ارائه‌دهنده:** Anthropic (Claude) و OpenAI. مدل به شکل `provider:model` ذخیره می‌شود (مثلاً `openai:gpt-5.4` یا `anthropic:claude-opus-5`) و `AiProviderRegistry` هر کار را به ارائه‌دهندهٔ همان مدل می‌فرستد. شناسهٔ بدون پیشوند از روی نامش تشخیص داده می‌شود (`gpt-`/`o3`… → OpenAI، بقیه → Anthropic).
-- ادمین در **پنل ← تنظیمات** مدل پیش‌فرض و مدل هر نوع کار (از جمله «گفتگوی اسمارت») را انتخاب می‌کند؛ مدل دلخواه خارج از فهرست هم قابل افزودن است. اگر در تنظیمات مدلی ذخیره نشده باشد، `AI_DEFAULT_MODEL` استفاده می‌شود.
+- **چند ارائه‌دهنده:** Anthropic (Claude) و OpenAI. مدل به شکل `provider:model` ذخیره می‌شود (مثلاً `openai:gpt-6-sol` یا `anthropic:claude-opus-5`) و `AiProviderRegistry` هر کار را به ارائه‌دهندهٔ همان مدل می‌فرستد. شناسهٔ بدون پیشوند از روی نامش تشخیص داده می‌شود (`gpt-`/`o3`… → OpenAI، بقیه → Anthropic).
+- ادمین در **پنل ← تنظیمات** مدل پیش‌فرض و مدل هر نوع کار (از جمله «گفتگوی اسمارت») را انتخاب می‌کند؛ مدل دلخواه خارج از فهرست هم قابل افزودن است. فهرست مدل‌ها علاوه بر فهرست پیشنهادی ثابت (`AI_MODEL_CATALOG`)، مدل‌های متنی‌ای را که API خود OpenAI (`GET /v1/models`) برای همان کلید گزارش می‌کند هم نشان می‌دهد (یک ساعت کش می‌شود)، پس مدل‌های تازه منتشرشده بدون تغییر کد قابل انتخاب‌اند. اگر در تنظیمات مدلی ذخیره نشده باشد، `AI_DEFAULT_MODEL` استفاده می‌شود.
 - کلیدهای API فقط در env سرور (`ANTHROPIC_API_KEY`، `OPENAI_API_KEY`) نگه‌داری می‌شوند و هرگز در DB یا پاسخ API نمی‌آیند؛ صفحهٔ تنظیمات فقط وضعیت «متصل / کلید تنظیم نشده» را نشان می‌دهد. `OPENAI_BASE_URL` اختیاری برای پراکسی/درگاه سازگار با OpenAI است.
-- **OpenAI:** از Responses API با Structured Outputs سخت‌گیرانه (`json_schema`، `strict`) استفاده می‌شود؛ اسکیمای JSON از همان اسکیمای Zod ساخته می‌شود. effort در مدل‌های استدلالی (`gpt-5*`، `o*`) به `reasoning.effort` نگاشت می‌شود و اگر مدلی `xhigh`/`max` را نپذیرد با `high` تکرار می‌شود. پاسخ‌ها در OpenAI ذخیره نمی‌شوند (`store: false`). اتمام اعتبار (`insufficient_quota`) و کلید نامعتبر خطای بدون retry هستند.
+- **OpenAI:** از Responses API با Structured Outputs سخت‌گیرانه (`json_schema`، `strict`) استفاده می‌شود؛ اسکیمای JSON از همان اسکیمای Zod ساخته می‌شود. effort در مدل‌های استدلالی (`gpt-5*` و بالاتر مثل `gpt-6-sol`، `o*`) به `reasoning.effort` نگاشت می‌شود و اگر مدلی `xhigh`/`max` را نپذیرد با `high` تکرار می‌شود. پاسخ‌ها در OpenAI ذخیره نمی‌شوند (`store: false`). اتمام اعتبار (`insufficient_quota`) و کلید نامعتبر خطای بدون retry هستند.
 - **هزینه:** جدول قیمت در `pricing.ts` برای هر دو ارائه‌دهنده است؛ مدل‌های ناشناخته هزینهٔ صفر ثبت می‌کنند.
 - **Adaptive thinking** و **effort** قابل‌تنظیم برای هر کار. پیش‌فرض‌ها: تحلیل و پروفایل `high`، ایده `medium`، تولید `high`.
 - **Structured Outputs (Claude):** با `output_config.format` و اسکیمای Zod مشترک (`zodOutputFormat`). خروجی پیش از ذخیره دوباره با Zod اعتبارسنجی می‌شود.
@@ -53,6 +53,7 @@
 | `business_discover` | `language`، `count`، `keyword`، `location`، `notes`، `research` |
 | `business_build` | `language`، `business_name`، `sections_spec`، `business`، `instruction`، `research` |
 | `business_suggest` | `language`، `business`، `requested_sections`، `instruction`، `research` |
+| `business_audit` | `language`، `sections_spec`، `business`، `gaps`، `standing_notes` ([16-business-profile-quality.md](16-business-profile-quality.md)) |
 
 اگر نسخهٔ ویرایش‌شدهٔ یک پرامپت در بک‌آفیس متغیر `{{business}}` یا `{{brand_docs}}` را نداشته باشد، `AiExecutor` بلوک `<business>` / `<brand_guidelines>` را به ابتدای پیام کاربر اضافه می‌کند تا پروفایل کسب‌وکار و اسناد برند هرگز جا نمانند.
 

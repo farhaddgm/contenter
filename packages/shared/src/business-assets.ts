@@ -24,6 +24,8 @@ export const CreateBusinessNoteSchema = z.object({
   /** What AI may consult besides the profile and the note. */
   scope: z.enum(ResearchScope).default('NONE'),
   referenceIds: z.array(z.string().min(1).max(50)).max(50).optional(),
+  /** Keep giving the note to later builds/suggestions (false for one-off fixes, e.g. audit issues). */
+  standing: z.boolean().default(true),
 });
 export type CreateBusinessNoteInput = z.input<typeof CreateBusinessNoteSchema>;
 

@@ -16,8 +16,10 @@ import type {
 import {
   BusinessAssetAnalysisSchema,
   BRAND_DOCS_PROMPT_CHARS,
+  BUSINESS_SECTION_META,
   BUSINESS_SECTION_SPEC,
   BusinessSectionKey,
+  isFactExpired,
   type FetchedMedia,
   type SampleAnalysisResult,
 } from '@contenter/shared';
@@ -110,16 +112,101 @@ const SECTION_TITLE: Record<BusinessSectionKey, string> = {
   CONTENT_PILLARS: 'Content pillars',
   GUIDELINES: 'Rules & constraints',
   CHANNELS: 'Channels & CTA',
+  GOALS: 'Goals & priorities',
+  FAQ: 'Customer questions & objections',
+  CALENDAR: 'Occasions & campaigns calendar',
 };
+
+/** Marker on AI-written text the admin has not confirmed yet. */
+export const UNREVIEWED_MARK = '(AI draft — not yet confirmed by the admin)';
 
 export type BusinessForPrompt = Pick<
   Business,
   'name' | 'tagline' | 'industry' | 'website' | 'location' | 'language'
 > & {
-  sections: Pick<BusinessSection, 'key' | 'content'>[];
+  sections: (Pick<BusinessSection, 'key' | 'content'> &
+    Partial<Pick<BusinessSection, 'source' | 'reviewedAt'>>)[];
   /** Analyzed brand assets (past articles, creatives, videos …), when loaded. */
   assets?: AssetForPrompt[];
+  facts?: FactForPrompt[];
+  terms?: TermForPrompt[];
 };
+
+export type FactForPrompt = {
+  label: string;
+  value: string;
+  category: string;
+  verified: boolean;
+  validUntil: Date | string | null;
+};
+
+export type TermForPrompt = {
+  term: string;
+  kind: 'USE' | 'AVOID';
+  alternatives: string[];
+  note: string;
+};
+
+export const MAX_FACTS_TEXT = 5_000;
+export const MAX_TERMS_TEXT = 3_000;
+
+/** Lines within a budget, with a note on how many did not fit. */
+function budgeted(lines: string[], budget: number): string[] {
+  const out: string[] = [];
+  let left = budget;
+  for (const line of lines) {
+    if (line.length > left) {
+      out.push(`(${lines.length - out.length} more omitted — budget exhausted)`);
+      break;
+    }
+    out.push(line);
+    left -= line.length + 1;
+  }
+  return out;
+}
+
+/**
+ * Key facts: exact values content may quote. Expired facts are left out (their offer or rate no
+ * longer holds); unverified ones are marked so the model does not state them as certain.
+ */
+export function formatBusinessFacts(facts: FactForPrompt[], now = new Date()): string {
+  const valid = facts.filter((f) => !isFactExpired(f.validUntil, now));
+  if (!valid.length) return '';
+  const lines = valid.map((f) => {
+    const until = f.validUntil
+      ? ` (valid until ${new Date(f.validUntil).toISOString().slice(0, 10)})`
+      : '';
+    return `- [${f.category}] ${f.label}: ${f.value}${until}${f.verified ? '' : ' (unverified — do not state as certain)'}`;
+  });
+  return [
+    '### Key facts [FACTS]',
+    'Exact values maintained by the admin. Quote them exactly as written. Never state a price, fee, rate, limit, number, date or contact detail of this business that is not listed here or in the sections above; if one is needed and missing, write around it.',
+    ...budgeted(lines, MAX_FACTS_TEXT),
+  ].join('\n');
+}
+
+/** Brand terminology: words always written one way and words never used. */
+export function formatBusinessTerms(terms: TermForPrompt[]): string {
+  if (!terms.length) return '';
+  const lines = terms.map((t) => {
+    const note = t.note ? ` — ${t.note}` : '';
+    if (t.kind === 'AVOID') {
+      const alt = t.alternatives.length
+        ? `; use instead: ${t.alternatives.map((a) => `"${a}"`).join(', ')}`
+        : '';
+      return `- NEVER write "${t.term}"${alt}${note}`;
+    }
+    const wrong = t.alternatives.length
+      ? ` (never: ${t.alternatives.map((a) => `"${a}"`).join(', ')})`
+      : '';
+    return `- ALWAYS write "${t.term}"${wrong}${note}`;
+  });
+  return [
+    '### Terminology [TERMINOLOGY]',
+    'Binding word choices of the brand. Every piece of content is checked against this list automatically.',
+    ...budgeted(lines, MAX_TERMS_TEXT),
+  ].join('\n');
+}
 
 export type AssetForPrompt = {
   kind: string;
@@ -193,12 +280,14 @@ export function formatBusiness(
   ]
     .filter(Boolean)
     .join('\n');
-  const byKey = new Map(b.sections.map((s) => [s.key, s.content.trim()]));
+  const byKey = new Map(b.sections.map((s) => [s.key, s]));
   let left = budget - head.length;
   const blocks: string[] = [];
   for (const key of BusinessSectionKey) {
-    const text = byKey.get(key) ?? '';
-    const title = `### ${SECTION_TITLE[key]} [${key}]`;
+    const section = byKey.get(key);
+    const text = section?.content.trim() ?? '';
+    const draft = section?.source === 'AI' && section.reviewedAt === null;
+    const title = `### ${SECTION_TITLE[key]} [${key}]${text && draft ? ` ${UNREVIEWED_MARK}` : ''}`;
     if (!text) {
       if (includeEmpty) blocks.push(`${title}\n(empty)`);
       continue;
@@ -211,15 +300,28 @@ export function formatBusiness(
     blocks.push(`${title}\n${text.length > cap ? `${text.slice(0, cap)}\n[truncated]` : text}`);
     left -= Math.min(text.length, cap);
   }
+  const facts = b.facts?.length ? formatBusinessFacts(b.facts) : '';
+  const terms = b.terms?.length ? formatBusinessTerms(b.terms) : '';
   const assets = b.assets?.length ? formatBusinessAssets(b.assets) : '';
-  return [head, ...blocks, assets].filter(Boolean).join('\n\n');
+  return [head, ...blocks, facts, terms, assets].filter(Boolean).join('\n\n');
 }
+
+const NATURE_HINT = {
+  FACT: 'factual — only from sources/admin, never invented',
+  STRATEGY: 'strategic — may be derived by grounded analysis, label recommendations',
+  RULES: 'rules — binding constraints for every piece of content',
+} as const;
 
 /** Section keys with what each must contain, for prompts that write sections. */
 export function formatSectionSpec(
   keys: readonly BusinessSectionKey[] = BusinessSectionKey,
 ): string {
-  return keys.map((k) => `- ${k} (${SECTION_TITLE[k]}): ${BUSINESS_SECTION_SPEC[k]}`).join('\n');
+  return keys
+    .map(
+      (k) =>
+        `- ${k} (${SECTION_TITLE[k]}, ${NATURE_HINT[BUSINESS_SECTION_META[k].nature]}): ${BUSINESS_SECTION_SPEC[k]}`,
+    )
+    .join('\n');
 }
 
 export function formatSample(

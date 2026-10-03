@@ -1,7 +1,7 @@
 /**
  * AI vendors and the model catalog shown in the back office.
  *
- * A model is stored in settings as a reference `"<provider>:<model>"`, e.g. `openai:gpt-5.4`.
+ * A model is stored in settings as a reference `"<provider>:<model>"`, e.g. `openai:gpt-6-sol`.
  * Bare ids (legacy settings, AI_DEFAULT_MODEL) are resolved by their prefix.
  */
 export const AiProviderName = ['anthropic', 'openai'] as const;
@@ -12,13 +12,22 @@ export interface AiModelInfo {
   id: string;
 }
 
-/** Suggested models; admins may also type any other id the vendor supports. */
+/**
+ * Suggested models, used when the vendor's live list is unavailable (no key, mock, network).
+ * The settings page also shows every model the vendor's API reports (`AiProviderStatus.models`),
+ * and admins may type any other id the vendor supports.
+ */
 export const AI_MODEL_CATALOG: readonly AiModelInfo[] = [
   { provider: 'anthropic', id: 'claude-opus-5' },
   { provider: 'anthropic', id: 'claude-opus-5-5' },
   { provider: 'anthropic', id: 'claude-fable-5-1' },
   { provider: 'anthropic', id: 'claude-sonnet-5' },
   { provider: 'anthropic', id: 'claude-haiku-4-5' },
+  { provider: 'openai', id: 'gpt-6-sol' },
+  { provider: 'openai', id: 'gpt-6-luna' },
+  { provider: 'openai', id: 'gpt-5.6-sol' },
+  { provider: 'openai', id: 'gpt-5.6-terra' },
+  { provider: 'openai', id: 'gpt-5.6-luna' },
   { provider: 'openai', id: 'gpt-5.4' },
   { provider: 'openai', id: 'gpt-5.4-mini' },
   { provider: 'openai', id: 'gpt-5.4-nano' },

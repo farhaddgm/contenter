@@ -12,7 +12,11 @@ import {
   BusinessDiscoverRunner,
   BusinessSuggestRunner,
 } from './runners/business.runners';
-import { BusinessAssetAnalyzeRunner, BusinessReviseRunner } from './runners/business-extra.runners';
+import {
+  BusinessAssetAnalyzeRunner,
+  BusinessAuditRunner,
+  BusinessReviseRunner,
+} from './runners/business-extra.runners';
 import { GenerateContentRunner, ReviseContentRunner } from './runners/content.runners';
 import { IdeateRunner } from './runners/ideate.runner';
 import { AI_RUNNERS } from './runners/runner';
@@ -30,6 +34,7 @@ const RUNNERS = [
   BusinessSuggestRunner,
   BusinessReviseRunner,
   BusinessAssetAnalyzeRunner,
+  BusinessAuditRunner,
 ];
 
 @Global()
