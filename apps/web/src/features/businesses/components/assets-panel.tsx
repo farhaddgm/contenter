@@ -25,7 +25,6 @@ import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-controls';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
 import { formatNumber } from '@/utils/format';
@@ -33,6 +32,7 @@ import {
   useAnalyzeAsset,
   useAsset,
   useAssets,
+  useCanEditBusiness,
   useCreateAsset,
   useDeleteAsset,
   useUpdateAsset,
@@ -460,8 +460,7 @@ function AssetDialog({
 /** Past content of the business that AI learns from: grid, add, inspect, toggle, delete. */
 export function AssetsPanel({ businessId }: { businessId: string }) {
   const t = useT();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
+  const editable = useCanEditBusiness(businessId);
   const { data, isLoading } = useAssets(businessId);
   const update = useUpdateAsset(businessId);
   const remove = useDeleteAsset(businessId);

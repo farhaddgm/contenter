@@ -153,6 +153,7 @@ export default function BusinessesRoute() {
                   {b.tagline || [b.industry, b.location].filter(Boolean).join(' · ')}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {b.access === 'VIEW' && <Badge tone="outline">{t('topics.readOnly')}</Badge>}
                   <Badge tone={b.origin === 'RESEARCH' ? 'primary' : 'neutral'}>
                     {t(`enums.businessOrigin.${b.origin}`)}
                   </Badge>

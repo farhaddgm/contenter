@@ -30,7 +30,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
-import { TopicAccessService, TopicScoped } from '../../common/topic-access';
+import { AccessService, TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -48,11 +48,11 @@ export class ContentsService {
     private readonly prisma: PrismaService,
     private readonly jobs: AiJobsService,
     private readonly audit: AuditService,
-    private readonly access: TopicAccessService,
+    private readonly access: AccessService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
-    const visible = this.access.visibleWhere(user);
+    const visible = this.access.visibleTopics(user);
     const where: Prisma.ContentWhereInput = {
       ...(visible ? { topic: visible } : {}),
       ...(query.topicId ? { topicId: query.topicId } : {}),

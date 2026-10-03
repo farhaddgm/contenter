@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { AiJobType, DashboardStats } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Public, type AuthUser } from '../../common/auth.decorators';
-import { TopicAccessService } from '../../common/topic-access';
+import { AccessService } from '../../common/access';
 import { QueueService } from '../../infra/queue/queue.service';
 
 const DAYS = 14;
@@ -12,7 +12,7 @@ const DAYS = 14;
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly access: TopicAccessService,
+    private readonly access: AccessService,
   ) {}
 
   /** Admins see everything; others only their projects and the jobs they started (docs/17). */
@@ -20,7 +20,7 @@ export class DashboardService {
     const since = new Date(Date.now() - (DAYS - 1) * 86_400_000);
     since.setUTCHours(0, 0, 0, 0);
 
-    const visible = this.access.visibleWhere(user);
+    const visible = this.access.visibleTopics(user);
     const ids = visible
       ? (await this.prisma.topic.findMany({ where: visible, select: { id: true } })).map(
           (t) => t.id,

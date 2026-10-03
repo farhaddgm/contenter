@@ -28,7 +28,7 @@ import {
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
-import { TopicScoped } from '../../common/topic-access';
+import { TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';

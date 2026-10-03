@@ -19,7 +19,8 @@ import {
   type UpdateBusinessAssetInput,
   type UpdateBusinessNoteInput,
 } from '@contenter/shared';
-import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { BusinessScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   AssetUploadInterceptor,
@@ -38,13 +39,14 @@ export class BusinessNotesAssetsController {
 
   // ---------- notes ----------
 
+  @BusinessScoped('business')
   @Get('businesses/:id/notes')
   listNotes(@Param('id') id: string) {
     return this.notes.list(id);
   }
 
+  @BusinessScoped('business')
   @Post('businesses/:id/notes')
-  @Roles('ADMIN', 'EDITOR')
   createNote(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(CreateBusinessNoteSchema)) body: CreateBusinessNoteInput,
@@ -53,8 +55,8 @@ export class BusinessNotesAssetsController {
     return this.notes.create(id, body, user);
   }
 
+  @BusinessScoped('businessNote')
   @Patch('business-notes/:id')
-  @Roles('ADMIN', 'EDITOR')
   updateNote(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateBusinessNoteSchema)) body: UpdateBusinessNoteInput,
@@ -63,8 +65,8 @@ export class BusinessNotesAssetsController {
     return this.notes.update(id, body, user);
   }
 
+  @BusinessScoped('businessNote')
   @Delete('business-notes/:id')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(204)
   removeNote(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.notes.remove(id, user);
@@ -72,26 +74,28 @@ export class BusinessNotesAssetsController {
 
   // ---------- assets ----------
 
+  @BusinessScoped('business')
   @Get('businesses/:id/assets')
   listAssets(@Param('id') id: string) {
     return this.assets.list(id);
   }
 
   /** multipart/form-data: text fields + `file` (optional) + `previews` (0–4 images). */
+  @BusinessScoped('business')
   @Post('businesses/:id/assets')
-  @Roles('ADMIN', 'EDITOR')
   @UseInterceptors(AssetUploadInterceptor)
   createAsset(@Param('id') id: string, @Req() req: Request, @CurrentUser() user: AuthUser) {
     return this.assets.create(id, req.body, uploadOf(req), user);
   }
 
+  @BusinessScoped('businessAsset')
   @Get('business-assets/:id')
   asset(@Param('id') id: string) {
     return this.assets.get(id);
   }
 
+  @BusinessScoped('businessAsset')
   @Patch('business-assets/:id')
-  @Roles('ADMIN', 'EDITOR')
   updateAsset(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateBusinessAssetSchema)) body: UpdateBusinessAssetInput,
@@ -100,15 +104,15 @@ export class BusinessNotesAssetsController {
     return this.assets.update(id, body, user);
   }
 
+  @BusinessScoped('businessAsset')
   @Post('business-assets/:id/analyze')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(200)
   analyzeAsset(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.assets.analyze(id, user);
   }
 
+  @BusinessScoped('businessAsset')
   @Delete('business-assets/:id')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(204)
   removeAsset(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.assets.remove(id, user);

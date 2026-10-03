@@ -24,8 +24,8 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 - Never treat a shared host (Drive, social networks — `isSharedHost`) as "the business's site", and never store a sign-in page as content (`isLoginWall`).
 - References are read into a text snapshot in the request path (`ReferencesService`, no AI); runners only read the snapshot. Private Google Docs go through `GoogleDriveService` (encrypted refresh tokens via `SecretBox`).
 
-## Project access (docs/17-project-access.md)
-- EDITOR/VIEWER only reach topics they created or were granted (`TopicMember`, VIEW/EDIT); admins reach all. Every topic-scoped route needs `@TopicScoped(via, param)`; every list of topics or their data must apply `TopicAccessService.visibleWhere()`. Web gates edit UI with `useCanEditTopic(topicId)`, not `can('content:write')`.
+## Topic & business access (docs/17-project-access.md)
+- EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 
 ## Smart (docs/10-smart.md)
 - Walker steps: `WalkerStepKey` in `packages/shared/src/smart.ts`; server progress in `WalkerProgressService`, client routing in `apps/web/src/features/smart/walker-steps.ts`.

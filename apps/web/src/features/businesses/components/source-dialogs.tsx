@@ -15,7 +15,13 @@ import { useAuthorization } from '@/lib/auth';
 import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/format';
 import { notify } from '@/stores/notifications';
-import { useBlocklist, useBlockSource, useRemoveSource, useUnblockSource } from '../api/businesses';
+import {
+  useBlocklist,
+  useBlockSource,
+  useCanEditBusiness,
+  useRemoveSource,
+  useUnblockSource,
+} from '../api/businesses';
 
 type SourceTarget = { business: string } | { discovery: string };
 type RemoveMode = NonNullable<RemoveSourceInput['block']>;
@@ -32,7 +38,9 @@ export function SourceList({
 }) {
   const t = useT();
   const { can } = useAuthorization();
-  const editable = can('content:write');
+  const canEditBusiness = useCanEditBusiness('business' in target ? target.business : undefined);
+  // a discovery is private to whoever ran it, so the global role decides there
+  const editable = 'business' in target ? canEditBusiness : can('content:write');
   const [removing, setRemoving] = useState<WebSource | null>(null);
 
   return (

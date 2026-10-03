@@ -127,7 +127,7 @@
 | متد | مسیر | توضیح |
 |---|---|---|
 | GET / POST / PATCH / DELETE | `/admin/users[/:id]` | مدیریت کاربران؛ `loginMethod` فقط توسط مالک تغییر می‌کند؛ DELETE حذف دائمی (نه خود، نه مالک) |
-| GET / PUT | `/admin/users/:id/topics[/:topicId]` | دسترسی کاربر به موضوع‌ها؛ بدنه `{ access: 'VIEW' \| 'EDIT' \| null }` ([17-project-access.md](17-project-access.md)) |
+| GET / PUT | `/owner/users/:id/access`، `/owner/users/:id/topics/:topicId`، `/owner/users/:id/businesses/:businessId` | فقط مالک: دسترسی کاربر به موضوع‌ها و کسب‌وکارها؛ بدنه `{ access: 'VIEW' \| 'EDIT' \| null }` ([17-project-access.md](17-project-access.md)) |
 | GET | `/admin/jobs?status&type&topicId&q&page` | فهرست کارهای AI |
 | GET | `/admin/jobs/queue` | آمار صف |
 | POST | `/admin/jobs/:id/retry` ، `/admin/jobs/:id/cancel` | اجرای مجدد / لغو |

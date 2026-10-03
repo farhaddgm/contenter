@@ -14,7 +14,7 @@ import {
   Platform,
   PrincipleKind,
   Role,
-  TopicAccess,
+  AccessLevel,
   TopicStatus,
   TraitCategory,
   TraitStatus,
@@ -182,11 +182,11 @@ export const TopicListQuerySchema = PaginationQuerySchema.extend({
   businessId: z.string().optional(),
 });
 
-/** Admin sets a user's access to one project; null removes the grant (docs/17). */
-export const SetTopicAccessSchema = z.object({
-  access: z.enum(TopicAccess).nullable(),
+/** The owner sets a user's access to one topic or business; null removes the grant (docs/17). */
+export const SetAccessSchema = z.object({
+  access: z.enum(AccessLevel).nullable(),
 });
-export type SetTopicAccessInput = z.infer<typeof SetTopicAccessSchema>;
+export type SetAccessInput = z.infer<typeof SetAccessSchema>;
 
 // ---------- principles ----------
 export const CreatePrincipleSchema = z.object({
