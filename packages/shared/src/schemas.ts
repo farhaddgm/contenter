@@ -94,18 +94,49 @@ export const UpdateGoogleAccessSchema = z.object({
 export type UpdateGoogleAccessInput = z.infer<typeof UpdateGoogleAccessSchema>;
 
 // ---------- users ----------
-export const CreateUserSchema = z.object({
-  email: z.email(),
-  name: z.string().trim().min(2).max(100),
-  password: z.string().min(8).max(128),
-  role: z.enum(Role),
-});
+/** Gmail sign-in (GOOGLE/BOTH) needs a Gmail address; only the owner may grant it (server-side). */
+export const CreateUserSchema = z
+  .object({
+    email: z.email(),
+    name: z.string().trim().min(2).max(100),
+    /** Required unless loginMethod is GOOGLE (Google-only accounts have no password). */
+    password: z.string().min(8).max(128).optional(),
+    role: z.enum(Role),
+    /** Defaults to PASSWORD. */
+    loginMethod: z.enum(LoginMethod).optional(),
+  })
+  .superRefine((v, ctx) => {
+    const method = v.loginMethod ?? 'PASSWORD';
+    if (method === 'GOOGLE' && v.password) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['password'],
+        message: 'Google-only accounts have no password',
+      });
+    }
+    if (method !== 'GOOGLE' && !v.password) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['password'],
+        message: 'A password is required for password sign-in',
+      });
+    }
+    if (method !== 'PASSWORD' && !isGmail(v.email)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['email'],
+        message: 'Only @gmail.com addresses can sign in with Google',
+      });
+    }
+  });
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
 export const UpdateUserSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   role: z.enum(Role).optional(),
   isActive: z.boolean().optional(),
+  /** Changing to/from Gmail sign-in is owner-only; BOTH/PASSWORD need a password (new or existing). */
+  loginMethod: z.enum(LoginMethod).optional(),
   password: z.string().min(8).max(128).optional(),
 });
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
