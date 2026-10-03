@@ -62,6 +62,8 @@ model User {
   businessAssets      BusinessAsset[]
   topicMemberships    TopicMember[]             @relation("TopicMemberUser")
   topicGrants         TopicMember[]             @relation("TopicMemberGrantedBy")
+  businessMemberships BusinessMember[]          @relation("BusinessMemberUser")
+  businessGrants      BusinessMember[]          @relation("BusinessMemberGrantedBy")
 }
 
 model RefreshToken {
@@ -172,8 +174,27 @@ model Business {
   facts       BusinessFact[]
   terms       BusinessTerm[]
   audits      BusinessAudit[]
+  members     BusinessMember[]
 
   @@index([status, updatedAt])
+}
+
+/// Grants a non-admin user access to a business, like TopicMember (docs/17-project-access.md).
+model BusinessMember {
+  id          String      @id @default(cuid())
+  businessId  String
+  userId      String
+  access      AccessLevel
+  grantedById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user      User     @relation("BusinessMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User?    @relation("BusinessMemberGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, userId])
+  @@index([userId])
 }
 
 /// One profile section of a business (services, personas, brand book, …). Markdown text.
@@ -517,8 +538,8 @@ enum TopicStatus {
   ARCHIVED
 }
 
-/// Per-project access for EDITOR/VIEWER accounts (admins see every project)
-enum TopicAccess {
+/// Per-topic / per-business access for EDITOR/VIEWER accounts (admins see everything)
+enum AccessLevel {
   VIEW
   EDIT
 }
@@ -560,7 +581,7 @@ model TopicMember {
   id          String      @id @default(cuid())
   topicId     String
   userId      String
-  access      TopicAccess
+  access      AccessLevel
   grantedById String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

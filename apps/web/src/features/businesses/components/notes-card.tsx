@@ -7,7 +7,6 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Switch, Textarea } from '@/components/ui/form-controls';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/format';
@@ -15,6 +14,7 @@ import { useTrackJob } from '@/features/jobs/api/jobs';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import {
   businessKeys,
+  useCanEditBusiness,
   useCreateNote,
   useDeleteNote,
   useNotes,
@@ -41,8 +41,7 @@ export function NotesCard({
   disabled?: boolean;
 }) {
   const t = useT();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
+  const editable = useCanEditBusiness(businessId);
   const notes = useNotes(businessId);
   const refs = useReferences(businessId);
   const create = useCreateNote(businessId);

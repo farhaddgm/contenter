@@ -6,6 +6,7 @@
  * See docs/12-businesses.md. Enums mirror `apps/api/prisma/schema.prisma`.
  */
 import { z } from 'zod';
+import type { AccessLevel } from './enums';
 import { PaginationQuerySchema, patchOf } from './schemas';
 
 // ---------- enums ----------
@@ -491,6 +492,8 @@ export interface Business {
   sections?: BusinessSection[];
   topics?: { id: string; title: string; status: string }[];
   pendingSuggestions?: number;
+  /** The current user's access to this business (admins: EDIT; docs/17). */
+  access?: AccessLevel | null;
 }
 
 export interface BusinessDiscovery {

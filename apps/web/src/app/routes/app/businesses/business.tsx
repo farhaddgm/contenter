@@ -28,7 +28,7 @@ import { PageHeader, Segmented } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
-import { Authorization, useAuthorization } from '@/lib/auth';
+import { Authorization } from '@/lib/auth';
 import { formatDate } from '@/utils/format';
 import { useTrackJob } from '@/features/jobs/api/jobs';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
@@ -61,9 +61,8 @@ export default function BusinessRoute() {
   const t = useT();
   const navigate = useNavigate();
   const { businessId = '' } = useParams();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
   const { data: business, isLoading, error } = useBusiness(businessId);
+  const editable = business?.access === 'EDIT';
   const suggestions = useSuggestions(businessId);
   const update = useUpdateBusiness(businessId);
   const remove = useDeleteBusiness();
@@ -170,6 +169,7 @@ export default function BusinessRoute() {
             <Badge tone={business.origin === 'MANUAL' ? 'neutral' : 'primary'}>
               {t(`enums.businessOrigin.${business.origin}`)}
             </Badge>
+            {business.access === 'VIEW' && <Badge tone="outline">{t('topics.readOnly')}</Badge>}
             {business.buildState !== 'NONE' && (
               <Badge tone={statusTone[business.buildState]}>
                 {t(`enums.businessBuildState.${business.buildState}`)}
@@ -183,50 +183,52 @@ export default function BusinessRoute() {
           </span>
         }
         actions={
-          <Authorization policy="content:write">
-            {emptyKeys.length > 0 && (
-              <Button icon={<Sparkles />} onClick={() => setSuggestKeys(emptyKeys)}>
-                {t('businesses.fillEmpty')}
+          editable && (
+            <>
+              {emptyKeys.length > 0 && (
+                <Button icon={<Sparkles />} onClick={() => setSuggestKeys(emptyKeys)}>
+                  {t('businesses.fillEmpty')}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                icon={<Globe />}
+                disabled={building}
+                onClick={() => setBuildOpen(true)}
+              >
+                {t('businesses.researchBuild')}
               </Button>
-            )}
-            <Button
-              variant="outline"
-              icon={<Globe />}
-              disabled={building}
-              onClick={() => setBuildOpen(true)}
-            >
-              {t('businesses.researchBuild')}
-            </Button>
-            <Button variant="outline" icon={<Pencil />} onClick={() => setFormOpen(true)}>
-              {t('common.edit')}
-            </Button>
-            <Button
-              variant="outline"
-              icon={business.status === 'ACTIVE' ? <Archive /> : <ArchiveRestore />}
-              isLoading={update.isPending}
-              onClick={() =>
-                update.mutate({ status: business.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE' })
-              }
-            >
-              {business.status === 'ACTIVE' ? t('businesses.archive') : t('businesses.unarchive')}
-            </Button>
-            <Authorization policy="business:delete">
-              <ConfirmationDialog
-                trigger={
-                  <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
-                    <Trash2 />
-                  </Button>
+              <Button variant="outline" icon={<Pencil />} onClick={() => setFormOpen(true)}>
+                {t('common.edit')}
+              </Button>
+              <Button
+                variant="outline"
+                icon={business.status === 'ACTIVE' ? <Archive /> : <ArchiveRestore />}
+                isLoading={update.isPending}
+                onClick={() =>
+                  update.mutate({ status: business.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE' })
                 }
-                body={t('businesses.deleteBody')}
-                isLoading={remove.isPending}
-                onConfirm={() =>
-                  remove
-                    .mutateAsync(business.id)
-                    .then(() => navigate(paths.app.businesses.getHref()))
-                }
-              />
-            </Authorization>
-          </Authorization>
+              >
+                {business.status === 'ACTIVE' ? t('businesses.archive') : t('businesses.unarchive')}
+              </Button>
+              <Authorization policy="business:delete">
+                <ConfirmationDialog
+                  trigger={
+                    <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
+                      <Trash2 />
+                    </Button>
+                  }
+                  body={t('businesses.deleteBody')}
+                  isLoading={remove.isPending}
+                  onConfirm={() =>
+                    remove
+                      .mutateAsync(business.id)
+                      .then(() => navigate(paths.app.businesses.getHref()))
+                  }
+                />
+              </Authorization>
+            </>
+          )
         }
       />
 

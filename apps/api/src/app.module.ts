@@ -4,7 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from './config/config.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
-import { TopicAccessGuard, TopicAccessModule } from './common/topic-access';
+import { AccessGuard, AccessModule } from './common/access';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { QueueModule } from './infra/queue/queue.service';
 import { StorageModule } from './infra/storage/file-storage.service';
@@ -31,7 +31,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
   imports: [
     ConfigModule,
     PrismaModule,
-    TopicAccessModule,
+    AccessModule,
     QueueModule,
     StorageModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 600 }]),
@@ -58,7 +58,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
-    { provide: APP_GUARD, useClass: TopicAccessGuard },
+    { provide: APP_GUARD, useClass: AccessGuard },
     { provide: APP_INTERCEPTOR, useClass: InteractionInterceptor },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],

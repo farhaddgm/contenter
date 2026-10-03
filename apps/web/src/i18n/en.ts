@@ -598,12 +598,14 @@ export const en: DeepStrings<Dictionary> = {
     deleteBody:
       '"{{name}}" will be permanently deleted and signed out everywhere. Content they created stays. This cannot be undone; to remove access temporarily, deactivate the user instead.',
     deleted: 'User deleted',
-    projects: 'Topic access',
-    projectsTitle: "{{name}}'s topic access",
-    projectsHint:
-      'Editors and viewers only see topics (projects) they created or that you grant here. For each topic choose whether they can only view it or also edit it.',
-    projectsEmpty: 'No topics yet.',
-    projectsAdmin: 'Admins have full access to every topic.',
+    accessButton: 'Topic and business access',
+    accessTitle: "{{name}}'s access",
+    accessHint:
+      'Editors and viewers only see topics (projects) and businesses they created or that you grant here. For each one choose whether they can only view it or also edit it.',
+    accessTopics: 'Topics',
+    accessBusinesses: 'Businesses',
+    accessEmpty: 'Nothing here yet.',
+    accessAdmin: 'Admins have full access to everything.',
     access: { NONE: 'No access', VIEW: 'View only', EDIT: 'Edit' },
     creator: 'Creator',
     archived: 'Archived',

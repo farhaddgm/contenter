@@ -23,7 +23,8 @@ import {
   type UpdateBusinessFactInput,
   type UpdateBusinessTermInput,
 } from '@contenter/shared';
-import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { BusinessScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ProfileKnowledgeService } from './profile-knowledge.service';
 
@@ -34,8 +35,8 @@ const SectionKeyPipe = new ParseEnumPipe(Object.fromEntries(BusinessSectionKey.m
 export class ProfileKnowledgeController {
   constructor(private readonly knowledge: ProfileKnowledgeService) {}
 
+  @BusinessScoped('business')
   @Post('businesses/:id/sections/:key/review')
-  @Roles('ADMIN', 'EDITOR')
   reviewSection(
     @Param('id') id: string,
     @Param('key', SectionKeyPipe) key: BusinessSectionKey,
@@ -46,13 +47,14 @@ export class ProfileKnowledgeController {
 
   // ---------- facts ----------
 
+  @BusinessScoped('business')
   @Get('businesses/:id/facts')
   facts(@Param('id') id: string) {
     return this.knowledge.facts(id);
   }
 
+  @BusinessScoped('business')
   @Post('businesses/:id/facts')
-  @Roles('ADMIN', 'EDITOR')
   createFact(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(CreateBusinessFactSchema)) body: CreateBusinessFactInput,
@@ -61,8 +63,8 @@ export class ProfileKnowledgeController {
     return this.knowledge.createFact(id, body, user);
   }
 
+  @BusinessScoped('businessFact')
   @Patch('business-facts/:id')
-  @Roles('ADMIN', 'EDITOR')
   updateFact(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateBusinessFactSchema)) body: UpdateBusinessFactInput,
@@ -71,8 +73,8 @@ export class ProfileKnowledgeController {
     return this.knowledge.updateFact(id, body, user);
   }
 
+  @BusinessScoped('businessFact')
   @Delete('business-facts/:id')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(204)
   removeFact(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.knowledge.removeFact(id, user);
@@ -80,13 +82,14 @@ export class ProfileKnowledgeController {
 
   // ---------- terms ----------
 
+  @BusinessScoped('business')
   @Get('businesses/:id/terms')
   terms(@Param('id') id: string) {
     return this.knowledge.terms(id);
   }
 
+  @BusinessScoped('business')
   @Post('businesses/:id/terms')
-  @Roles('ADMIN', 'EDITOR')
   createTerm(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(CreateBusinessTermSchema)) body: CreateBusinessTermInput,
@@ -95,8 +98,8 @@ export class ProfileKnowledgeController {
     return this.knowledge.createTerm(id, body, user);
   }
 
+  @BusinessScoped('businessTerm')
   @Patch('business-terms/:id')
-  @Roles('ADMIN', 'EDITOR')
   updateTerm(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateBusinessTermSchema)) body: UpdateBusinessTermInput,
@@ -105,8 +108,8 @@ export class ProfileKnowledgeController {
     return this.knowledge.updateTerm(id, body, user);
   }
 
+  @BusinessScoped('businessTerm')
   @Delete('business-terms/:id')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(204)
   removeTerm(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.knowledge.removeTerm(id, user);
@@ -114,19 +117,20 @@ export class ProfileKnowledgeController {
 
   // ---------- audit ----------
 
+  @BusinessScoped('business')
   @Get('businesses/:id/audit')
   async latestAudit(@Param('id') id: string) {
     return (await this.knowledge.latestAudit(id)) ?? null;
   }
 
+  @BusinessScoped('business')
   @Post('businesses/:id/audit')
-  @Roles('ADMIN', 'EDITOR')
   startAudit(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.knowledge.startAudit(id, user);
   }
 
+  @BusinessScoped('businessAudit')
   @Post('business-audits/:id/issues/:index/fix')
-  @Roles('ADMIN', 'EDITOR')
   fixIssue(
     @Param('id') id: string,
     @Param('index', ParseIntPipe) index: number,
@@ -136,8 +140,8 @@ export class ProfileKnowledgeController {
     return this.knowledge.fixIssue(id, index, body, user);
   }
 
+  @BusinessScoped('businessAudit')
   @Post('business-audits/:id/issues/:index/dismiss')
-  @Roles('ADMIN', 'EDITOR')
   dismissIssue(
     @Param('id') id: string,
     @Param('index', ParseIntPipe) index: number,

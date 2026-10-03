@@ -21,7 +21,6 @@ import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-controls';
 import { Spinner } from '@/components/ui/spinner';
 import { useT, type TFn } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
 import { formatDate, formatNumber } from '@/utils/format';
@@ -35,6 +34,7 @@ import {
   useUpdateFact,
   useUpdateTerm,
 } from '../api/profile-knowledge';
+import { useCanEditBusiness } from '../api/businesses';
 
 /** "Facts & terms" tab: key facts and the brand glossary (docs/16). */
 export function KnowledgePanel({ businessId }: { businessId: string }) {
@@ -50,8 +50,7 @@ export function KnowledgePanel({ businessId }: { businessId: string }) {
 
 function FactsCard({ businessId }: { businessId: string }) {
   const t = useT();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
+  const editable = useCanEditBusiness(businessId);
   const facts = useFacts(businessId);
   const update = useUpdateFact(businessId);
   const remove = useDeleteFact(businessId);
@@ -331,8 +330,7 @@ const splitList = (v: string) =>
 
 function TermsCard({ businessId }: { businessId: string }) {
   const t = useT();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
+  const editable = useCanEditBusiness(businessId);
   const terms = useTerms(businessId);
   const create = useCreateTerm(businessId);
   const update = useUpdateTerm(businessId);

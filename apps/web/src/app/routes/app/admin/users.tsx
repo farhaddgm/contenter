@@ -26,7 +26,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { notify } from '@/stores/notifications';
 import { formatDate, formatRelative } from '@/utils/format';
 import { useCreateUser, useDeleteUser, useUpdateUser, useUsers } from '@/features/admin/api';
-import { TopicAccessDialog } from '@/features/users/components/topic-access-dialog';
+import { AccessDialog } from '@/features/users/components/access-dialog';
 
 type FormValues = CreateUserInput & UpdateUserInput;
 
@@ -260,16 +260,18 @@ export default function UsersRoute() {
       className: 'text-end',
       cell: (u) => (
         <div className="flex justify-end">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            disabled={u.role === 'ADMIN'}
-            title={u.role === 'ADMIN' ? t('users.projectsAdmin') : t('users.projects')}
-            aria-label={t('users.projects')}
-            onClick={() => setAccessFor(u)}
-          >
-            <FolderKey />
-          </Button>
+          {me?.isOwner && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              disabled={u.role === 'ADMIN'}
+              title={u.role === 'ADMIN' ? t('users.accessAdmin') : t('users.accessButton')}
+              aria-label={t('users.accessButton')}
+              onClick={() => setAccessFor(u)}
+            >
+              <FolderKey />
+            </Button>
+          )}
           <Button
             size="icon-sm"
             variant="ghost"
@@ -343,7 +345,7 @@ export default function UsersRoute() {
         )}
       </Card>
       {drawer && <UserDrawer user={drawer.user} onClose={() => setDrawer(null)} />}
-      {accessFor && <TopicAccessDialog user={accessFor} onClose={() => setAccessFor(null)} />}
+      {accessFor && <AccessDialog user={accessFor} onClose={() => setAccessFor(null)} />}
     </>
   );
 }

@@ -5,13 +5,12 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
 import { formatDate, formatNumber } from '@/utils/format';
 import { useTrackJob } from '@/features/jobs/api/jobs';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
-import { businessKeys } from '../api/businesses';
+import { businessKeys, useCanEditBusiness } from '../api/businesses';
 import {
   knowledgeKeys,
   useAudit,
@@ -41,8 +40,7 @@ export function AuditCard({
   onJump: (key: BusinessSectionKey) => void;
 }) {
   const t = useT();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
+  const editable = useCanEditBusiness(businessId);
   const { data: audit } = useAudit(businessId);
   const start = useStartAudit(businessId);
   const fix = useFixAuditIssue(businessId);
