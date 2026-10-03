@@ -22,6 +22,8 @@ docker compose exec api npx -w @contenter/api prisma db seed   # فقط بار �
 | `worker` (`APP_ROLE=worker`) | مصرف‌کنندهٔ صف BullMQ؛ برای مقیاس، تعداد replica را بالا ببرید |
 | `postgres`، `redis` | داده و صف |
 
+همهٔ سرویس‌ها `restart: unless-stopped` دارند؛ پس از ری‌استارت سرور (به شرط فعال بودن سرویس Docker هنگام بوت: `systemctl enable docker`) خودشان بالا می‌آیند. سرویسی که با `docker compose stop` متوقف شده، پس از بوت خاموش می‌ماند.
+
 جلوی `web` یک reverse proxy با TLS (Caddy/Traefik/nginx) قرار دهید.
 
 ## مقیاس‌پذیری
