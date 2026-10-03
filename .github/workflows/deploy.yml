@@ -54,8 +54,16 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          # rebuild the key from its base64 body: copying from a Windows terminal can add
+          # spaces, CRLF line ends or join the lines, and ssh then rejects the key
+          body="$(printf '%s' "$DEPLOY_SSH_KEY" | tr -d '\r' |
+            sed -e 's/-----BEGIN OPENSSH PRIVATE KEY-----//' -e 's/-----END OPENSSH PRIVATE KEY-----//' | tr -d ' \t\n')"
+          { echo '-----BEGIN OPENSSH PRIVATE KEY-----'; printf '%s' "$body" | fold -w 70; echo; echo '-----END OPENSSH PRIVATE KEY-----'; } > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null; then
+            echo "::error::The DEPLOY_SSH_KEY secret is not a complete key. Run scripts/setup-auto-deploy.sh on the server again and paste every line of DEPLOY_SSH_KEY into the secret."
+            exit 1
+          fi
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           echo "Deploying $SHA to $DEPLOY_HOST"
           # the key may only run scripts/deploy.sh on the server; the "command" sent is the commit id
