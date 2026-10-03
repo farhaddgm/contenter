@@ -121,7 +121,7 @@
 ## بک‌آفیس (`ADMIN`)
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET / POST / PATCH | `/admin/users[/:id]` | مدیریت کاربران |
+| GET / POST / PATCH / DELETE | `/admin/users[/:id]` | مدیریت کاربران؛ `loginMethod` فقط توسط مالک تغییر می‌کند؛ DELETE حذف دائمی (نه خود، نه مالک) |
 | GET | `/admin/jobs?status&type&topicId&q&page` | فهرست کارهای AI |
 | GET | `/admin/jobs/queue` | آمار صف |
 | POST | `/admin/jobs/:id/retry` ، `/admin/jobs/:id/cancel` | اجرای مجدد / لغو |

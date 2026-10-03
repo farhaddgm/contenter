@@ -548,8 +548,17 @@ export const en: DeepStrings<Dictionary> = {
     activate: 'Activate',
     loginMethod: 'Sign-in method',
     owner: 'Owner',
-    googleManaged:
-      'This account signs in with Gmail only; its sign-in method is managed by the owner in Settings → Gmail sign-in.',
+    methodHint: {
+      PASSWORD: 'Signs in with email and password only. Any Gmail access is removed.',
+      GOOGLE: 'Signs in with the Gmail account only and has no password (the old one is removed).',
+      BOTH: 'Signs in with Gmail or with email and password.',
+    },
+    methodGmailOnly: 'Gmail sign-in is only possible for @gmail.com addresses.',
+    methodOwnerOnly: 'Only the owner can change sign-in methods.',
+    delete: 'Delete user',
+    deleteBody:
+      '"{{name}}" will be permanently deleted and signed out everywhere. Content they created stays. This cannot be undone; to remove access temporarily, deactivate the user instead.',
+    deleted: 'User deleted',
   },
   googleAccess: {
     title: 'Gmail sign-in',
