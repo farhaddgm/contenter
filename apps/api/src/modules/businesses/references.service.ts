@@ -7,6 +7,7 @@ import {
   isGoogleDriveUrl,
   parseGoogleFileUrl,
   parseGoogleFolderUrl,
+  parsePodSpaceUrl,
   type AddReferenceInput,
   type GoogleFileType,
   type UpdateReferenceInput,
@@ -16,6 +17,9 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DriveReadError, GoogleDriveService } from '../google-drive/google-drive.service';
 import { FetchError, MediaFetcherService } from '../samples/media-fetcher.service';
+import { documentKind, extractText, isTextKind } from './document-text';
+import { BusinessAssetsService, PREVIEW_MAX_BYTES } from './notes-assets.service';
+import { PodSpaceService, type PodSpaceEntry } from './podspace.service';
 
 const ACCOUNT_REF = { select: { id: true, email: true } } as const;
 const PUBLIC_EXPORT: Record<GoogleFileType, ((id: string) => string) | null> = {
@@ -27,6 +31,26 @@ const PUBLIC_EXPORT: Record<GoogleFileType, ((id: string) => string) | null> = {
 /** A web page with less readable text than this is a shell (login wall, JS app), not a source. */
 export const MIN_PAGE_TEXT = 200;
 const READ_CONCURRENCY = 4;
+/** Largest shared file downloaded to be read as text (PDF, Word …). */
+const DOCUMENT_MAX_BYTES = 25_000_000;
+
+/** What adding or refreshing a link produced. */
+interface Expansion {
+  ids: string[];
+  /** Files that could not be read or imported. */
+  skipped: number;
+  /** Images of a shared folder imported as brand assets (analyzed by AI). */
+  assets?: number;
+}
+
+const isPodSpaceFolder = (url: string | null) => parsePodSpaceUrl(url ?? '')?.kind === 'folder';
+
+/** Runs `fn` over `items`, `READ_CONCURRENCY` at a time. */
+async function inBatches<T>(items: T[], fn: (item: T) => Promise<void>) {
+  for (let i = 0; i < items.length; i += READ_CONCURRENCY) {
+    await Promise.all(items.slice(i, i + READ_CONCURRENCY).map(fn));
+  }
+}
 
 type ReferenceWithAccount = ReferenceRow & {
   googleAccount: { id: string; email: string } | null;
@@ -80,6 +104,8 @@ export class ReferencesService {
     private readonly audit: AuditService,
     private readonly fetcher: MediaFetcherService,
     private readonly drive: GoogleDriveService,
+    private readonly podspace: PodSpaceService,
+    private readonly assets: BusinessAssetsService,
   ) {}
 
   async list(businessId: string) {
@@ -114,9 +140,10 @@ export class ReferencesService {
   }
 
   /**
-   * Adds a pasted text, a link (read right away) or a Google Drive folder (one reference per
-   * readable file inside). A failed read is stored on the reference, not thrown. `skipped`
-   * counts folder files that cannot be read as text.
+   * Adds a pasted text, a link (read right away) or a shared folder — Google Drive or
+   * PodSpace — (one reference per readable file inside; PodSpace images become brand assets).
+   * A failed read is stored on the reference, not thrown. `skipped` counts folder files that
+   * cannot be read.
    */
   async add(businessId: string, input: AddReferenceInput, user: AuthUser) {
     const data = AddReferenceSchema.parse(input);
@@ -124,6 +151,7 @@ export class ReferencesService {
 
     let ids: string[];
     let skipped = 0;
+    let assets = 0;
     if (data.content) {
       const row = await this.prisma.businessReference.create({
         data: {
@@ -162,7 +190,9 @@ export class ReferencesService {
         },
       });
       if (isFolder) ({ ids, skipped } = await this.expandFolder(row));
-      else {
+      else if (isPodSpaceFolder(url)) {
+        ({ ids, skipped, assets = 0 } = await this.expandPodSpace(row, user));
+      } else {
         await this.read(row);
         ids = [row.id];
       }
@@ -172,9 +202,9 @@ export class ReferencesService {
       action: 'business.reference_add',
       entityType: 'Business',
       entityId: businessId,
-      meta: { references: ids.length, skipped, url: data.url ?? null },
+      meta: { references: ids.length, skipped, assets, url: data.url ?? null },
     });
-    return { references: await this.listByIds(ids), skipped };
+    return { references: await this.listByIds(ids), skipped, assets };
   }
 
   /** Reads the link again and replaces the snapshot (a folder link is expanded into its files). */
@@ -183,16 +213,19 @@ export class ReferencesService {
     if (row.kind === 'TEXT') throw new BadRequestException('A pasted text has nothing to refresh');
     let ids = [id];
     let skipped = 0;
+    let assets = 0;
     if (parseGoogleFolderUrl(row.url)) ({ ids, skipped } = await this.expandFolder(row));
-    else await this.read(row);
+    else if (isPodSpaceFolder(row.url)) {
+      ({ ids, skipped, assets = 0 } = await this.expandPodSpace(row, user));
+    } else await this.read(row);
     this.audit.log({
       userId: user.id,
       action: 'business.reference_refresh',
       entityType: 'Business',
       entityId: row.businessId,
-      meta: { referenceId: id, references: ids.length, skipped },
+      meta: { referenceId: id, references: ids.length, skipped, assets },
     });
-    return { references: await this.listByIds(ids), skipped };
+    return { references: await this.listByIds(ids), skipped, assets };
   }
 
   async update(id: string, input: UpdateReferenceInput, user: AuthUser) {
@@ -247,14 +280,8 @@ export class ReferencesService {
    * a connected Google account). The folder row itself is removed on success; when the folder
    * cannot be listed or has nothing readable it stays as a FAILED reference explaining why.
    */
-  private async expandFolder(folderRow: ReferenceRow): Promise<{ ids: string[]; skipped: number }> {
-    const fail = async (error: string) => {
-      await this.prisma.businessReference.update({
-        where: { id: folderRow.id },
-        data: { kind: 'GOOGLE_DOC', status: 'FAILED', content: '', error: error.slice(0, 1000) },
-      });
-      return { ids: [folderRow.id], skipped: 0 };
-    };
+  private async expandFolder(folderRow: ReferenceRow): Promise<Expansion> {
+    const fail = (error: string) => this.failFolder(folderRow, 'GOOGLE_DOC', error);
 
     let folder;
     try {
@@ -304,11 +331,135 @@ export class ReferencesService {
             }),
       );
     }
-    for (let i = 0; i < rows.length; i += READ_CONCURRENCY) {
-      await Promise.all(rows.slice(i, i + READ_CONCURRENCY).map((r) => this.read(r)));
-    }
+    await inBatches(rows, (r) => this.read(r));
     await this.prisma.businessReference.delete({ where: { id: folderRow.id } });
     return { ids: rows.map((r) => r.id), skipped: folder.skipped.length };
+  }
+
+  /** A folder that could not be expanded stays as one FAILED reference explaining why. */
+  private async failFolder(
+    folderRow: ReferenceRow,
+    kind: ReferenceRow['kind'],
+    error: string,
+    skipped = 0,
+  ): Promise<Expansion> {
+    await this.prisma.businessReference.update({
+      where: { id: folderRow.id },
+      data: { kind, status: 'FAILED', content: '', error: error.slice(0, 1000) },
+    });
+    return { ids: [folderRow.id], skipped };
+  }
+
+  /**
+   * Turns a shared PodSpace folder (docs/14-business-references.md) into its contents, walking
+   * the subfolders: text files, PDFs and Word documents become one reference each; JPEG/PNG/WebP
+   * images become brand assets that AI analyzes (BUSINESS_ASSET_ANALYZE). Videos and other
+   * files are counted as skipped. The folder row is removed once something was taken from it.
+   */
+  private async expandPodSpace(folderRow: ReferenceRow, user: AuthUser): Promise<Expansion> {
+    const link = parsePodSpaceUrl(folderRow.url)!;
+    let folder;
+    try {
+      folder = await this.podspace.listFolder(link);
+    } catch (err) {
+      if (!(err instanceof FetchError)) {
+        this.logger.warn(`PodSpace folder ${folderRow.url} failed: ${String(err)}`);
+      }
+      return this.failFolder(folderRow, 'URL', err instanceof Error ? err.message : String(err));
+    }
+
+    const texts = folder.files.filter((f) => isTextKind(f.kind));
+    const images = folder.files.filter((f) => f.kind === 'image');
+    const unreadable = folder.files.filter((f) => !isTextKind(f.kind) && f.kind !== 'image');
+    const skippedNames = unreadable.map((f) => f.path);
+
+    const existing = await this.prisma.businessReference.findMany({
+      where: { businessId: folderRow.businessId },
+      select: { id: true, url: true },
+    });
+    const byUrl = new Map(existing.map((r) => [r.url, r.id]));
+    let room = BUSINESS_REFERENCE_LIMIT - existing.length + 1;
+    const rows: ReferenceRow[] = [];
+    for (const file of texts) {
+      const known = byUrl.get(file.url);
+      if (!known && room <= 0) {
+        skippedNames.push(file.path);
+        continue;
+      }
+      if (!known) room--;
+      const data = { title: file.path.slice(0, 300) };
+      rows.push(
+        known
+          ? await this.prisma.businessReference.update({ where: { id: known }, data })
+          : await this.prisma.businessReference.create({
+              data: {
+                ...data,
+                businessId: folderRow.businessId,
+                kind: 'URL',
+                url: file.url,
+                createdById: folderRow.createdById,
+              },
+            }),
+      );
+    }
+    await inBatches(rows, (r) => this.read(r));
+
+    let imported = 0;
+    await inBatches(images, async (file) => {
+      const reason = await this.importPodSpaceImage(folderRow.businessId, file, user);
+      if (reason === null) imported++;
+      else if (reason) skippedNames.push(`${file.path} (${reason})`);
+    });
+
+    if (!rows.length && !imported) {
+      const detail = skippedNames.length
+        ? ` Not read: ${skippedNames.slice(0, 8).join(', ')}${skippedNames.length > 8 ? ' …' : ''}.`
+        : '';
+      return this.failFolder(
+        folderRow,
+        'URL',
+        folder.files.length
+          ? `Nothing in the PodSpace folder "${folder.name}" could be read or imported.${detail} Videos go to the brand assets (upload them there, so frames are captured).`
+          : `The PodSpace folder "${folder.name}" is empty.`,
+        skippedNames.length,
+      );
+    }
+    if (skippedNames.length) {
+      this.logger.log(`PodSpace ${folderRow.url}: skipped ${skippedNames.join(', ')}`);
+    }
+    await this.prisma.businessReference.delete({ where: { id: folderRow.id } });
+    return { ids: rows.map((r) => r.id), skipped: skippedNames.length, assets: imported };
+  }
+
+  /**
+   * Downloads one image of a shared folder into the brand assets. Null = imported, '' = already
+   * there, otherwise why it was not imported.
+   */
+  private async importPodSpaceImage(
+    businessId: string,
+    file: PodSpaceEntry,
+    user: AuthUser,
+  ): Promise<string | null> {
+    if (!/\.(jpe?g|png|webp)$/i.test(file.name)) return 'GIF is not supported';
+    if (file.size && file.size > PREVIEW_MAX_BYTES) return 'larger than 3 MB';
+    try {
+      const link = parsePodSpaceUrl(file.url)!;
+      const dl = await this.podspace.download(link, PREVIEW_MAX_BYTES);
+      const created = await this.assets.importImage(
+        businessId,
+        {
+          buffer: dl.buffer,
+          fileName: file.name,
+          mimeType: dl.contentType.startsWith('image/') ? dl.contentType.split(';')[0]! : '',
+          url: file.url,
+          title: file.path.replace(/\.[^./]+$/, ''),
+        },
+        user,
+      );
+      return created ? null : '';
+    } catch (err) {
+      return err instanceof Error ? err.message.slice(0, 120) : String(err);
+    }
   }
 
   /** Fetches the link into the snapshot; the outcome (READY / FAILED + reason) is persisted. */
@@ -316,7 +467,11 @@ export class ReferencesService {
     let data: Prisma.BusinessReferenceUpdateInput;
     try {
       const out =
-        row.kind === 'GOOGLE_DOC' ? await this.readGoogle(row) : await this.readPage(row.url);
+        row.kind === 'GOOGLE_DOC'
+          ? await this.readGoogle(row)
+          : parsePodSpaceUrl(row.url ?? '')?.kind === 'file'
+            ? await this.readPodSpaceFile(row.url!)
+            : await this.readPage(row.url);
       const text = out.text.trim().slice(0, BUSINESS_REFERENCE_MAX_CHARS);
       if (!text) {
         throw new FetchError(
@@ -355,6 +510,38 @@ export class ReferencesService {
       );
     }
     return { title: media.title ?? '', text, accountId: null as string | null };
+  }
+
+  /** One shared PodSpace file: downloaded through the API and turned into text. */
+  private async readPodSpaceFile(url: string) {
+    const dl = await this.podspace.download(parsePodSpaceUrl(url)!, DOCUMENT_MAX_BYTES);
+    const name = dl.fileName ?? '';
+    const kind = documentKind(name, dl.contentType);
+    if (!isTextKind(kind)) {
+      throw new FetchError(
+        kind === 'image' || kind === 'video'
+          ? 'This PodSpace file is an image or a video, not a text. Add it to the brand assets instead (or add its whole folder link: images are imported as assets).'
+          : `This PodSpace file (${name || dl.contentType || 'unknown type'}) cannot be read as text. Readable: text, Markdown, CSV, HTML, PDF and Word (.docx).`,
+      );
+    }
+    let text: string;
+    try {
+      text = await extractText(dl.buffer, kind!, dl.finalUrl);
+    } catch (err) {
+      throw new FetchError(
+        `The file could not be read (${err instanceof Error ? err.message : String(err)}).`,
+      );
+    }
+    if (kind === 'pdf' && text.trim().length < 20) {
+      throw new FetchError(
+        'This PDF has no text layer (it is a scanned image). Paste its text instead.',
+      );
+    }
+    return {
+      title: name.replace(/\.[^.]+$/, ''),
+      text,
+      accountId: null as string | null,
+    };
   }
 
   /**

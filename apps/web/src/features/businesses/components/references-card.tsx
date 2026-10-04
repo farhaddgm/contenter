@@ -160,8 +160,13 @@ function AddReferenceDialog({
         (n, r) => n + (r.status === 'fulfilled' ? r.value.skipped : 0),
         0,
       );
+      const assets = results.reduce(
+        (n, r) => n + (r.status === 'fulfilled' ? (r.value.assets ?? 0) : 0),
+        0,
+      );
       const unread = added.filter((r) => r.status !== 'READY').length;
       if (skipped) notify.info(t('businesses.references.folderSkipped', { count: skipped }));
+      if (assets) notify.info(t('businesses.references.folderAssets', { count: assets }));
       if (rejected.length) {
         notify.error(t('common.error'), (rejected[0] as PromiseRejectedResult).reason?.message);
       }

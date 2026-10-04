@@ -51,8 +51,10 @@ export const businessKeys = {
 /** A link can become several references (a Drive folder → one per readable file). */
 export interface ReferenceBatch {
   references: BusinessReference[];
-  /** Folder files that cannot be read as text (PDF, images, Office files …). */
+  /** Folder files that could not be read or imported. */
   skipped: number;
+  /** Images of a shared PodSpace folder imported as brand assets (analyzed by AI). */
+  assets?: number;
 }
 
 export function useBusinesses(params: {
@@ -312,6 +314,8 @@ function useInvalidateReferences(businessId: string) {
   return () => {
     void qc.invalidateQueries({ queryKey: businessKeys.references(businessId) });
     void qc.invalidateQueries({ queryKey: ['business-references'] });
+    // A PodSpace folder can add brand assets too.
+    void qc.invalidateQueries({ queryKey: businessKeys.assets(businessId) });
   };
 }
 

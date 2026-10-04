@@ -72,6 +72,7 @@ import {
   BusinessAssetsService,
   BusinessNotesService,
 } from './notes-assets.service';
+import { PodSpaceService } from './podspace.service';
 import { ProfileKnowledgeController } from './profile-knowledge.controller';
 import { ProfileKnowledgeService } from './profile-knowledge.service';
 import { ReferencesService } from './references.service';
@@ -992,6 +993,7 @@ export class BusinessItemsController {
   providers: [
     BusinessesService,
     ReferencesService,
+    PodSpaceService,
     BusinessNotesService,
     BusinessAssetsService,
     AssetUploadInterceptor,
