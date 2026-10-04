@@ -18,7 +18,7 @@ import { AuditService } from '../audit/audit.service';
 import { DriveReadError, GoogleDriveService } from '../google-drive/google-drive.service';
 import { FetchError, MediaFetcherService } from '../samples/media-fetcher.service';
 import { documentKind, extractText, isTextKind } from './document-text';
-import { BusinessAssetsService, PREVIEW_MAX_BYTES } from './notes-assets.service';
+import { AssetImportService, PREVIEW_MAX_BYTES } from './asset-import.service';
 import { PodSpaceService, type PodSpaceEntry } from './podspace.service';
 
 const ACCOUNT_REF = { select: { id: true, email: true } } as const;
@@ -105,7 +105,7 @@ export class ReferencesService {
     private readonly fetcher: MediaFetcherService,
     private readonly drive: GoogleDriveService,
     private readonly podspace: PodSpaceService,
-    private readonly assets: BusinessAssetsService,
+    private readonly assets: AssetImportService,
   ) {}
 
   async list(businessId: string) {
