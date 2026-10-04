@@ -58,6 +58,7 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
   const refs = [
     ...new Set([
       ...AI_MODEL_CATALOG.map((m) => modelRef(m.provider, m.id)),
+      ...data.providers.flatMap((p) => (p.models ?? []).map((id) => modelRef(p.name, id))),
       ...customModels,
       ...Object.values(form.models),
     ]),

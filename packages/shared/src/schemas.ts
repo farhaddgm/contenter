@@ -14,6 +14,7 @@ import {
   Platform,
   PrincipleKind,
   Role,
+  AccessLevel,
   TopicStatus,
   TraitCategory,
   TraitStatus,
@@ -94,21 +95,70 @@ export const UpdateGoogleAccessSchema = z.object({
 export type UpdateGoogleAccessInput = z.infer<typeof UpdateGoogleAccessSchema>;
 
 // ---------- users ----------
-export const CreateUserSchema = z.object({
-  email: z.email(),
-  name: z.string().trim().min(2).max(100),
-  password: z.string().min(8).max(128),
-  role: z.enum(Role),
-});
+/** Gmail sign-in (GOOGLE/BOTH) needs a Gmail address; only the owner may grant it (server-side). */
+export const CreateUserSchema = z
+  .object({
+    email: z.email(),
+    name: z.string().trim().min(2).max(100),
+    /** Required unless loginMethod is GOOGLE (Google-only accounts have no password). */
+    password: z.string().min(8).max(128).optional(),
+    role: z.enum(Role),
+    /** Defaults to PASSWORD. */
+    loginMethod: z.enum(LoginMethod).optional(),
+  })
+  .superRefine((v, ctx) => {
+    const method = v.loginMethod ?? 'PASSWORD';
+    if (method === 'GOOGLE' && v.password) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['password'],
+        message: 'Google-only accounts have no password',
+      });
+    }
+    if (method !== 'GOOGLE' && !v.password) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['password'],
+        message: 'A password is required for password sign-in',
+      });
+    }
+    if (method !== 'PASSWORD' && !isGmail(v.email)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['email'],
+        message: 'Only @gmail.com addresses can sign in with Google',
+      });
+    }
+  });
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
 export const UpdateUserSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   role: z.enum(Role).optional(),
   isActive: z.boolean().optional(),
+  /** Changing to/from Gmail sign-in is owner-only; BOTH/PASSWORD need a password (new or existing). */
+  loginMethod: z.enum(LoginMethod).optional(),
   password: z.string().min(8).max(128).optional(),
 });
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
+
+/**
+ * PATCH body from a create schema. Unlike `.partial()`, fields lose their defaults: in Zod 4 a
+ * default still fills an omitted field, so `{ status: 'ARCHIVED' }` would reset every defaulted
+ * field (tagline, language …). Here an omitted field stays undefined and Prisma leaves it as is.
+ */
+export function patchOf<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  const shape = Object.fromEntries(
+    Object.entries(schema.shape).map(([key, field]) => [
+      key,
+      (field instanceof z.ZodDefault
+        ? (field.removeDefault() as z.ZodType)
+        : (field as z.ZodType)
+      ).optional(),
+    ]),
+  );
+  return z.object(shape) as unknown as ReturnType<z.ZodObject<T>['partial']>;
+}
 
 // ---------- topics ----------
 export const CreateTopicSchema = z.object({
@@ -122,7 +172,7 @@ export const CreateTopicSchema = z.object({
 });
 export type CreateTopicInput = z.input<typeof CreateTopicSchema>;
 
-export const UpdateTopicSchema = CreateTopicSchema.partial().extend({
+export const UpdateTopicSchema = patchOf(CreateTopicSchema).extend({
   status: z.enum(TopicStatus).optional(),
 });
 export type UpdateTopicInput = z.input<typeof UpdateTopicSchema>;
@@ -131,6 +181,12 @@ export const TopicListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(TopicStatus).optional(),
   businessId: z.string().optional(),
 });
+
+/** The owner sets a user's access to one topic or business; null removes the grant (docs/17). */
+export const SetAccessSchema = z.object({
+  access: z.enum(AccessLevel).nullable(),
+});
+export type SetAccessInput = z.infer<typeof SetAccessSchema>;
 
 // ---------- principles ----------
 export const CreatePrincipleSchema = z.object({
@@ -141,7 +197,7 @@ export const CreatePrincipleSchema = z.object({
 });
 export type CreatePrincipleInput = z.input<typeof CreatePrincipleSchema>;
 
-export const UpdatePrincipleSchema = CreatePrincipleSchema.partial();
+export const UpdatePrincipleSchema = patchOf(CreatePrincipleSchema);
 export type UpdatePrincipleInput = z.input<typeof UpdatePrincipleSchema>;
 
 // ---------- samples ----------
@@ -305,6 +361,8 @@ export interface AiProviderStatus {
   name: AiProviderName;
   /** API key present in the server environment. */
   configured: boolean;
+  /** Text models the vendor's API currently lists (live, cached); absent when unavailable. */
+  models?: string[];
 }
 
 export type AiSettingsResponse = AiSettings & {

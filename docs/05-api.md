@@ -43,6 +43,11 @@
 | GET | `/businesses/:id/suggestions` | پیشنهادهای AI در انتظار |
 | POST | `/businesses/:id/suggest`، `/businesses/:id/build` | کار `BUSINESS_SUGGEST` / `BUSINESS_BUILD` ← `{ jobId }` |
 | POST | `/business-suggestions/:id/accept`، `/business-suggestions/:id/dismiss` | پذیرش (با ویرایش اختیاری) / رد |
+| POST | `/businesses/:id/sections/:key/review` | تأیید متن بخش |
+| GET / POST · PATCH / DELETE | `/businesses/:id/facts` · `/business-facts/:id` | واقعیت‌های کلیدی |
+| GET / POST · PATCH / DELETE | `/businesses/:id/terms` · `/business-terms/:id` | واژه‌نامهٔ برند |
+| GET / POST | `/businesses/:id/audit` | آخرین بررسی کیفیت / شروع `BUSINESS_AUDIT` |
+| POST | `/business-audits/:id/issues/:index/fix`، `…/dismiss` | رفع مشکل با AI (پیشنهاد) / نادیده گرفتن ([16-business-profile-quality.md](16-business-profile-quality.md)) |
 | GET / POST | `/business-discoveries`، GET `/business-discoveries/:id` | تحقیق کلیدواژه (`BUSINESS_DISCOVER`) |
 | POST | `/business-discoveries/:id/select` | `{ index }` — تأیید کاندیدا، ساخت کسب‌وکار و شروع `BUSINESS_BUILD` |
 | POST | `/businesses/:id/sources/remove`، `/business-discoveries/:id/sources/remove` | `{ url, block }` — حذف منبع تحقیق و در صورت نیاز افزودن به فهرست سیاه (مسدودسازی فقط ADMIN) |
@@ -121,7 +126,8 @@
 ## بک‌آفیس (`ADMIN`)
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET / POST / PATCH | `/admin/users[/:id]` | مدیریت کاربران |
+| GET / POST / PATCH / DELETE | `/admin/users[/:id]` | مدیریت کاربران؛ `loginMethod` فقط توسط مالک تغییر می‌کند؛ DELETE حذف دائمی (نه خود، نه مالک) |
+| GET / PUT | `/owner/users/:id/access`، `/owner/users/:id/topics/:topicId`، `/owner/users/:id/businesses/:businessId` | فقط مالک: دسترسی کاربر به موضوع‌ها و کسب‌وکارها؛ بدنه `{ access: 'VIEW' \| 'EDIT' \| null }` ([17-project-access.md](17-project-access.md)) |
 | GET | `/admin/jobs?status&type&topicId&q&page` | فهرست کارهای AI |
 | GET | `/admin/jobs/queue` | آمار صف |
 | POST | `/admin/jobs/:id/retry` ، `/admin/jobs/:id/cancel` | اجرای مجدد / لغو |

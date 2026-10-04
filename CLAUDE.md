@@ -19,9 +19,13 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 
 ## Businesses (docs/12-businesses.md, docs/14-business-references.md)
 - AI builds/suggestions take a `ResearchScope`; `consult()` in `business.runners.ts` assembles references + web notes into the `research` prompt variable.
-- Admin notes → `BUSINESS_REVISE`; brand assets → `BUSINESS_ASSET_ANALYZE` (docs/15). Asset analyses ride inside the `business` prompt variable (`formatBusinessAssets`), so every topic job gets them. Uploads live in `FileStorageService` (`UPLOAD_DIR`, signed URLs); the worker reads the same volume.
+- Admin notes → `BUSINESS_REVISE`; brand assets → `BUSINESS_ASSET_ANALYZE` (docs/15).
+- Profile quality (docs/16): section behavior comes from `BUSINESS_SECTION_META` (append new keys to the end of `BusinessSectionKey`); AI-written sections stay unreviewed until the admin confirms (`writeSection` `reviewed`); key facts / terminology ride in the `business` variable as `[FACTS]` / `[TERMINOLOGY]`; terminology is checked by code (`checkTerms`), never by the model; `BUSINESS_AUDIT` issues are fixed through one-off notes (suggestions). Asset analyses ride inside the `business` prompt variable (`formatBusinessAssets`), so every topic job gets them. Uploads live in `FileStorageService` (`UPLOAD_DIR`, signed URLs); the worker reads the same volume.
 - Never treat a shared host (Drive, social networks — `isSharedHost`) as "the business's site", and never store a sign-in page as content (`isLoginWall`).
 - References are read into a text snapshot in the request path (`ReferencesService`, no AI); runners only read the snapshot. Private Google Docs go through `GoogleDriveService` (encrypted refresh tokens via `SecretBox`).
+
+## Topic & business access (docs/17-project-access.md)
+- EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 
 ## Smart (docs/10-smart.md)
 - Walker steps: `WalkerStepKey` in `packages/shared/src/smart.ts`; server progress in `WalkerProgressService`, client routing in `apps/web/src/features/smart/walker-steps.ts`.

@@ -6,7 +6,8 @@
  * See docs/12-businesses.md. Enums mirror `apps/api/prisma/schema.prisma`.
  */
 import { z } from 'zod';
-import { PaginationQuerySchema } from './schemas';
+import type { AccessLevel } from './enums';
+import { PaginationQuerySchema, patchOf } from './schemas';
 
 // ---------- enums ----------
 
@@ -22,7 +23,10 @@ export type BusinessOrigin = (typeof BusinessOrigin)[number];
 export const BusinessBuildState = ['NONE', 'BUILDING', 'READY', 'FAILED'] as const;
 export type BusinessBuildState = (typeof BusinessBuildState)[number];
 
-/** Profile sections, in display order. */
+/**
+ * Profile sections, in prompt order (new keys are appended so prompt prefixes stay stable).
+ * The UI shows them grouped by `BUSINESS_SECTION_META[key].group` — see BUSINESS_SECTION_GROUPS.
+ */
 export const BusinessSectionKey = [
   'OVERVIEW',
   'SERVICES',
@@ -36,6 +40,9 @@ export const BusinessSectionKey = [
   'CONTENT_PILLARS',
   'GUIDELINES',
   'CHANNELS',
+  'GOALS',
+  'FAQ',
+  'CALENDAR',
 ] as const;
 export type BusinessSectionKey = (typeof BusinessSectionKey)[number];
 
@@ -62,7 +69,63 @@ export const BUSINESS_SECTION_SPEC: Record<BusinessSectionKey, string> = {
     'Rules and constraints: legal/compliance limits, claims that must not be made, sensitive topics, required disclaimers.',
   CHANNELS:
     'Official website, social channels, contact points and the preferred calls to action (CTA).',
+  GOALS:
+    'Business and content goals: what content must achieve now (awareness, sign-ups, sales, trust …), priority products/campaigns, KPIs and what to push or de-emphasize.',
+  FAQ: 'Real customer questions and objections with the approved short answer to each (the answers content may repeat).',
+  CALENDAR:
+    'Occasions, seasons, campaigns and launches relevant to the business (with dates or periods) and how content should use them.',
 };
+
+/** Where a section sits in the profile page. */
+export const BusinessSectionGroup = ['IDENTITY', 'AUDIENCE', 'BRAND', 'STRATEGY', 'RULES'] as const;
+export type BusinessSectionGroup = (typeof BusinessSectionGroup)[number];
+
+/**
+ * Registry of section behavior. To add a section later: append its key to BusinessSectionKey (and
+ * the Prisma enum), give it a spec and an entry here, and add its i18n labels — everything else
+ * (prompts, completeness, health, UI grouping) follows from this table.
+ *
+ * - `nature`: FACT sections must come from sources/admin (never invented); STRATEGY sections may
+ *   be derived by analysis; RULES sections are binding constraints.
+ * - `weight`: importance for the profile health score (3 = core, 2 = important, 1 = optional).
+ * - `minChars`: below this the section counts as "thin" (half credit) in the health score.
+ */
+export const BUSINESS_SECTION_META: Record<
+  BusinessSectionKey,
+  {
+    group: BusinessSectionGroup;
+    nature: 'FACT' | 'STRATEGY' | 'RULES';
+    weight: 1 | 2 | 3;
+    minChars: number;
+  }
+> = {
+  OVERVIEW: { group: 'IDENTITY', nature: 'FACT', weight: 3, minChars: 400 },
+  SERVICES: { group: 'IDENTITY', nature: 'FACT', weight: 3, minChars: 400 },
+  VALUE_PROPOSITION: { group: 'IDENTITY', nature: 'STRATEGY', weight: 2, minChars: 250 },
+  COMPETITORS: { group: 'IDENTITY', nature: 'FACT', weight: 1, minChars: 200 },
+  TARGET_MARKET: { group: 'AUDIENCE', nature: 'STRATEGY', weight: 3, minChars: 300 },
+  PERSONAS: { group: 'AUDIENCE', nature: 'STRATEGY', weight: 3, minChars: 500 },
+  FAQ: { group: 'AUDIENCE', nature: 'FACT', weight: 1, minChars: 250 },
+  BRAND_VOICE: { group: 'BRAND', nature: 'STRATEGY', weight: 3, minChars: 300 },
+  BRAND_BOOK: { group: 'BRAND', nature: 'RULES', weight: 2, minChars: 250 },
+  KEY_MESSAGES: { group: 'BRAND', nature: 'STRATEGY', weight: 2, minChars: 150 },
+  GOALS: { group: 'STRATEGY', nature: 'STRATEGY', weight: 2, minChars: 200 },
+  CONTENT_PILLARS: { group: 'STRATEGY', nature: 'STRATEGY', weight: 2, minChars: 300 },
+  CHANNELS: { group: 'STRATEGY', nature: 'FACT', weight: 2, minChars: 150 },
+  CALENDAR: { group: 'STRATEGY', nature: 'STRATEGY', weight: 1, minChars: 200 },
+  GUIDELINES: { group: 'RULES', nature: 'RULES', weight: 3, minChars: 200 },
+};
+
+/** Groups with their sections, in display order. */
+export const BUSINESS_SECTION_GROUPS: {
+  group: BusinessSectionGroup;
+  keys: BusinessSectionKey[];
+}[] = BusinessSectionGroup.map((group) => ({
+  group,
+  keys: (Object.keys(BUSINESS_SECTION_META) as BusinessSectionKey[]).filter(
+    (k) => BUSINESS_SECTION_META[k].group === group,
+  ),
+}));
 
 export const SectionSource = ['ADMIN', 'AI'] as const;
 export type SectionSource = (typeof SectionSource)[number];
@@ -131,6 +194,27 @@ export const BusinessDiscoveryResultSchema = z.object({
 });
 export type BusinessDiscoveryResult = z.infer<typeof BusinessDiscoveryResultSchema>;
 
+/** Kind of a key fact (the exact values content may quote: prices, numbers, dates, contacts …). */
+export const FactCategory = [
+  'IDENTITY',
+  'OFFER',
+  'PRICING',
+  'NUMBERS',
+  'CONTACT',
+  'LEGAL',
+  'OTHER',
+] as const;
+export type FactCategory = (typeof FactCategory)[number];
+
+/** A key fact AI found while researching; saved unverified until the admin confirms it. */
+export const ResearchedFactSchema = z.object({
+  label: z.string().describe('Short name of the fact, e.g. "Card delivery fee" or "Founded"'),
+  value: z.string().describe('The exact value as stated by the source'),
+  category: z.enum(FactCategory),
+  sourceUrl: z.string().describe('URL of the source that states it, or ""'),
+});
+export type ResearchedFact = z.infer<typeof ResearchedFactSchema>;
+
 export const BusinessBuildResultSchema = z.object({
   name: z.string(),
   tagline: z.string().describe('One-line description / slogan, or ""'),
@@ -143,6 +227,11 @@ export const BusinessBuildResultSchema = z.object({
       content: z.string().describe('Section content in Markdown'),
     }),
   ),
+  facts: z
+    .array(ResearchedFactSchema)
+    .describe(
+      'Up to 25 exact, source-backed facts content may quote (prices, limits, fees, numbers, dates, official contacts, license/legal facts). Only facts a source states; none invented.',
+    ),
   gaps: z
     .array(z.string())
     .describe('Facts that could not be verified and parts the admin should complete or check'),
@@ -166,7 +255,7 @@ export const CreateBusinessSchema = z.object({
 });
 export type CreateBusinessInput = z.input<typeof CreateBusinessSchema>;
 
-export const UpdateBusinessSchema = CreateBusinessSchema.partial().extend({
+export const UpdateBusinessSchema = patchOf(CreateBusinessSchema).extend({
   status: z.enum(BusinessStatus).optional(),
 });
 export type UpdateBusinessInput = z.input<typeof UpdateBusinessSchema>;
@@ -350,8 +439,11 @@ export interface BusinessSection {
   key: BusinessSectionKey;
   content: string;
   source: SectionSource;
+  /** When a person confirmed the current text (null = AI text nobody has reviewed yet). */
+  reviewedAt: string | null;
   updatedAt: string;
   updatedBy?: { id: string; name: string } | null;
+  reviewedBy?: { id: string; name: string } | null;
 }
 
 export interface BusinessSectionRevision {
@@ -400,6 +492,8 @@ export interface Business {
   sections?: BusinessSection[];
   topics?: { id: string; title: string; status: string }[];
   pendingSuggestions?: number;
+  /** The current user's access to this business (admins: EDIT; docs/17). */
+  access?: AccessLevel | null;
 }
 
 export interface BusinessDiscovery {

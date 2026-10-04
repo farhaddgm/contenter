@@ -20,6 +20,7 @@ import {
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
 
@@ -151,11 +152,13 @@ export class BrandDocsService {
 export class BrandDocsController {
   constructor(private readonly docs: BrandDocsService) {}
 
+  @TopicScoped('topic', 'topicId')
   @Get('topics/:topicId/brand-docs')
   list(@Param('topicId') topicId: string) {
     return this.docs.list(topicId);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Post('topics/:topicId/brand-docs')
   create(
     @Param('topicId') topicId: string,
@@ -165,16 +168,19 @@ export class BrandDocsController {
     return this.docs.create(topicId, body, user);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Get('topics/:topicId/ai-context')
   aiContext(@Param('topicId') topicId: string) {
     return this.docs.aiContext(topicId);
   }
 
+  @TopicScoped('brandDoc')
   @Get('brand-docs/:id')
   get(@Param('id') id: string) {
     return this.docs.get(id);
   }
 
+  @TopicScoped('brandDoc')
   @Patch('brand-docs/:id')
   update(
     @Param('id') id: string,
@@ -184,6 +190,7 @@ export class BrandDocsController {
     return this.docs.update(id, body, user);
   }
 
+  @TopicScoped('brandDoc')
   @Delete('brand-docs/:id')
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {

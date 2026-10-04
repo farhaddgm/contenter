@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Module, Param, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Module,
+  NotFoundException,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import {
   CreatePromptVersionSchema,
   JobListQuerySchema,
@@ -6,6 +16,7 @@ import {
 } from '@contenter/shared';
 import { z } from 'zod';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { AccessService } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { QueueService } from '../../infra/queue/queue.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
@@ -13,14 +24,32 @@ import { PromptService } from '../ai/prompts/prompt.service';
 
 const JobQuery = JobListQuerySchema.extend({ topicId: z.string().optional() });
 
-/** Any signed-in user can poll a job they triggered. */
+/**
+ * Any signed-in user can poll a job they started; someone else's job needs access to its topic or
+ * business (docs/17).
+ */
 @Controller('jobs')
 export class JobsController {
-  constructor(private readonly jobs: AiJobsService) {}
+  constructor(
+    private readonly jobs: AiJobsService,
+    private readonly access: AccessService,
+  ) {}
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.jobs.get(id);
+  async get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    const job = await this.jobs.get(id);
+    if (user.role === 'ADMIN' || job.createdById === user.id) return job;
+    if (job.topicId) {
+      await this.access.assert(user, 'topic', job.topicId, 'VIEW');
+    } else if (job.targetType === 'Business') {
+      await this.access.assert(user, 'business', job.targetId, 'VIEW');
+    } else if (job.targetType === 'BusinessAsset') {
+      const target = await this.access.targetOf('businessAsset', job.targetId);
+      if (target?.id) await this.access.assert(user, 'business', target.id, 'VIEW');
+    } else {
+      throw new NotFoundException('Job not found');
+    }
+    return job;
   }
 }
 

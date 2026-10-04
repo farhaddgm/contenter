@@ -4,6 +4,7 @@ name: contenter
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: contenter
       POSTGRES_PASSWORD: contenter
@@ -20,6 +21,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - '6379:6379'
     volumes:
@@ -32,6 +34,7 @@ services:
 
   api:
     profiles: [app]
+    restart: unless-stopped
     build: { context: ., dockerfile: apps/api/Dockerfile }
     # worker runs the same image; it is built once here and reused below
     image: contenter-api:latest
@@ -53,6 +56,7 @@ services:
 
   worker:
     profiles: [app]
+    restart: unless-stopped
     image: contenter-api:latest
     pull_policy: never
     env_file: apps/api/.env
@@ -71,6 +75,7 @@ services:
 
   web:
     profiles: [app]
+    restart: unless-stopped
     build: { context: ., dockerfile: apps/web/Dockerfile }
     depends_on: [api]
     ports:

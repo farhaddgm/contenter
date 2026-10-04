@@ -29,6 +29,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { AccessService, TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -43,10 +44,13 @@ export class TopicsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly access: AccessService,
   ) {}
 
-  async list(query: z.infer<typeof TopicListQuerySchema>) {
+  async list(query: z.infer<typeof TopicListQuerySchema>, user: AuthUser) {
+    const visible = this.access.visibleTopics(user);
     const where: Prisma.TopicWhereInput = {
+      ...(visible ? { AND: [visible] } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.businessId ? { businessId: query.businessId } : {}),
       ...(query.q
@@ -62,30 +66,38 @@ export class TopicsService {
       this.prisma.topic.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
-        include: COUNTS,
+        include: { ...COUNTS, ...this.access.memberInclude(user) },
         ...paginate(query),
       }),
       this.prisma.topic.count({ where }),
     ]);
-    return toPage(items, total, query);
+    return toPage(
+      items.map((t) => this.access.withAccess(user, t)),
+      total,
+      query,
+    );
   }
 
-  async get(id: string) {
-    const topic = await this.prisma.topic.findUnique({ where: { id }, include: COUNTS });
+  async get(id: string, user?: AuthUser) {
+    const topic = await this.prisma.topic.findUnique({
+      where: { id },
+      include: { ...COUNTS, ...(user ? this.access.memberInclude(user) : {}) },
+    });
     if (!topic) throw new NotFoundException('Topic not found');
-    return topic;
+    return user ? this.access.withAccess(user, topic) : topic;
   }
 
-  /** A topic may only be linked to an existing business. */
-  private async assertBusiness(businessId: string | null | undefined) {
+  /** A topic may only be linked to an existing business the user can see (docs/17). */
+  private async assertBusiness(businessId: string | null | undefined, user: AuthUser) {
     if (!businessId) return;
-    const exists = await this.prisma.business.count({ where: { id: businessId } });
-    if (!exists) throw new BadRequestException('Business not found');
+    if (!(await this.access.accessTo(user, 'business', businessId))) {
+      throw new BadRequestException('Business not found');
+    }
   }
 
   async create(input: CreateTopicInput, user: AuthUser) {
     const data = CreateTopicSchema.parse(input);
-    await this.assertBusiness(data.businessId);
+    await this.assertBusiness(data.businessId, user);
     const topic = await this.prisma.topic.create({ data: { ...data, createdById: user.id } });
     this.audit.log({
       userId: user.id,
@@ -98,7 +110,12 @@ export class TopicsService {
 
   async update(id: string, input: UpdateTopicInput, user: AuthUser) {
     const data = UpdateTopicSchema.parse(input);
-    await this.assertBusiness(data.businessId);
+    const current = await this.prisma.topic.findUnique({
+      where: { id },
+      select: { businessId: true },
+    });
+    // only a new link is checked, so editing a topic linked to a hidden business still works
+    if (data.businessId !== current?.businessId) await this.assertBusiness(data.businessId, user);
     const topic = await this.prisma.topic.update({ where: { id }, data });
     this.audit.log({
       userId: user.id,
@@ -181,8 +198,9 @@ export class TopicsController {
   @Get()
   list(
     @Query(new ZodValidationPipe(TopicListQuerySchema)) query: z.infer<typeof TopicListQuerySchema>,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.topics.list(query);
+    return this.topics.list(query, user);
   }
 
   @Post()
@@ -193,11 +211,13 @@ export class TopicsController {
     return this.topics.create(body, user);
   }
 
+  @TopicScoped('topic')
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.topics.get(id);
+  get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.topics.get(id, user);
   }
 
+  @TopicScoped('topic')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -214,11 +234,13 @@ export class TopicsController {
     return this.topics.remove(id, user);
   }
 
+  @TopicScoped('topic')
   @Get(':id/principles')
   principles(@Param('id') id: string) {
     return this.topics.listPrinciples(id);
   }
 
+  @TopicScoped('topic')
   @Post(':id/principles')
   addPrinciple(
     @Param('id') id: string,
@@ -248,6 +270,7 @@ export class PrinciplesController {
     return this.topics.createPrinciple(null, body, user);
   }
 
+  @TopicScoped('principle')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -257,6 +280,7 @@ export class PrinciplesController {
     return this.topics.updatePrinciple(id, body, user);
   }
 
+  @TopicScoped('principle')
   @Delete(':id')
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {

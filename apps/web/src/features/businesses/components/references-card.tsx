@@ -30,6 +30,7 @@ import { notify } from '@/stores/notifications';
 import { formatDate, formatNumber } from '@/utils/format';
 import {
   useAddReference,
+  useCanEditBusiness,
   useDeleteReference,
   useDriveStatus,
   useReference,
@@ -315,8 +316,7 @@ function ReferenceViewDialog({
 /** The admin's own sources for AI: list, add, view snapshot, refresh, enable/disable, delete. */
 export function ReferencesCard({ businessId }: { businessId: string }) {
   const t = useT();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
+  const editable = useCanEditBusiness(businessId);
   const { data, isLoading } = useReferences(businessId);
   const update = useUpdateReference(businessId);
   const refresh = useRefreshReference(businessId);

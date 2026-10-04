@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  checkTerms,
   ContentListQuerySchema,
   EditContentVersionSchema,
   GenerateContentSchema,
@@ -29,6 +30,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { AccessService, TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -46,10 +48,13 @@ export class ContentsService {
     private readonly prisma: PrismaService,
     private readonly jobs: AiJobsService,
     private readonly audit: AuditService,
+    private readonly access: AccessService,
   ) {}
 
-  async list(query: z.infer<typeof ContentListQuerySchema>) {
+  async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
+    const visible = this.access.visibleTopics(user);
     const where: Prisma.ContentWhereInput = {
+      ...(visible ? { topic: visible } : {}),
       ...(query.topicId ? { topicId: query.topicId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
@@ -78,6 +83,23 @@ export class ContentsService {
     });
     if (!c) throw new NotFoundException('Content not found');
     return c;
+  }
+
+  /**
+   * Content with its versions plus the brand terminology check of the current version: the
+   * linked business's USE/AVOID terms matched by code (checkTerms), never by the model.
+   */
+  async detail(id: string) {
+    const c = await this.get(id);
+    const v = c.currentVersion;
+    if (!v) return { ...c, termIssues: [] };
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: c.topicId },
+      select: { business: { select: { terms: { where: { isActive: true } } } } },
+    });
+    const terms = topic?.business?.terms ?? [];
+    const text = [v.title, v.body, v.hashtags.join(' '), v.cta].join('\n');
+    return { ...c, termIssues: terms.length ? checkTerms(text, terms) : [] };
   }
 
   /** Creates the content shell (status GENERATING) and queues the AI draft. */
@@ -211,10 +233,12 @@ export class ContentsController {
   list(
     @Query(new ZodValidationPipe(ContentListQuerySchema))
     query: z.infer<typeof ContentListQuerySchema>,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.contents.list(query);
+    return this.contents.list(query, user);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Post('topics/:topicId/contents/generate')
   @HttpCode(202)
   generate(
@@ -225,11 +249,13 @@ export class ContentsController {
     return this.contents.generate(topicId, body, user);
   }
 
+  @TopicScoped('content')
   @Get('contents/:id')
   get(@Param('id') id: string) {
-    return this.contents.get(id);
+    return this.contents.detail(id);
   }
 
+  @TopicScoped('content')
   @Patch('contents/:id')
   update(
     @Param('id') id: string,
@@ -239,6 +265,7 @@ export class ContentsController {
     return this.contents.update(id, body, user);
   }
 
+  @TopicScoped('content')
   @Post('contents/:id/revise')
   @HttpCode(202)
   revise(
@@ -249,6 +276,7 @@ export class ContentsController {
     return this.contents.revise(id, body, user);
   }
 
+  @TopicScoped('content')
   @Put('contents/:id/current')
   edit(
     @Param('id') id: string,
@@ -258,6 +286,7 @@ export class ContentsController {
     return this.contents.editVersion(id, body, user);
   }
 
+  @TopicScoped('content')
   @Post('contents/:id/versions/:versionId/restore')
   restore(
     @Param('id') id: string,
@@ -267,6 +296,7 @@ export class ContentsController {
     return this.contents.restoreVersion(id, versionId, user);
   }
 
+  @TopicScoped('content')
   @Delete('contents/:id')
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {

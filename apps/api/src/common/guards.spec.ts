@@ -14,8 +14,11 @@ function ctx(method: string, role: Role | null): ExecutionContext {
   } as unknown as ExecutionContext;
 }
 
-function guard(required?: Role[]) {
-  const reflector = { getAllAndOverride: () => required } as unknown as Reflector;
+function guard(required?: Role[], topicScoped = false) {
+  const reflector = {
+    getAllAndOverride: () => required,
+    get: () => (topicScoped ? { via: 'topic', param: 'id' } : undefined),
+  } as unknown as Reflector;
   return new RolesGuard(reflector);
 }
 
@@ -26,6 +29,12 @@ describe('RolesGuard', () => {
   it('makes VIEWER read-only', () => {
     expect(guard().canActivate(ctx('GET', 'VIEWER'))).toBe(true);
     expect(() => guard().canActivate(ctx('POST', 'VIEWER'))).toThrow(ForbiddenException);
+  });
+  it('leaves project routes to the per-project grant', () => {
+    expect(guard(undefined, true).canActivate(ctx('POST', 'VIEWER'))).toBe(true);
+    expect(() => guard(['ADMIN'], true).canActivate(ctx('POST', 'VIEWER'))).toThrow(
+      ForbiddenException,
+    );
   });
   it('lets EDITOR mutate by default', () => {
     expect(guard().canActivate(ctx('POST', 'EDITOR'))).toBe(true);

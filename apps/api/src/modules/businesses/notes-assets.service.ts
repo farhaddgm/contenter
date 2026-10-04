@@ -94,6 +94,7 @@ export class BusinessNotesService {
         text: data.text,
         apply: data.apply,
         scope: data.scope,
+        isActive: data.standing,
         createdById: user.id,
       },
     });

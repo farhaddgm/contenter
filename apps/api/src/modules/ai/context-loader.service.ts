@@ -2,9 +2,22 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
-/** What `formatBusiness` needs: the sections and the usable brand assets (newest first). */
+/**
+ * What `formatBusiness` needs: the sections (with review state), active key facts and
+ * terminology, and the usable brand assets (newest first).
+ */
 export const BUSINESS_PROMPT_INCLUDE = {
-  sections: { select: { key: true, content: true } },
+  sections: { select: { key: true, content: true, source: true, reviewedAt: true } },
+  facts: {
+    where: { isActive: true },
+    orderBy: [{ category: 'asc' }, { createdAt: 'asc' }],
+    select: { label: true, value: true, category: true, verified: true, validUntil: true },
+  },
+  terms: {
+    where: { isActive: true },
+    orderBy: [{ kind: 'asc' }, { createdAt: 'asc' }],
+    select: { term: true, kind: true, alternatives: true, note: true },
+  },
   assets: {
     where: { isActive: true },
     orderBy: { createdAt: 'desc' },

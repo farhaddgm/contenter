@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Search, Pencil } from 'lucide-react';
+import { FolderKey, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import {
   CreateUserSchema,
+  LoginMethod,
   Role,
   UpdateUserSchema,
+  isGmail,
   type CreateUserInput,
   type UpdateUserInput,
   type User,
@@ -13,74 +15,92 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Drawer } from '@/components/ui/dialog';
 import { Field, Input, Select, Switch } from '@/components/ui/form-controls';
-import { PageHeader } from '@/components/ui/misc';
+import { PageHeader, Segmented } from '@/components/ui/misc';
 import { Pagination, Table, type Column } from '@/components/ui/table';
 import { useT } from '@/i18n';
 import { useUser } from '@/lib/auth';
 import { useDebounce } from '@/hooks/use-debounce';
 import { notify } from '@/stores/notifications';
 import { formatDate, formatRelative } from '@/utils/format';
-import { useCreateUser, useUpdateUser, useUsers } from '@/features/admin/api';
+import { useCreateUser, useDeleteUser, useUpdateUser, useUsers } from '@/features/admin/api';
+import { AccessDialog } from '@/features/users/components/access-dialog';
 
-function UserDrawer({
-  user,
-  open,
-  onOpenChange,
-}: {
-  user: User | null;
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-}) {
+type FormValues = CreateUserInput & UpdateUserInput;
+
+/** Create / edit a user. Mounted only while open, so defaults need no reset. */
+function UserDrawer({ user, onClose }: { user: User | null; onClose: () => void }) {
   const t = useT();
+  const me = useUser();
   const create = useCreateUser();
   const update = useUpdateUser();
-  const isEdit = !!user;
-  const googleOnly = user?.loginMethod === 'GOOGLE';
-  const form = useForm<CreateUserInput & UpdateUserInput>({
-    resolver: zodResolver(isEdit ? UpdateUserSchema : CreateUserSchema) as never,
+  const form = useForm<FormValues>({
+    resolver: zodResolver(user ? UpdateUserSchema : CreateUserSchema) as never,
+    defaultValues: user
+      ? { name: user.name, role: user.role, isActive: user.isActive, loginMethod: user.loginMethod }
+      : { name: '', email: '', role: 'EDITOR', loginMethod: 'PASSWORD' },
   });
-
-  useEffect(() => {
-    if (open) {
-      form.reset(
-        user
-          ? { name: user.name, role: user.role, isActive: user.isActive, password: '' }
-          : { name: '', email: '', password: '', role: 'EDITOR' },
-      );
-    }
-  }, [open, user, form]);
+  const [method, isActive, email] = useWatch({
+    control: form.control,
+    name: ['loginMethod', 'isActive', 'email'],
+  });
+  const current = method ?? 'PASSWORD';
+  // Gmail sign-in is the owner's call (docs/11) and only works for @gmail.com addresses.
+  const canChooseMethod = !!me?.isOwner && isGmail(user?.email ?? email ?? '');
+  const needsPassword =
+    current !== 'GOOGLE' && (!user || !user.hasPassword || user.loginMethod === 'GOOGLE');
+  const errors = form.formState.errors;
 
   const onSubmit = form.handleSubmit((values) => {
+    if (needsPassword && !values.password) {
+      form.setError('password', { message: t('googleAccess.passwordRequired') });
+      return;
+    }
+    const password = current !== 'GOOGLE' && values.password ? values.password : undefined;
     const done = {
       onSuccess: () => {
-        notify.success(isEdit ? t('common.saved') : t('users.created'));
-        onOpenChange(false);
+        notify.success(user ? t('common.saved') : t('users.created'));
+        onClose();
       },
       onError: (e: Error) => notify.error(t('common.error'), e.message),
     };
     if (user) {
-      const { name, role, isActive, password } = values;
+      const { name, role, isActive: active } = values;
       update.mutate(
-        { id: user.id, data: { name, role, isActive, ...(password ? { password } : {}) } },
+        {
+          id: user.id,
+          data: {
+            name,
+            role,
+            isActive: active,
+            ...(current !== user.loginMethod ? { loginMethod: current } : {}),
+            ...(password ? { password } : {}),
+          },
+        },
         done,
       );
     } else {
-      create.mutate(values as CreateUserInput, done);
+      const { email: address, name, role } = values;
+      create.mutate({ email: address, name, role, loginMethod: current, password }, done);
     }
   });
 
-  const errors = form.formState.errors;
-  const isActive = useWatch({ control: form.control, name: 'isActive' });
+  const methodHint = canChooseMethod
+    ? t(`users.methodHint.${current}`)
+    : me?.isOwner
+      ? t('users.methodGmailOnly')
+      : t('users.methodOwnerOnly');
+
   return (
     <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={isEdit ? t('common.edit') : t('users.new')}
+      open
+      onOpenChange={(v) => !v && onClose()}
+      title={user ? t('common.edit') : t('users.new')}
       footer={
         <>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button type="submit" form="user-form" isLoading={create.isPending || update.isPending}>
@@ -90,10 +110,15 @@ function UserDrawer({
       }
     >
       <form id="user-form" onSubmit={onSubmit} className="space-y-4">
+        {user && (
+          <p className="text-sm text-muted-foreground" dir="ltr">
+            {user.email}
+          </p>
+        )}
         <Field label={t('users.name')} error={errors.name?.message}>
           {(id) => <Input id={id} {...form.register('name')} />}
         </Field>
-        {!isEdit && (
+        {!user && (
           <Field label={t('users.email')} error={errors.email?.message}>
             {(id) => <Input id={id} dir="ltr" type="email" {...form.register('email')} />}
           </Field>
@@ -107,13 +132,32 @@ function UserDrawer({
             />
           )}
         </Field>
-        {googleOnly ? (
-          <p className="rounded-md bg-muted px-3 py-2 text-xs leading-6 text-muted-foreground">
-            {t('users.googleManaged')}
-          </p>
-        ) : (
+        <Field label={t('users.loginMethod')} hint={methodHint}>
+          {() => (
+            <div>
+              {canChooseMethod ? (
+                <Segmented
+                  value={current}
+                  onChange={(v) => {
+                    form.setValue('loginMethod', v);
+                    form.clearErrors('password');
+                  }}
+                  options={LoginMethod.map((m) => ({
+                    value: m,
+                    label: t(`enums.loginMethod.${m}`),
+                  }))}
+                />
+              ) : (
+                <Badge tone={current === 'PASSWORD' ? 'outline' : 'neutral'}>
+                  {t(`enums.loginMethod.${current}`)}
+                </Badge>
+              )}
+            </div>
+          )}
+        </Field>
+        {current !== 'GOOGLE' && (
           <Field
-            label={isEdit ? t('users.resetPassword') : t('users.password')}
+            label={needsPassword ? t('users.password') : t('users.resetPassword')}
             error={errors.password?.message}
           >
             {(id) => (
@@ -122,14 +166,12 @@ function UserDrawer({
                 dir="ltr"
                 type="password"
                 autoComplete="new-password"
-                {...form.register('password', {
-                  setValueAs: (v) => (isEdit && !v ? undefined : v),
-                })}
+                {...form.register('password', { setValueAs: (v) => v || undefined })}
               />
             )}
           </Field>
         )}
-        {isEdit && (
+        {user && (
           <Switch
             checked={!!isActive}
             onCheckedChange={(v) => form.setValue('isActive', v)}
@@ -147,8 +189,9 @@ export default function UsersRoute() {
   const [q, setQ] = useState('');
   const debouncedQ = useDebounce(q);
   const me = useUser();
-  const [editing, setEditing] = useState<User | null>(null);
-  const [open, setOpen] = useState(false);
+  const [drawer, setDrawer] = useState<{ user: User | null } | null>(null);
+  const [accessFor, setAccessFor] = useState<User | null>(null);
+  const remove = useDeleteUser();
   const { data, isLoading } = useUsers({ page, q: debouncedQ });
 
   const columns: Column<User>[] = [
@@ -216,18 +259,51 @@ export default function UsersRoute() {
       header: '',
       className: 'text-end',
       cell: (u) => (
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          disabled={u.isOwner && !me?.isOwner}
-          aria-label={t('common.edit')}
-          onClick={() => {
-            setEditing(u);
-            setOpen(true);
-          }}
-        >
-          <Pencil />
-        </Button>
+        <div className="flex justify-end">
+          {me?.isOwner && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              disabled={u.role === 'ADMIN'}
+              title={u.role === 'ADMIN' ? t('users.accessAdmin') : t('users.accessButton')}
+              aria-label={t('users.accessButton')}
+              onClick={() => setAccessFor(u)}
+            >
+              <FolderKey />
+            </Button>
+          )}
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            disabled={u.isOwner && !me?.isOwner}
+            aria-label={t('common.edit')}
+            onClick={() => setDrawer({ user: u })}
+          >
+            <Pencil />
+          </Button>
+          <ConfirmationDialog
+            trigger={
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={u.isOwner || u.id === me?.id}
+                aria-label={t('users.delete')}
+              >
+                <Trash2 />
+              </Button>
+            }
+            title={t('users.delete')}
+            body={t('users.deleteBody', { name: u.name })}
+            confirmLabel={t('users.delete')}
+            isLoading={remove.isPending}
+            onConfirm={() =>
+              remove
+                .mutateAsync(u.id)
+                .then(() => notify.success(t('users.deleted')))
+                .catch((e: Error) => notify.error(t('common.error'), e.message))
+            }
+          />
+        </div>
       ),
     },
   ];
@@ -238,13 +314,7 @@ export default function UsersRoute() {
         title={t('users.title')}
         description={t('users.subtitle')}
         actions={
-          <Button
-            icon={<Plus />}
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
+          <Button icon={<Plus />} onClick={() => setDrawer({ user: null })}>
             {t('users.new')}
           </Button>
         }
@@ -274,7 +344,8 @@ export default function UsersRoute() {
           />
         )}
       </Card>
-      <UserDrawer user={editing} open={open} onOpenChange={setOpen} />
+      {drawer && <UserDrawer user={drawer.user} onClose={() => setDrawer(null)} />}
+      {accessFor && <AccessDialog user={accessFor} onClose={() => setAccessFor(null)} />}
     </>
   );
 }

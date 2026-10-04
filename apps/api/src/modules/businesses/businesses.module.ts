@@ -58,6 +58,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
+import { AccessService, BusinessScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -72,6 +73,8 @@ import {
   BusinessNotesService,
 } from './notes-assets.service';
 import { PodSpaceService } from './podspace.service';
+import { ProfileKnowledgeController } from './profile-knowledge.controller';
+import { ProfileKnowledgeService } from './profile-knowledge.service';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
 
@@ -94,12 +97,15 @@ export class BusinessesService {
     private readonly references: ReferencesService,
     private readonly assets: BusinessAssetsService,
     private readonly storage: FileStorageService,
+    private readonly access: AccessService,
   ) {}
 
   // ---------- businesses ----------
 
-  async list(query: z.infer<typeof BusinessListQuerySchema>) {
+  async list(query: z.infer<typeof BusinessListQuerySchema>, user: AuthUser) {
+    const visible = this.access.visibleBusinesses(user);
     const where: Prisma.BusinessWhereInput = {
+      ...(visible ? { AND: [visible] } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.q
         ? {
@@ -118,6 +124,7 @@ export class BusinessesService {
         include: {
           _count: { select: { topics: true, suggestions: { where: { status: 'PENDING' } } } },
           sections: { select: { content: true } },
+          ...this.access.memberInclude(user),
         },
         ...paginate(query),
       }),
@@ -125,7 +132,7 @@ export class BusinessesService {
     ]);
     return toPage(
       items.map(({ sections, _count, ...b }) => ({
-        ...b,
+        ...this.access.withAccess(user, b),
         filledSections: sections.filter((s) => s.content.trim()).length,
         pendingSuggestions: _count.suggestions,
         _count: { topics: _count.topics },
@@ -136,26 +143,33 @@ export class BusinessesService {
   }
 
   /** Lightweight list for pickers (topic form). */
-  options() {
+  options(user: AuthUser) {
     return this.prisma.business.findMany({
+      where: this.access.visibleBusinesses(user),
       orderBy: { name: 'asc' },
       select: { id: true, name: true, status: true },
     });
   }
 
-  async get(id: string) {
+  async get(id: string, user: AuthUser) {
     const b = await this.prisma.business.findUnique({
       where: { id },
       include: {
-        sections: { include: { updatedBy: USER_REF } },
-        topics: { select: { id: true, title: true, status: true }, orderBy: { updatedAt: 'desc' } },
+        sections: { include: { updatedBy: USER_REF, reviewedBy: USER_REF } },
+        // only the projects this user may open (docs/17)
+        topics: {
+          where: this.access.visibleTopics(user),
+          select: { id: true, title: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
         _count: { select: { topics: true, suggestions: { where: { status: 'PENDING' } } } },
+        ...this.access.memberInclude(user),
       },
     });
     if (!b) throw new NotFoundException('Business not found');
     const { _count, ...rest } = b;
     return {
-      ...rest,
+      ...this.access.withAccess(user, rest),
       filledSections: b.sections.filter((s) => s.content.trim()).length,
       pendingSuggestions: _count.suggestions,
       _count: { topics: _count.topics },
@@ -322,6 +336,8 @@ export class BusinessesService {
         content,
         source,
         userId: user.id,
+        // The admin read and accepted it.
+        reviewed: true,
       });
     });
     await this.touch(s.businessId);
@@ -414,16 +430,20 @@ export class BusinessesService {
 
   // ---------- keyword discovery ----------
 
-  discoveries() {
+  /** Keyword searches are private to whoever ran them; admins see all (docs/17). */
+  discoveries(user: AuthUser) {
     return this.prisma.businessDiscovery.findMany({
+      where: user.role === 'ADMIN' ? {} : { createdById: user.id },
       orderBy: { createdAt: 'desc' },
       take: RECENT_DISCOVERIES,
     });
   }
 
-  async discovery(id: string) {
+  async discovery(id: string, user: AuthUser) {
     const d = await this.prisma.businessDiscovery.findUnique({ where: { id } });
-    if (!d) throw new NotFoundException('Discovery not found');
+    if (!d || (user.role !== 'ADMIN' && d.createdById !== user.id)) {
+      throw new NotFoundException('Discovery not found');
+    }
     return d;
   }
 
@@ -445,7 +465,7 @@ export class BusinessesService {
 
   /** The admin approves a candidate: create the business and research its full profile. */
   async selectCandidate(discoveryId: string, input: SelectCandidateInput, user: AuthUser) {
-    const d = await this.discovery(discoveryId);
+    const d = await this.discovery(discoveryId, user);
     if (d.status !== 'READY' && d.status !== 'USED') {
       throw new BadRequestException('The research has not finished yet');
     }
@@ -564,7 +584,7 @@ export class BusinessesService {
 
   /** Same as removeSource, for the sources of a keyword discovery. */
   async removeDiscoverySource(discoveryId: string, input: RemoveSourceInput, user: AuthUser) {
-    const d = await this.discovery(discoveryId);
+    const d = await this.discovery(discoveryId, user);
     const data = RemoveSourceSchema.parse(input);
     const sources = d.sources as unknown as WebSource[];
     const kept = sources.filter((s) => s.url !== data.url);
@@ -709,13 +729,14 @@ export class BusinessesController {
   list(
     @Query(new ZodValidationPipe(BusinessListQuerySchema))
     query: z.infer<typeof BusinessListQuerySchema>,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.businesses.list(query);
+    return this.businesses.list(query, user);
   }
 
   @Get('options')
-  options() {
-    return this.businesses.options();
+  options(@CurrentUser() user: AuthUser) {
+    return this.businesses.options(user);
   }
 
   @Post()
@@ -736,29 +757,31 @@ export class BusinessesController {
     return this.businesses.createFromReferences(body, user);
   }
 
+  @BusinessScoped('business')
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.businesses.get(id);
+  get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.businesses.get(id, user);
   }
 
+  @BusinessScoped('business')
   @Get(':id/references')
   references(@Param('id') id: string) {
     return this.refs.list(id);
   }
 
+  @BusinessScoped('business')
   @Post(':id/references')
-  @Roles('ADMIN', 'EDITOR')
   async addReference(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(AddReferenceSchema)) body: AddReferenceInput,
     @CurrentUser() user: AuthUser,
   ) {
-    await this.businesses.get(id);
+    await this.businesses.get(id, user);
     return this.refs.add(id, body, user);
   }
 
+  @BusinessScoped('business')
   @Patch(':id')
-  @Roles('ADMIN', 'EDITOR')
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateBusinessSchema)) body: UpdateBusinessInput,
@@ -774,8 +797,8 @@ export class BusinessesController {
     return this.businesses.remove(id, user);
   }
 
+  @BusinessScoped('business')
   @Put(':id/sections/:key')
-  @Roles('ADMIN', 'EDITOR')
   updateSection(
     @Param('id') id: string,
     @Param('key', SectionKeyPipe) key: BusinessSectionKey,
@@ -785,11 +808,13 @@ export class BusinessesController {
     return this.businesses.updateSection(id, key, body, user);
   }
 
+  @BusinessScoped('business')
   @Get(':id/sections/:key/revisions')
   revisions(@Param('id') id: string, @Param('key', SectionKeyPipe) key: BusinessSectionKey) {
     return this.businesses.revisions(id, key);
   }
 
+  @BusinessScoped('business')
   @Get(':id/suggestions')
   suggestions(
     @Param('id') id: string,
@@ -804,8 +829,8 @@ export class BusinessesController {
     return this.businesses.suggestions(id, status);
   }
 
+  @BusinessScoped('business')
   @Post(':id/suggest')
-  @Roles('ADMIN', 'EDITOR')
   suggest(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(SuggestBusinessSchema)) body: SuggestBusinessInput,
@@ -814,8 +839,8 @@ export class BusinessesController {
     return this.businesses.suggest(id, body, user);
   }
 
+  @BusinessScoped('business')
   @Post(':id/sources/remove')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(200)
   removeSource(
     @Param('id') id: string,
@@ -825,8 +850,8 @@ export class BusinessesController {
     return this.businesses.removeSource(id, body, user);
   }
 
+  @BusinessScoped('business')
   @Post(':id/build')
-  @Roles('ADMIN', 'EDITOR')
   build(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(BuildBusinessSchema)) body: BuildBusinessInput,
@@ -843,13 +868,14 @@ export class BusinessItemsController {
     private readonly refs: ReferencesService,
   ) {}
 
+  @BusinessScoped('businessReference')
   @Get('business-references/:id')
   reference(@Param('id') id: string) {
     return this.refs.get(id);
   }
 
+  @BusinessScoped('businessReference')
   @Patch('business-references/:id')
-  @Roles('ADMIN', 'EDITOR')
   updateReference(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateReferenceSchema)) body: UpdateReferenceInput,
@@ -858,28 +884,28 @@ export class BusinessItemsController {
     return this.refs.update(id, body, user);
   }
 
+  @BusinessScoped('businessReference')
   @Post('business-references/:id/refresh')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(200)
   refreshReference(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.refs.refresh(id, user);
   }
 
+  @BusinessScoped('businessReference')
   @Delete('business-references/:id')
-  @Roles('ADMIN', 'EDITOR')
   @HttpCode(204)
   removeReference(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.refs.remove(id, user);
   }
 
+  @BusinessScoped('businessRevision')
   @Post('business-revisions/:id/restore')
-  @Roles('ADMIN', 'EDITOR')
   restore(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.businesses.restoreRevision(id, user);
   }
 
+  @BusinessScoped('businessSuggestion')
   @Post('business-suggestions/:id/accept')
-  @Roles('ADMIN', 'EDITOR')
   accept(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(AcceptSuggestionSchema)) body: AcceptSuggestionInput,
@@ -888,15 +914,15 @@ export class BusinessItemsController {
     return this.businesses.acceptSuggestion(id, body, user);
   }
 
+  @BusinessScoped('businessSuggestion')
   @Post('business-suggestions/:id/dismiss')
-  @Roles('ADMIN', 'EDITOR')
   dismiss(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.businesses.dismissSuggestion(id, user);
   }
 
   @Get('business-discoveries')
-  discoveries() {
-    return this.businesses.discoveries();
+  discoveries(@CurrentUser() user: AuthUser) {
+    return this.businesses.discoveries(user);
   }
 
   @Post('business-discoveries')
@@ -909,8 +935,8 @@ export class BusinessItemsController {
   }
 
   @Get('business-discoveries/:id')
-  discovery(@Param('id') id: string) {
-    return this.businesses.discovery(id);
+  discovery(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.businesses.discovery(id, user);
   }
 
   @Post('business-discoveries/:id/select')
@@ -958,7 +984,12 @@ export class BusinessItemsController {
 
 @Module({
   imports: [SamplesCoreModule, GoogleDriveModule],
-  controllers: [BusinessesController, BusinessItemsController, BusinessNotesAssetsController],
+  controllers: [
+    BusinessesController,
+    BusinessItemsController,
+    BusinessNotesAssetsController,
+    ProfileKnowledgeController,
+  ],
   providers: [
     BusinessesService,
     ReferencesService,
@@ -966,6 +997,7 @@ export class BusinessItemsController {
     BusinessNotesService,
     BusinessAssetsService,
     AssetUploadInterceptor,
+    ProfileKnowledgeService,
   ],
   exports: [BusinessesService],
 })

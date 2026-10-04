@@ -1,18 +1,42 @@
 import { Controller, Get, Injectable, Module } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { AiJobType, DashboardStats } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
-import { Public } from '../../common/auth.decorators';
+import { CurrentUser, Public, type AuthUser } from '../../common/auth.decorators';
+import { AccessService } from '../../common/access';
 import { QueueService } from '../../infra/queue/queue.service';
 
 const DAYS = 14;
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
 
-  async stats(): Promise<DashboardStats> {
+  /** Admins see everything; others only their projects and the jobs they started (docs/17). */
+  async stats(user: AuthUser): Promise<DashboardStats> {
     const since = new Date(Date.now() - (DAYS - 1) * 86_400_000);
     since.setUTCHours(0, 0, 0, 0);
+
+    const visible = this.access.visibleTopics(user);
+    const ids = visible
+      ? (await this.prisma.topic.findMany({ where: visible, select: { id: true } })).map(
+          (t) => t.id,
+        )
+      : null;
+    const inTopics = ids ? { topicId: { in: ids } } : {};
+    const jobWhere: Prisma.AiJobWhereInput = ids
+      ? { OR: [{ topicId: { in: ids } }, { createdById: user.id }] }
+      : {};
+    // raw SQL needs the same filters; an empty IN () is invalid, so use a sentinel id
+    const topicSql = ids
+      ? Prisma.sql`AND "topicId" IN (${Prisma.join(ids.length ? ids : [''])})`
+      : Prisma.empty;
+    const jobSql = ids
+      ? Prisma.sql`AND ("topicId" IN (${Prisma.join(ids.length ? ids : [''])}) OR "createdById" = ${user.id})`
+      : Prisma.empty;
 
     const [
       topics,
@@ -28,30 +52,32 @@ export class DashboardService {
       dailyJobs,
       dailyContents,
     ] = await Promise.all([
-      this.prisma.topic.count(),
-      this.prisma.sampleContent.count(),
-      this.prisma.contentProfile.count(),
-      this.prisma.idea.count(),
-      this.prisma.content.count(),
+      this.prisma.topic.count({ where: visible }),
+      this.prisma.sampleContent.count({ where: inTopics }),
+      this.prisma.contentProfile.count({ where: inTopics }),
+      this.prisma.idea.count({ where: inTopics }),
+      this.prisma.content.count({ where: inTopics }),
       this.prisma.user.count(),
-      this.prisma.content.groupBy({ by: ['status'], _count: { _all: true } }),
-      this.prisma.aiJob.groupBy({ by: ['status'], _count: { _all: true } }),
+      this.prisma.content.groupBy({ by: ['status'], where: inTopics, _count: { _all: true } }),
+      this.prisma.aiJob.groupBy({ by: ['status'], where: jobWhere, _count: { _all: true } }),
       this.prisma.aiJob.groupBy({
         by: ['type'],
+        where: jobWhere,
         _count: { _all: true },
         _sum: { costUsd: true, inputTokens: true, outputTokens: true },
       }),
       this.prisma.aiJob.findMany({
+        where: jobWhere,
         orderBy: { createdAt: 'desc' },
         take: 8,
         include: { createdBy: { select: { id: true, name: true } } },
       }),
       this.prisma.$queryRaw<{ day: Date; jobs: bigint; cost: number | null }[]>`
           SELECT date_trunc('day', "createdAt") AS day, COUNT(*) AS jobs, SUM("costUsd") AS cost
-          FROM "AiJob" WHERE "createdAt" >= ${since} GROUP BY 1`,
+          FROM "AiJob" WHERE "createdAt" >= ${since} ${jobSql} GROUP BY 1`,
       this.prisma.$queryRaw<{ day: Date; contents: bigint }[]>`
           SELECT date_trunc('day', "createdAt") AS day, COUNT(*) AS contents
-          FROM "Content" WHERE "createdAt" >= ${since} GROUP BY 1`,
+          FROM "Content" WHERE "createdAt" >= ${since} ${topicSql} GROUP BY 1`,
     ]);
 
     const key = (d: Date) => d.toISOString().slice(0, 10);
@@ -96,8 +122,8 @@ export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
 
   @Get()
-  stats() {
-    return this.dashboard.stats();
+  stats(@CurrentUser() user: AuthUser) {
+    return this.dashboard.stats(user);
   }
 }
 

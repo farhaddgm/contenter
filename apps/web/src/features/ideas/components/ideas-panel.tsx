@@ -11,7 +11,7 @@ import { Segmented } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState, Pagination } from '@/components/ui/table';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
+import { useCanEditTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -123,7 +123,7 @@ function IdeateDialog({
 
 function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void }) {
   const t = useT();
-  const { can } = useAuthorization();
+  const editable = useCanEditTopic(idea.topicId);
   const update = useUpdateIdea();
   const remove = useDeleteIdea();
   const setStatus = (status: IdeaStatus) => update.mutate({ id: idea.id, data: { status } });
@@ -168,7 +168,7 @@ function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void })
           </details>
         )}
       </div>
-      {can('content:write') && (
+      {editable && (
         <div className="flex flex-wrap items-center gap-1 border-t px-3 py-2">
           <Button
             size="sm"
@@ -226,7 +226,7 @@ function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void })
 
 export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfile: boolean }) {
   const t = useT();
-  const { can } = useAuthorization();
+  const editable = useCanEditTopic(topicId);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<IdeaStatus | ''>('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -239,7 +239,7 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
     onDone: () => setJobId(null),
   });
 
-  const generateButton = can('content:write') && (
+  const generateButton = editable && (
     <Button icon={<Sparkles />} onClick={ideateDialog.open} disabled={isRunning}>
       {t('ideas.generate')}
     </Button>

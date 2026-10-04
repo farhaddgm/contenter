@@ -50,7 +50,9 @@ model User {
   walkerIssues        WalkerIssue[]
   brandDocuments      BrandDocument[]
   businesses          Business[]
-  businessSections    BusinessSection[]
+  businessSections    BusinessSection[]         @relation("SectionUpdatedBy")
+  reviewedSections    BusinessSection[]         @relation("SectionReviewedBy")
+  businessFacts       BusinessFact[]
   sectionRevisions    BusinessSectionRevision[]
   businessDiscovery   BusinessDiscovery[]
   blockedSources      BlockedSource[]
@@ -58,6 +60,10 @@ model User {
   googleDriveAccounts GoogleDriveAccount[]
   businessNotes       BusinessNote[]
   businessAssets      BusinessAsset[]
+  topicMemberships    TopicMember[]             @relation("TopicMemberUser")
+  topicGrants         TopicMember[]             @relation("TopicMemberGrantedBy")
+  businessMemberships BusinessMember[]          @relation("BusinessMemberUser")
+  businessGrants      BusinessMember[]          @relation("BusinessMemberGrantedBy")
 }
 
 model RefreshToken {
@@ -109,6 +115,9 @@ enum BusinessSectionKey {
   CONTENT_PILLARS
   GUIDELINES
   CHANNELS
+  GOALS
+  FAQ
+  CALENDAR
 }
 
 enum SectionSource {
@@ -162,24 +171,50 @@ model Business {
   references  BusinessReference[]
   notes       BusinessNote[]
   assets      BusinessAsset[]
+  facts       BusinessFact[]
+  terms       BusinessTerm[]
+  audits      BusinessAudit[]
+  members     BusinessMember[]
 
   @@index([status, updatedAt])
 }
 
+/// Grants a non-admin user access to a business, like TopicMember (docs/17-project-access.md).
+model BusinessMember {
+  id          String      @id @default(cuid())
+  businessId  String
+  userId      String
+  access      AccessLevel
+  grantedById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user      User     @relation("BusinessMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User?    @relation("BusinessMemberGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+}
+
 /// One profile section of a business (services, personas, brand book, …). Markdown text.
 model BusinessSection {
-  id          String             @id @default(cuid())
-  businessId  String
-  key         BusinessSectionKey
-  content     String             @default("")
-  source      SectionSource      @default(ADMIN)
-  updatedById String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id           String             @id @default(cuid())
+  businessId   String
+  key          BusinessSectionKey
+  content      String             @default("")
+  source       SectionSource      @default(ADMIN)
+  updatedById  String?
+  /// When a person confirmed the current text; null = AI text nobody has reviewed yet
+  reviewedAt   DateTime?
+  reviewedById String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  business  Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  updatedBy User?                     @relation(fields: [updatedById], references: [id], onDelete: SetNull)
-  revisions BusinessSectionRevision[]
+  business   Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy  User?                     @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  reviewedBy User?                     @relation("SectionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  revisions  BusinessSectionRevision[]
 
   @@unique([businessId, key])
 }
@@ -379,6 +414,91 @@ model BusinessAsset {
   @@index([businessId, createdAt])
 }
 
+enum FactCategory {
+  IDENTITY
+  OFFER
+  PRICING
+  NUMBERS
+  CONTACT
+  LEGAL
+  OTHER
+}
+
+/// Exact value content may quote (price, fee, limit, number, date, contact, license …).
+/// Admin-typed facts are verified; facts found by a research build start unverified.
+model BusinessFact {
+  id          String        @id @default(cuid())
+  businessId  String
+  label       String
+  value       String
+  category    FactCategory  @default(OTHER)
+  sourceUrl   String        @default("")
+  note        String        @default("")
+  source      SectionSource @default(ADMIN)
+  verified    Boolean       @default(true)
+  /// After this day the value is no longer sent to AI (offers, rates, campaigns)
+  validUntil  DateTime?
+  isActive    Boolean       @default(true)
+  updatedById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, category])
+}
+
+enum TermKind {
+  USE
+  AVOID
+}
+
+/// Brand terminology: USE = always write `term` (alternatives = wrong variants to catch);
+/// AVOID = never write `term` (alternatives = replacements). Checked by code (checkTerms).
+model BusinessTerm {
+  id           String   @id @default(cuid())
+  businessId   String
+  term         String
+  kind         TermKind @default(USE)
+  alternatives String[]
+  note         String   @default("")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+enum AuditStatus {
+  RUNNING
+  READY
+  FAILED
+}
+
+/// AI quality review of the whole profile (BUSINESS_AUDIT). `issues` holds AuditIssue[] with
+/// their OPEN / FIXING / DISMISSED state.
+model BusinessAudit {
+  id          String      @id @default(cuid())
+  businessId  String
+  status      AuditStatus @default(RUNNING)
+  score       Int?
+  summary     String      @default("")
+  strengths   String[]
+  issues      Json        @default("[]")
+  error       String?
+  jobId       String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+}
+
 enum SourceBlockKind {
   URL
   DOMAIN
@@ -418,6 +538,12 @@ enum TopicStatus {
   ARCHIVED
 }
 
+/// Per-topic / per-business access for EDITOR/VIEWER accounts (admins see everything)
+enum AccessLevel {
+  VIEW
+  EDIT
+}
+
 model Topic {
   id              String      @id @default(cuid())
   title           String
@@ -443,9 +569,29 @@ model Topic {
   ideas         Idea[]
   contents      Content[]
   brandDocs     BrandDocument[]
+  members       TopicMember[]
 
   @@index([status, createdAt])
   @@index([businessId])
+}
+
+/// Grants a non-admin user access to a project. The creator has EDIT without a row; a row
+/// overrides that (e.g. VIEW). See docs/17-project-access.md.
+model TopicMember {
+  id          String      @id @default(cuid())
+  topicId     String
+  userId      String
+  access      AccessLevel
+  grantedById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  topic     Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user      User  @relation("TopicMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("TopicMemberGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([topicId, userId])
+  @@index([userId])
 }
 
 enum PrincipleKind {
@@ -762,6 +908,7 @@ enum AiJobType {
   BUSINESS_SUGGEST
   BUSINESS_REVISE
   BUSINESS_ASSET_ANALYZE
+  BUSINESS_AUDIT
 }
 
 enum AiJobStatus {

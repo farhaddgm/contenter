@@ -22,6 +22,7 @@ import {
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
@@ -102,6 +103,7 @@ export class IdeasService {
 export class IdeasController {
   constructor(private readonly ideas: IdeasService) {}
 
+  @TopicScoped('topic', 'topicId')
   @Get('topics/:topicId/ideas')
   list(
     @Param('topicId') topicId: string,
@@ -110,6 +112,7 @@ export class IdeasController {
     return this.ideas.list(topicId, query);
   }
 
+  @TopicScoped('topic', 'topicId')
   @Post('topics/:topicId/ideas/generate')
   @HttpCode(202)
   ideate(
@@ -120,6 +123,7 @@ export class IdeasController {
     return this.ideas.ideate(topicId, body, user);
   }
 
+  @TopicScoped('idea')
   @Patch('ideas/:id')
   update(
     @Param('id') id: string,
@@ -129,6 +133,7 @@ export class IdeasController {
     return this.ideas.update(id, body, user);
   }
 
+  @TopicScoped('idea')
   @Delete('ideas/:id')
   @HttpCode(204)
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {

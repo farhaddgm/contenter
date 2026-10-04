@@ -78,11 +78,21 @@ export function useBusinessOptions() {
   });
 }
 
-export function useBusiness(id: string) {
+export function useBusiness(id: string | undefined) {
   return useQuery({
-    queryKey: businessKeys.one(id),
+    queryKey: businessKeys.one(id ?? ''),
     queryFn: () => api.get<Business>(`/businesses/${id}`),
+    enabled: !!id,
   });
+}
+
+/**
+ * Whether the current user may change this business: admins always, others with an EDIT grant or
+ * as its creator (docs/17). Reuses the cached business, so it is cheap to call per card.
+ */
+export function useCanEditBusiness(businessId: string | undefined) {
+  const { data } = useBusiness(businessId);
+  return data?.access === 'EDIT';
 }
 
 function useInvalidateBusinesses() {

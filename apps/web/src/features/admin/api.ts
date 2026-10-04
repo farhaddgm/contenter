@@ -11,9 +11,11 @@ import type {
   DashboardStats,
   Paginated,
   PromptTemplate,
+  SetAccessInput,
   UpdateGoogleAccessInput,
   UpdateUserInput,
   User,
+  UserAccess,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
 
@@ -48,7 +50,45 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateUserInput }) =>
       api.patch<User>(`/admin/users/${id}`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['users'] });
+      void qc.invalidateQueries({ queryKey: ['google-access'] });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/users/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['users'] });
+      void qc.invalidateQueries({ queryKey: ['google-access'] });
+    },
+  });
+}
+
+// ---------- topic / business access of a user (owner only, docs/17) ----------
+export function useUserAccess(userId: string) {
+  return useQuery({
+    queryKey: ['user-access', userId],
+    queryFn: () => api.get<UserAccess>(`/owner/users/${userId}/access`),
+  });
+}
+
+export function useSetAccess(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      kind,
+      id,
+      data,
+    }: {
+      kind: 'topics' | 'businesses';
+      id: string;
+      data: SetAccessInput;
+    }) => api.put(`/owner/users/${userId}/${kind}/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['user-access', userId] }),
   });
 }
 

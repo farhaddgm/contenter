@@ -21,6 +21,11 @@ const PRICES: Record<string, Price> = {
   'claude-sonnet-4-6': { input: 3, output: 15 },
   'claude-haiku-4-5': { input: 1, output: 5 },
   // OpenAI — cached input is billed at a discount, there is no cache-write charge.
+  'gpt-6-sol': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 },
+  'gpt-6-luna': { input: 0.1, output: 0.5, cacheRead: 0.1, cacheWrite: 0 },
+  'gpt-5.6-sol': { input: 5, output: 30, cacheRead: 0.1, cacheWrite: 0 },
+  'gpt-5.6-terra': { input: 2, output: 12, cacheRead: 0.1, cacheWrite: 0 },
+  'gpt-5.6-luna': { input: 0.2, output: 1.2, cacheRead: 0.1, cacheWrite: 0 },
   'gpt-5.2': { input: 1.75, output: 14, cacheRead: 0.1, cacheWrite: 0 },
   'gpt-5.1': { input: 1.25, output: 10, cacheRead: 0.1, cacheWrite: 0 },
   'gpt-5': { input: 1.25, output: 10, cacheRead: 0.1, cacheWrite: 0 },

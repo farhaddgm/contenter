@@ -13,7 +13,7 @@ import {
   XCircle,
   AlertTriangle,
 } from 'lucide-react';
-import type { Content, ContentVersion } from '@contenter/shared';
+import type { Content, ContentVersion, TermIssue } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -24,7 +24,7 @@ import { CopyButton, MarkdownView, PageHeader } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
-import { useAuthorization } from '@/lib/auth';
+import { useCanEditTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -200,6 +200,82 @@ function EditDrawer({
   );
 }
 
+/** Brand glossary violations of the current version, found by code on the server (checkTerms). */
+function TermIssuesCard({
+  contentId,
+  issues,
+  canFix,
+}: {
+  contentId: string;
+  issues: TermIssue[];
+  /** The user may revise and no generation is running. */
+  canFix: boolean;
+}) {
+  const t = useT();
+  const revise = useReviseContent(contentId);
+  if (!issues.length) return null;
+  const line = (i: TermIssue) =>
+    t(`businesses.termIssue.${i.kind}`, {
+      found: i.found,
+      term: i.term,
+      count: formatNumber(i.count),
+    });
+  // One revision with every violation as feedback; the glossary itself also reaches the model.
+  const fix = () =>
+    revise.mutate(
+      [
+        t('contents.termFixFeedback'),
+        ...issues.map(
+          (i) =>
+            `- ${line(i)}${i.kind === 'AVOID' && i.replaceWith.length ? ` — ${t('businesses.termIssue.replace', { list: i.replaceWith.join('، ') })}` : ''}`,
+        ),
+      ].join('\n'),
+      {
+        onSuccess: () => notify.info(t('contents.reviseQueued')),
+        onError: (e) => notify.error(t('common.error'), e.message),
+      },
+    );
+  return (
+    <Card className="border-warning/50">
+      <CardHeader
+        title={
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-warning" />
+            {t('contents.termIssues')}
+          </span>
+        }
+        description={t('contents.termIssuesHint')}
+      />
+      <CardBody className="space-y-3">
+        <ul className="space-y-1.5 text-sm">
+          {issues.map((i, n) => (
+            <li key={n} className="rounded-md bg-warning/10 px-3 py-1.5 leading-6">
+              {line(i)}
+              {i.kind === 'AVOID' && i.replaceWith.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {' '}
+                  · {t('businesses.termIssue.replace', { list: i.replaceWith.join('، ') })}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+        {canFix && (
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<Send />}
+            isLoading={revise.isPending}
+            onClick={fix}
+          >
+            {t('contents.termFix')}
+          </Button>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
 function SelfCheckCard({ version }: { version: ContentVersion }) {
   const t = useT();
   const sc = version.selfCheck;
@@ -255,9 +331,8 @@ function SelfCheckCard({ version }: { version: ContentVersion }) {
 export function ContentView({ contentId }: { contentId: string }) {
   const t = useT();
   const navigate = useNavigate();
-  const { can } = useAuthorization();
-  const editable = can('content:write');
   const { data: content, isLoading } = useContent(contentId);
+  const editable = useCanEditTopic(content?.topicId);
   const lastJob = useJob(
     content?.status === 'FAILED' || content?.status === 'GENERATING' ? content.lastJobId : null,
   );
@@ -454,6 +529,13 @@ export function ContentView({ contentId }: { contentId: string }) {
           </div>
 
           <div className="space-y-4">
+            {version.id === content.currentVersionId && (
+              <TermIssuesCard
+                contentId={content.id}
+                issues={content.termIssues ?? []}
+                canFix={editable && !generating}
+              />
+            )}
             <SelfCheckCard version={version} />
             <Card>
               <CardHeader

@@ -1,6 +1,7 @@
 /**
  * API response shapes (what the web app receives).
  */
+import type { TermIssue } from './business-profile';
 import type {
   AiJobStatus,
   AiJobType,
@@ -16,6 +17,7 @@ import type {
   PrincipleKind,
   ProfileStatus,
   Role,
+  AccessLevel,
   TopicStatus,
   TraitCategory,
   TraitSource,
@@ -79,6 +81,26 @@ export interface Topic {
   createdAt: ISODate;
   updatedAt: ISODate;
   _count?: { samples: number; ideas: number; contents: number; profiles: number };
+  /** The current user's access to this project (admins: EDIT). */
+  access?: AccessLevel;
+}
+
+/** One topic or business in the owner's "access of this user" dialog (docs/17). */
+export interface UserAccessRow {
+  id: string;
+  name: string;
+  status: string;
+  /** The user created it (EDIT unless a grant says otherwise). */
+  isCreator: boolean;
+  /** Explicit grant, if any. */
+  granted: AccessLevel | null;
+  /** What the user can actually do (null = no access). */
+  effective: AccessLevel | null;
+}
+
+export interface UserAccess {
+  topics: UserAccessRow[];
+  businesses: UserAccessRow[];
 }
 
 export interface Principle {
@@ -243,6 +265,8 @@ export interface Content {
   versions?: ContentVersion[];
   topic?: Pick<Topic, 'id' | 'title'>;
   idea?: Pick<Idea, 'id' | 'title'> | null;
+  /** Detail only: brand terminology violations of the current version (linked business). */
+  termIssues?: TermIssue[];
 }
 
 export interface AiJob {

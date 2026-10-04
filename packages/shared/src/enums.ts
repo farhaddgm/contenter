@@ -29,6 +29,10 @@ export type Platform = (typeof Platform)[number];
 export const TopicStatus = ['ACTIVE', 'ARCHIVED'] as const;
 export type TopicStatus = (typeof TopicStatus)[number];
 
+/** Per-topic / per-business access of an EDITOR/VIEWER account; admins always EDIT (docs/17). */
+export const AccessLevel = ['VIEW', 'EDIT'] as const;
+export type AccessLevel = (typeof AccessLevel)[number];
+
 export const PrincipleKind = ['MUST', 'AVOID', 'PREFER'] as const;
 export type PrincipleKind = (typeof PrincipleKind)[number];
 
@@ -103,6 +107,7 @@ export const AiJobType = [
   'BUSINESS_SUGGEST',
   'BUSINESS_REVISE',
   'BUSINESS_ASSET_ANALYZE',
+  'BUSINESS_AUDIT',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 
