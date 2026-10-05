@@ -24,6 +24,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 - Never treat a shared host (Drive, social networks — `isSharedHost`) as "the business's site", and never store a sign-in page as content (`isLoginWall`).
 - References are read into a text snapshot in the request path (`ReferencesService`, no AI); runners only read the snapshot. Private Google Docs go through `GoogleDriveService` (encrypted refresh tokens via `SecretBox`).
 
+## Docoo service API (docs/18-docoo-integration.md)
+- `GET /api/integrations/docoo/{ping,businesses,businesses/:id/export}`: read-only, bearer `INTEGRATION_TOKEN` (route absent when unset), not tied to users/roles. The export document (`DocooBusinessExport` in `packages/shared/src/integration.ts`, built by the pure `buildDocooExport`) must stay deterministic apart from `exportedAt` — Docoo hashes it to detect changes — and must never contain people, files or secrets. Add fields additively; bump `DOCOO_EXPORT_SCHEMA_VERSION` only for breaking changes.
+
 ## Topic & business access (docs/17-project-access.md)
 - EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 
