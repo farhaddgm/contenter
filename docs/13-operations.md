@@ -107,6 +107,7 @@ df -h /
 | `ANTHROPIC_API_KEY` | کلید Claude؛ بعد از گذاشتن، در سایت ← تنظیمات مدل‌ها را به Claude تغییر دهید |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ورود با جیمیل ([11-google-login.md](11-google-login.md)) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | کلیدهای امنیتی ورود؛ هرگز پاک یا عوض نکنید مگر عمداً |
+| `INTEGRATION_TOKEN` | توکن خواندن کسب‌وکارها برای Docoo ([18-docoo-integration.md](18-docoo-integration.md)). خالی = خاموش؛ حداقل ۳۲ نویسه |
 | `FETCH_PROXY_URL` / `FETCH_PROXY_HOSTS` | پراکسی خروجی برای خواندن لینک‌ها (پایین را ببینید). پیش‌فرض: خالی / `ir` |
 
 اگر فقط بخشی از متغیرهای `GOOGLE_*` مقدار داشته باشد، دکمهٔ «ورود با گوگل» بی‌صدا پنهان می‌شود. از این پس `deploy.sh` در این حالت متوقف می‌شود و API هم هنگام شروع هشدار می‌دهد. `GOOGLE_CLIENT_SECRET` فقط در Google Cloud Console است (Credentials ← OAuth client). اگر از `.env` پاک شد، باید از همان‌جا دوباره برداشته شود.

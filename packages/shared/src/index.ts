@@ -7,3 +7,4 @@ export * from './ai-providers';
 export * from './business';
 export * from './business-assets';
 export * from './business-profile';
+export * from './integration';

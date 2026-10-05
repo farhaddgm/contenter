@@ -52,6 +52,15 @@ const EnvSchema = z.object({
     .url()
     .optional()
     .or(z.literal('').transform(() => undefined)),
+  /**
+   * Bearer token of the read-only service API other applications (Docoo) use to read businesses
+   * (docs/18-docoo-integration.md). Empty = the API is switched off. At least 32 characters.
+   */
+  INTEGRATION_TOKEN: z
+    .string()
+    .min(32)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   /** Encrypts stored OAuth refresh tokens. Default: derived from JWT_REFRESH_SECRET. */
   DATA_ENCRYPTION_KEY: z
     .string()

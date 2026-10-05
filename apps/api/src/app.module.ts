@@ -16,6 +16,7 @@ import { BusinessesModule } from './modules/businesses/businesses.module';
 import { ContentsModule } from './modules/contents/contents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IdeasModule } from './modules/ideas/ideas.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { SamplesModule } from './modules/samples/samples.module';
@@ -44,6 +45,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     GoogleAccessModule,
     GoogleDriveModule,
     BusinessesModule,
+    IntegrationsModule,
     TopicsModule,
     SamplesModule,
     ProfilesModule,
