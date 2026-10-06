@@ -234,7 +234,11 @@ describe('fetcher: proxy routing and errors', () => {
     const message = await fetcherWith({})
       .getJson('http://nothing.invalid.ir/x')
       .catch((e: Error) => e.message);
-    expect(message).toMatch(/Could not connect to nothing\.invalid\.ir.*FETCH_PROXY_URL/);
+    // Depending on the network's DNS, the lookup either fails fast ("Could not connect") or
+    // hangs until the timeout ("did not answer"); both must carry the proxy hint.
+    expect(message).toMatch(
+      /(Could not connect to nothing\.invalid\.ir|nothing\.invalid\.ir did not answer within).*FETCH_PROXY_URL/,
+    );
   });
 
   it('refuses downloads over the limit', async () => {
