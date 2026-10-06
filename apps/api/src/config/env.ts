@@ -61,6 +61,18 @@ const EnvSchema = z.object({
     .min(32)
     .optional()
     .or(z.literal('').transform(() => undefined)),
+  /** Independent, least-privilege business reader; never share Docoo credentials. */
+  RESEARCHER_INTEGRATION_TOKEN: z
+    .string()
+    .min(32)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** Explicit business IDs; empty means deny all. Wildcards are not supported. */
+  RESEARCHER_BUSINESS_ACCESS: z.enum(['selected', 'all']).default('selected'),
+  RESEARCHER_BUSINESS_IDS: z.string().default('').transform((value) =>
+    [...new Set(value.split(',').map((id) => id.trim()).filter(Boolean))],
+  ).refine((ids) => ids.every((id) => /^[A-Za-z0-9_-]{1,128}$/u.test(id)),
+    'Business IDs must be explicit identifiers, not wildcards'),
   /** Encrypts stored OAuth refresh tokens. Default: derived from JWT_REFRESH_SECRET. */
   DATA_ENCRYPTION_KEY: z
     .string()

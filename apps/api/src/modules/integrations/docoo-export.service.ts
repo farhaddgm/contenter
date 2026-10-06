@@ -18,8 +18,8 @@ export class DocooExportService {
     private readonly audit: AuditService,
   ) {}
 
-  async ping() {
-    const businesses = await this.prisma.business.count();
+  async ping(allowedIds?: string[]) {
+    const businesses = await this.prisma.business.count(allowedIds === undefined ? undefined : { where: { id: { in: allowedIds } } });
     return {
       ok: true,
       service: 'contenter',
@@ -29,8 +29,9 @@ export class DocooExportService {
   }
 
   /** The businesses a project can be linked to: light rows, newest change first. */
-  async list(query: DocooBusinessListQuery) {
+  async list(query: DocooBusinessListQuery, allowedIds?: string[]) {
     const where: Prisma.BusinessWhereInput = {
+      ...(allowedIds === undefined ? {} : { id: { in: allowedIds } }),
       ...(query.status ? { status: query.status } : {}),
       ...(query.q
         ? {
@@ -71,14 +72,14 @@ export class DocooExportService {
     return toPage(items, total, query);
   }
 
-  async export(id: string, ip: string | null) {
+  async export(id: string, ip: string | null, consumer: 'docoo' | 'researcher' = 'docoo') {
     const business = await this.prisma.business.findUnique({
       where: { id },
       include: EXPORT_INCLUDE,
     });
     if (!business) throw new NotFoundException('Business not found');
     this.audit.log({
-      action: 'integration.docoo_export',
+      action: `integration.${consumer}_export`,
       entityType: 'Business',
       entityId: id,
       meta: { schemaVersion: DOCOO_EXPORT_SCHEMA_VERSION },
