@@ -7,6 +7,7 @@ import {
   AiJobStatus,
   AiJobType,
   BrandDocKind,
+  CampaignStatus,
   ContentFormat,
   ContentStatus,
   IdeaStatus,
@@ -15,6 +16,7 @@ import {
   PrincipleKind,
   Role,
   AccessLevel,
+  TagColor,
   TopicStatus,
   TraitCategory,
   TraitStatus,
@@ -300,7 +302,55 @@ export type UpdateIdeaInput = z.infer<typeof UpdateIdeaSchema>;
 
 export const IdeaListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(IdeaStatus).optional(),
+  tagId: z.string().optional(),
 });
+
+// ---------- tags & campaigns ----------
+export const MAX_TAGS_PER_ITEM = 20;
+
+export const CreateTagSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  color: z.enum(TagColor).default('slate'),
+});
+export type CreateTagInput = z.input<typeof CreateTagSchema>;
+
+export const UpdateTagSchema = patchOf(CreateTagSchema);
+export type UpdateTagInput = z.input<typeof UpdateTagSchema>;
+
+/** Replaces the tags of one idea or content with exactly these (all must belong to its topic). */
+export const SetTagsSchema = z.object({
+  tagIds: z.array(z.string().min(1)).max(MAX_TAGS_PER_ITEM),
+});
+export type SetTagsInput = z.infer<typeof SetTagsSchema>;
+
+const campaignDate = z.iso.datetime({ offset: true }).nullable().optional();
+
+export const CreateCampaignSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    description: z.string().trim().max(5000).optional().default(''),
+    startsAt: campaignDate,
+    endsAt: campaignDate,
+  })
+  .refine((v) => !v.startsAt || !v.endsAt || new Date(v.startsAt) <= new Date(v.endsAt), {
+    path: ['endsAt'],
+    message: 'The end date cannot be before the start date',
+  });
+export type CreateCampaignInput = z.input<typeof CreateCampaignSchema>;
+
+export const UpdateCampaignSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120).optional(),
+    description: z.string().trim().max(5000).optional(),
+    status: z.enum(CampaignStatus).optional(),
+    startsAt: campaignDate,
+    endsAt: campaignDate,
+  })
+  .refine((v) => !v.startsAt || !v.endsAt || new Date(v.startsAt) <= new Date(v.endsAt), {
+    path: ['endsAt'],
+    message: 'The end date cannot be before the start date',
+  });
+export type UpdateCampaignInput = z.infer<typeof UpdateCampaignSchema>;
 
 // ---------- contents ----------
 export const GenerateContentSchema = z
@@ -323,6 +373,8 @@ export type ReviseContentInput = z.infer<typeof ReviseContentSchema>;
 export const UpdateContentSchema = z.object({
   status: z.enum(ContentStatus).optional(),
   title: z.string().trim().min(1).max(300).optional(),
+  /** null removes the content from its campaign. */
+  campaignId: z.string().min(1).nullable().optional(),
 });
 export type UpdateContentInput = z.infer<typeof UpdateContentSchema>;
 
@@ -338,6 +390,8 @@ export type EditContentVersionInput = z.input<typeof EditContentVersionSchema>;
 export const ContentListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(ContentStatus).optional(),
   topicId: z.string().optional(),
+  tagId: z.string().optional(),
+  campaignId: z.string().optional(),
 });
 
 // ---------- jobs ----------

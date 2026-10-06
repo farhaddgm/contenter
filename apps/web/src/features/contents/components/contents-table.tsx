@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Loader2, Search } from 'lucide-react';
 import type { Content, ContentStatus } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/form-controls';
+import { Input, Select } from '@/components/ui/form-controls';
 import { Segmented } from '@/components/ui/misc';
 import { EmptyState, Pagination, Table, type Column } from '@/components/ui/table';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
 import { useDebounce } from '@/hooks/use-debounce';
 import { formatNumber, formatRelative } from '@/utils/format';
+import { useCampaigns } from '@/features/campaigns/api/campaigns';
+import { useTags } from '@/features/tags/api/tags';
+import { TagChips } from '@/features/tags/components/tag-chip';
 import { useContents } from '../api/contents';
 
 export function ContentsTable({
@@ -22,24 +25,38 @@ export function ContentsTable({
 }) {
   const t = useT();
   const navigate = useNavigate();
+  // a campaign card links here with `?campaign=<id>`; the filters then live in local state
+  const [search] = useSearchParams();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<ContentStatus | ''>('');
+  const [tagId, setTagId] = useState(search.get('tag') ?? '');
+  const [campaignId, setCampaignId] = useState(search.get('campaign') ?? '');
   const [q, setQ] = useState('');
   const debouncedQ = useDebounce(q);
-  const { data, isLoading } = useContents({ page, status, topicId, q: debouncedQ });
+  const tags = useTags(topicId);
+  const campaigns = useCampaigns(topicId);
+  const { data, isLoading } = useContents({
+    page,
+    status,
+    topicId,
+    tagId,
+    campaignId,
+    q: debouncedQ,
+  });
 
   const columns: Column<Content>[] = [
     {
       key: 'title',
       header: t('topics.fields.title'),
       cell: (c) => (
-        <div className="min-w-48">
+        <div className="min-w-48 space-y-1">
           <p className="line-clamp-1 font-medium" dir="auto">
             {c.title}
           </p>
           {c.idea && (
             <p className="line-clamp-1 text-xs text-muted-foreground">💡 {c.idea.title}</p>
           )}
+          <TagChips tags={c.tags} />
         </div>
       ),
     },
@@ -57,6 +74,22 @@ export function ContentsTable({
       header: t('contents.format'),
       cell: (c) => <Badge tone="outline">{t(`enums.contentFormat.${c.format}`)}</Badge>,
     },
+    ...(topicId
+      ? [
+          {
+            key: 'campaign',
+            header: t('campaigns.one'),
+            cell: (c: Content) =>
+              c.campaign ? (
+                <span className="text-xs" dir="auto">
+                  {c.campaign.name}
+                </span>
+              ) : (
+                '—'
+              ),
+          },
+        ]
+      : []),
     {
       key: 'status',
       header: t('common.status'),
@@ -122,6 +155,32 @@ export function ContentsTable({
             { value: 'REJECTED', label: t('enums.contentStatus.REJECTED') },
           ]}
         />
+        {!!tags.data?.length && (
+          <Select
+            className="h-9 w-44"
+            aria-label={t('tags.one')}
+            placeholder={t('tags.allTags')}
+            value={tagId}
+            onChange={(e) => {
+              setTagId(e.target.value);
+              setPage(1);
+            }}
+            options={tags.data.map((tag) => ({ value: tag.id, label: tag.name }))}
+          />
+        )}
+        {!!campaigns.data?.length && (
+          <Select
+            className="h-9 w-44"
+            aria-label={t('campaigns.one')}
+            placeholder={t('campaigns.allCampaigns')}
+            value={campaignId}
+            onChange={(e) => {
+              setCampaignId(e.target.value);
+              setPage(1);
+            }}
+            options={campaigns.data.map((c) => ({ value: c.id, label: c.name }))}
+          />
+        )}
       </div>
       <Table
         data={data?.items}

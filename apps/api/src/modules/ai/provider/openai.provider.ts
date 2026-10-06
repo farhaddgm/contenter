@@ -116,34 +116,20 @@ export class OpenAiProvider implements AiProvider {
     }
     const effort: OpenAiEffort =
       req.effort === 'xhigh' || req.effort === 'max' ? 'high' : req.effort;
-    let response: OpenAI.Responses.Response;
-    try {
-      response = await this.client.responses
-        .stream({
-          stream: true,
-          model: req.model,
-          instructions: req.system,
-          input: [{ role: 'user', content: [{ type: 'input_text', text: req.user }] }],
-          tools: [
-            {
-              type: 'web_search',
-              search_context_size: 'high',
-              ...(req.allowedDomains?.length
-                ? { filters: { allowed_domains: req.allowedDomains } }
-                : {}),
-            },
-          ],
-          include: ['web_search_call.action.sources'],
-          max_tool_calls: req.maxSearches,
-          max_output_tokens: req.maxTokens ?? 32_000,
-          store: false,
-          ...(isReasoningModel(req.model) ? { reasoning: { effort } } : {}),
-        })
-        .finalResponse();
-    } catch (err) {
-      throw permanentOrRaw(err);
+    const maxTokens = req.maxTokens ?? 32_000;
+    let response = await this.researchOnce(this.client, req, effort, maxTokens);
+    // Reasoning tokens share the output budget with the notes, so a deep search can use it all up
+    // before writing a word. Partial notes are still useful research; with none, retry once with
+    // less thinking and more room instead of failing the whole build.
+    if (response.status === 'incomplete' && response.incomplete_details?.reason === 'max_output_tokens') {
+      if (response.output_text.trim()) {
+        this.logger.warn(`Research hit the output limit; keeping the partial notes (${req.model})`);
+      } else {
+        this.logger.warn(`Research hit the output limit with no notes; retrying with "low" effort`);
+        response = await this.researchOnce(this.client, req, 'low', maxTokens * 2);
+      }
     }
-    if (response.status === 'incomplete') {
+    if (response.status === 'incomplete' && !response.output_text.trim()) {
       throw new NonRetryableAiError(
         `Research was cut off (${response.incomplete_details?.reason ?? 'incomplete'})`,
       );
@@ -185,6 +171,40 @@ export class OpenAiProvider implements AiProvider {
         webSearches: searches,
       },
     };
+  }
+
+  private async researchOnce(
+    client: OpenAI,
+    req: ResearchRequest,
+    effort: OpenAiEffort,
+    maxTokens: number,
+  ): Promise<OpenAI.Responses.Response> {
+    try {
+      return await client.responses
+        .stream({
+          stream: true,
+          model: req.model,
+          instructions: req.system,
+          input: [{ role: 'user', content: [{ type: 'input_text', text: req.user }] }],
+          tools: [
+            {
+              type: 'web_search',
+              search_context_size: 'high',
+              ...(req.allowedDomains?.length
+                ? { filters: { allowed_domains: req.allowedDomains } }
+                : {}),
+            },
+          ],
+          include: ['web_search_call.action.sources'],
+          max_tool_calls: req.maxSearches,
+          max_output_tokens: maxTokens,
+          store: false,
+          ...(isReasoningModel(req.model) ? { reasoning: { effort } } : {}),
+        })
+        .finalResponse();
+    } catch (err) {
+      throw permanentOrRaw(err);
+    }
   }
 
   private async call<T>(

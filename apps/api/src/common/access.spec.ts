@@ -47,6 +47,14 @@ function setup(grant: AccessLevel | null, meta: AccessScopeMeta | undefined) {
       findUnique: async ({ where }: { where: { id: string } }) =>
         where.id === 'i1' ? { topicId: 't1' } : null,
     },
+    tag: {
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        where.id === 'g1' ? { topicId: 't1' } : null,
+    },
+    campaign: {
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        where.id === 'k1' ? { topicId: 't1' } : null,
+    },
     principle: { findUnique: async () => ({ topicId: null }) },
   } as unknown as PrismaService;
   const reflector = { get: () => meta } as unknown as Reflector;
@@ -114,6 +122,19 @@ describe('AccessGuard', () => {
     ).rejects.toThrow(ForbiddenException);
     await expect(
       setup('EDIT', onNote).canActivate(ctx('DELETE', 'VIEWER', { id: 'n1' })),
+    ).resolves.toBe(true);
+  });
+  it('guards tags and campaigns through their topic', async () => {
+    const onTag: AccessScopeMeta = { via: 'tag', param: 'id' };
+    const onCampaign: AccessScopeMeta = { via: 'campaign', param: 'id' };
+    await expect(
+      setup(null, onTag).canActivate(ctx('PATCH', 'EDITOR', { id: 'g1' })),
+    ).rejects.toThrow(NotFoundException);
+    await expect(
+      setup('VIEW', onTag).canActivate(ctx('DELETE', 'EDITOR', { id: 'g1' })),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      setup('EDIT', onCampaign).canActivate(ctx('PATCH', 'VIEWER', { id: 'k1' })),
     ).resolves.toBe(true);
   });
   it('lets admins through without looking anything up', async () => {

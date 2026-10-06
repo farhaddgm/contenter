@@ -9,7 +9,7 @@ export const ideaKeys = {
 
 export function useIdeas(
   topicId: string,
-  params: { page: number; status?: IdeaStatus | ''; pageSize?: number; q?: string },
+  params: { page: number; status?: IdeaStatus | ''; tagId?: string; pageSize?: number; q?: string },
 ) {
   return useQuery({
     queryKey: ideaKeys.list(topicId, params),

@@ -572,9 +572,54 @@ model Topic {
   contents      Content[]
   brandDocs     BrandDocument[]
   members       TopicMember[]
+  tags          Tag[]
+  campaigns     Campaign[]
 
   @@index([status, createdAt])
   @@index([businessId])
+}
+
+/// Label an editor puts on ideas and contents of one topic (docs/20-tags-campaigns.md).
+model Tag {
+  id          String   @id @default(cuid())
+  topicId     String
+  name        String
+  /// One of the palette keys in `TagColor` (packages/shared); validated by Zod, not the DB
+  color       String   @default("slate")
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  topic    Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  contents Content[]
+  ideas    Idea[]
+
+  @@unique([topicId, name])
+}
+
+enum CampaignStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/// Groups the contents of one topic that serve one goal; the dates are optional, so a campaign
+/// without them works as a plain collection.
+model Campaign {
+  id          String         @id @default(cuid())
+  topicId     String
+  name        String
+  description String         @default("")
+  status      CampaignStatus @default(ACTIVE)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  topic    Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  contents Content[]
+
+  @@unique([topicId, name])
+  @@index([topicId, status])
 }
 
 /// Grants a non-admin user access to a project. The creator has EDIT without a row; a row
@@ -830,6 +875,7 @@ model Idea {
   topic    Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
   request  IdeationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
   contents Content[]
+  tags     Tag[]
 
   @@index([topicId, status, createdAt])
 }
@@ -855,6 +901,7 @@ model Content {
   topicId          String
   ideaId           String?
   profileId        String?
+  campaignId       String?
   title            String
   brief            String        @default("")
   format           ContentFormat @default(POST)
@@ -868,11 +915,14 @@ model Content {
   topic          Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
   idea           Idea?            @relation(fields: [ideaId], references: [id], onDelete: SetNull)
   profile        ContentProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  campaign       Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   currentVersion ContentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   versions       ContentVersion[] @relation("ContentVersions")
+  tags           Tag[]
 
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
+  @@index([campaignId])
 }
 
 model ContentVersion {

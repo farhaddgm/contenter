@@ -29,8 +29,18 @@ import { AiContextCard } from '@/features/brand-docs/components/ai-context-card'
 import { IdeasPanel } from '@/features/ideas/components/ideas-panel';
 import { ContentsTable } from '@/features/contents/components/contents-table';
 import { GenerateContentDialog } from '@/features/contents/components/generate-content';
+import { CampaignsPanel } from '@/features/campaigns/components/campaigns-panel';
+import { TagsManager } from '@/features/tags/components/tags-manager';
 
-const TABS = ['overview', 'principles', 'samples', 'profile', 'ideas', 'contents'] as const;
+const TABS = [
+  'overview',
+  'principles',
+  'samples',
+  'profile',
+  'ideas',
+  'contents',
+  'organize',
+] as const;
 type Tab = (typeof TABS)[number];
 
 export default function TopicRoute() {
@@ -149,6 +159,10 @@ export default function TopicRoute() {
             label: t('topics.tabs.contents'),
             badge: count(topic._count?.contents),
           },
+          {
+            to: paths.app.topic.getHref(topic.id, 'organize'),
+            label: t('topics.tabs.organize'),
+          },
         ]}
       />
 
@@ -188,6 +202,12 @@ export default function TopicRoute() {
         </div>
       )}
       {tab === 'contents' && <ContentsTable topicId={topic.id} />}
+      {tab === 'organize' && (
+        <div className="space-y-4">
+          <CampaignsPanel topicId={topic.id} />
+          <TagsManager topicId={topic.id} />
+        </div>
+      )}
 
       <TopicFormDrawer open={editDrawer.isOpen} onOpenChange={editDrawer.setIsOpen} topic={topic} />
       {generateDialog.isOpen && (

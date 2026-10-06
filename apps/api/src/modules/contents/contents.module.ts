@@ -35,11 +35,14 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { TAG_SELECT } from '../tags/tag-select';
 
 const LIST_INCLUDE = {
   topic: { select: { id: true, title: true } },
   idea: { select: { id: true, title: true } },
   currentVersion: { select: { id: true, version: true, selfCheck: true, createdAt: true } },
+  tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
+  campaign: { select: { id: true, name: true, status: true } },
 } satisfies Prisma.ContentInclude;
 
 @Injectable()
@@ -57,6 +60,8 @@ export class ContentsService {
       ...(visible ? { topic: visible } : {}),
       ...(query.topicId ? { topicId: query.topicId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.tagId ? { tags: { some: { id: query.tagId } } } : {}),
+      ...(query.campaignId ? { campaignId: query.campaignId } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
@@ -79,6 +84,8 @@ export class ContentsService {
         idea: { select: { id: true, title: true } },
         currentVersion: true,
         versions: { orderBy: { version: 'desc' } },
+        tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
+        campaign: { select: { id: true, name: true, status: true } },
       },
     });
     if (!c) throw new NotFoundException('Content not found');
@@ -107,7 +114,10 @@ export class ContentsService {
     const data = GenerateContentSchema.parse(input);
     await this.prisma.topic.findUniqueOrThrow({ where: { id: topicId } });
     const idea = data.ideaId
-      ? await this.prisma.idea.findFirst({ where: { id: data.ideaId, topicId } })
+      ? await this.prisma.idea.findFirst({
+          where: { id: data.ideaId, topicId },
+          include: { tags: { select: { id: true } } },
+        })
       : null;
     if (data.ideaId && !idea) throw new BadRequestException('Idea does not belong to this topic');
 
@@ -120,6 +130,8 @@ export class ContentsService {
         format: data.format ?? idea?.format ?? 'POST',
         status: 'GENERATING',
         createdById: user.id,
+        // a content written from a tagged idea starts with the idea's tags
+        ...(idea?.tags.length ? { tags: { connect: idea.tags } } : {}),
       },
     });
     const job = await this.jobs.enqueue({
@@ -202,6 +214,17 @@ export class ContentsService {
   async update(id: string, input: UpdateContentInput, user: AuthUser) {
     if (input.status === 'GENERATING' || input.status === 'FAILED') {
       throw new BadRequestException('Status is managed by the system');
+    }
+    if (input.campaignId) {
+      const content = await this.prisma.content.findUnique({
+        where: { id },
+        select: { topicId: true },
+      });
+      const campaign = await this.prisma.campaign.findFirst({
+        where: { id: input.campaignId, topicId: content?.topicId ?? '' },
+        select: { id: true },
+      });
+      if (!campaign) throw new BadRequestException('Campaign does not belong to this topic');
     }
     await this.prisma.content.update({ where: { id }, data: input });
     this.audit.log({

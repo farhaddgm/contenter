@@ -98,17 +98,21 @@
 ## ایده‌ها
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET | `/topics/:id/ideas?status&page&q` | فهرست |
+| GET | `/topics/:id/ideas?status&tagId&page&q` | فهرست |
 | POST | `/topics/:id/ideas/generate` | **۲۰۲** — `{ count, direction?, format? }` ← کار `IDEATE` |
 | PATCH / DELETE | `/ideas/:id` | تغییر وضعیت، ویرایش یا حذف |
+| PUT | `/ideas/:id/tags` | `{ tagIds }` — [20-tags-campaigns.md](20-tags-campaigns.md) |
+
+## برچسب‌ها و کمپین‌ها
+مسیرهای `/topics/:id/tags`، `/tags/:id`، `/topics/:id/campaigns` و `/campaigns/:id` و `PUT /contents/:id/tags` در [20-tags-campaigns.md](20-tags-campaigns.md) آمده‌اند.
 
 ## محتوا
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET | `/contents?topicId&status&q&page` | فهرست |
+| GET | `/contents?topicId&status&tagId&campaignId&q&page` | فهرست |
 | POST | `/topics/:id/contents/generate` | **۲۰۲** — `{ ideaId? , brief?, format? }` ← `{ jobId, contentId }` |
 | GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه |
-| PATCH | `/contents/:id` | `{ status?: DRAFT, IN_REVIEW, APPROVED یا REJECTED, title? }` |
+| PATCH | `/contents/:id` | `{ status?: DRAFT, IN_REVIEW, APPROVED یا REJECTED, title?, campaignId? }` |
 | POST | `/contents/:id/revise` | **۲۰۲** — `{ feedback }` ← کار `REVISE_CONTENT` |
 | PUT | `/contents/:id/current` | ویرایش دستی که نسخهٔ جدیدی با منبع `ADMIN` می‌سازد |
 | POST | `/contents/:id/versions/:versionId/restore` | بازگرداندن یک نسخه |
