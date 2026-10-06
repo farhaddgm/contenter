@@ -55,14 +55,32 @@ export class ContextLoader {
     });
   }
 
-  /** The business linked to the topic with its sections (the whole profile), or null. */
+  /**
+   * The business linked to the topic with its sections (the whole profile), or null. A topic
+   * without analyzed sample contents (skipped, or none yet) also gets the business's reference
+   * documents, so content rests on documents instead of samples (docs/19-optional-samples.md).
+   */
   async business(topicId: string) {
     const topic = await this.prisma.topic.findUniqueOrThrow({
       where: { id: topicId },
-      select: { businessId: true },
+      select: { businessId: true, samplesSkippedAt: true },
     });
     if (!topic.businessId) return null;
-    return this.businessById(topic.businessId);
+    const business = await this.businessById(topic.businessId);
+    if (!business) return null;
+    const analyzed = topic.samplesSkippedAt
+      ? 0
+      : await this.prisma.sampleContent.count({ where: { topicId, analysisStatus: 'DONE' } });
+    return { ...business, documents: analyzed > 0 ? [] : await this.documents(topic.businessId) };
+  }
+
+  /** Readable, active reference documents of a business (same rule as `usableWhere`). */
+  documents(businessId: string) {
+    return this.prisma.businessReference.findMany({
+      where: { businessId, status: 'READY', isActive: true, content: { not: '' } },
+      orderBy: { createdAt: 'asc' },
+      select: { title: true, url: true, content: true },
+    });
   }
 
   businessById(businessId: string) {

@@ -47,10 +47,11 @@ export class BuildProfileRunner implements AiRunner {
       this.ctx.activeProfile(topicId),
       this.ctx.brandDocs(topicId),
     ]);
-    const businessHasContent = !!business?.sections.some((s) => s.content.trim());
+    const businessHasContent =
+      !!business?.sections.some((s) => s.content.trim()) || !!business?.documents?.length;
     if (!analyzed.length && !brandDocs.length && !businessHasContent) {
       throw new NonRetryableAiError(
-        'Nothing to build from. Analyze at least one sample, add an active brand document, or link a business with a filled profile first.',
+        'Nothing to build from. Analyze at least one sample, add an active brand document, or link a business with a filled profile or reference documents first.',
       );
     }
 
@@ -72,7 +73,7 @@ export class BuildProfileRunner implements AiRunner {
                 result: s.analysis!.result as unknown as SampleAnalysisResult,
               })),
             )
-          : '(none — build the profile from the brand guidelines and the business profile)',
+          : '(none — build the profile from the brand guidelines, the business profile and the business documents)',
       },
     });
 

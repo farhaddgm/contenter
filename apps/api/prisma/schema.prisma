@@ -545,19 +545,21 @@ enum AccessLevel {
 }
 
 model Topic {
-  id              String      @id @default(cuid())
-  title           String
-  description     String
-  audience        String      @default("")
-  platform        Platform    @default(INSTAGRAM)
-  language        String      @default("fa")
-  status          TopicStatus @default(ACTIVE)
-  activeProfileId String?     @unique
+  id               String      @id @default(cuid())
+  title            String
+  description      String
+  audience         String      @default("")
+  platform         Platform    @default(INSTAGRAM)
+  language         String      @default("fa")
+  status           TopicStatus @default(ACTIVE)
+  activeProfileId  String?     @unique
   /// Business this project produces content for; its profile is sent to every AI job of the topic
-  businessId      String?
-  createdById     String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  businessId       String?
+  /// Set when the admin chose to produce content without sample contents (docs/19-optional-samples.md)
+  samplesSkippedAt DateTime?
+  createdById      String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
   business      Business?         @relation(fields: [businessId], references: [id], onDelete: SetNull)

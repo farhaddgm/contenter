@@ -27,6 +27,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Docoo service API (docs/18-docoo-integration.md)
 - `GET /api/integrations/docoo/{ping,businesses,businesses/:id/export}`: read-only, bearer `INTEGRATION_TOKEN` (route absent when unset), not tied to users/roles. The export document (`DocooBusinessExport` in `packages/shared/src/integration.ts`, built by the pure `buildDocooExport`) must stay deterministic apart from `exportedAt` — Docoo hashes it to detect changes — and must never contain people, files or secrets. Add fields additively; bump `DOCOO_EXPORT_SCHEMA_VERSION` only for breaking changes.
 
+## Optional samples (docs/19-optional-samples.md)
+- Sample contents are optional: `Topic.samplesSkippedAt` (set by `PUT /topics/:id/samples-skipped`) settles the `add_samples` / `analyze_samples` Walker steps. A topic with no analyzed samples (or skipped) gets the business's READY+active references as `documents` from `ContextLoader.business()`; `formatBusiness` appends them as `[DOCUMENTS]` in the `business` variable — never add a prompt variable for it.
+
 ## Topic & business access (docs/17-project-access.md)
 - EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 

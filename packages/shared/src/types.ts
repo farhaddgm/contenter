@@ -78,6 +78,8 @@ export interface Topic {
   activeProfileId: string | null;
   businessId: string | null;
   business?: { id: string; name: string } | null;
+  /** Set when the admin skipped the sample-contents step (content then rests on documents). */
+  samplesSkippedAt: ISODate | null;
   createdAt: ISODate;
   updatedAt: ISODate;
   _count?: { samples: number; ideas: number; contents: number; profiles: number };
@@ -204,7 +206,15 @@ export interface TopicAiContext {
   brandDocs: { id: string; title: string; kind: BrandDocKind; chars: number }[];
   activeProfile: { id: string; version: number; approvedTraits: number } | null;
   /** Linked business; its filled profile sections reach every AI job of the topic. */
-  business: { id: string; name: string; filledSections: number } | null;
+  business: {
+    id: string;
+    name: string;
+    filledSections: number;
+    /** Readable, active reference documents; they reach the topic's AI jobs while it has no analyzed samples. */
+    references: number;
+  } | null;
+  /** The admin skipped the sample-contents step. */
+  samplesSkipped: boolean;
 }
 
 export interface Idea {

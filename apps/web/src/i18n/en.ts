@@ -321,8 +321,9 @@ export const en: DeepStrings<Dictionary> = {
     },
     workflow: 'Workflow',
     steps: {
-      samples: 'Add sample content',
+      samples: 'Add sample content (optional)',
       analyze: 'Analyze samples with AI',
+      skipped: 'Skipped',
       profile: 'Build and approve the style profile',
       ideas: 'Generate ideas',
       contents: 'Produce content',
@@ -366,6 +367,8 @@ export const en: DeepStrings<Dictionary> = {
   aiContext: {
     business: 'Business',
     businessValue: '{{name}} · {{filled}} sections',
+    businessValueDocs: '{{name}} · {{filled}} sections · {{docs}} documents',
+    samplesSkipped: 'Skipped; documents are used',
     jobsEverything: 'every AI job',
     title: 'AI inputs for this topic',
     subtitle: 'These are passed to AI jobs as context.',
@@ -400,7 +403,17 @@ export const en: DeepStrings<Dictionary> = {
     refetch: 'Re-fetch link',
     analysisQueued: 'Analysis queued',
     empty: 'No samples yet.',
-    emptyHint: 'At least 3 samples are recommended for accurate style discovery.',
+    emptyHint:
+      'Sample content is optional; at least 3 samples are recommended for accurate style discovery.',
+    skip: 'Skip this step',
+    skipHint:
+      "Sample content is optional. If you skip it, content is produced from this project's business documents and the documents attached to it.",
+    skippedTitle: 'Sample content step skipped',
+    skippedHint:
+      "Content is produced from the business's reference documents and profile and the brand documents attached to this project. You can add samples at any time.",
+    resume: 'Undo skip',
+    skippedToast: 'Sample step skipped',
+    resumedToast: 'Sample step is active again',
     fetched: 'Fetched data',
     analysis: 'AI analysis',
     noText: 'No text could be extracted. Add it manually.',
@@ -428,7 +441,7 @@ export const en: DeepStrings<Dictionary> = {
     rebuild: 'Build new version with AI',
     buildQueued: 'Profile build queued',
     needsAnalysis:
-      'Building with AI needs at least one analyzed sample, an active brand document or a linked business with a filled profile — or create the profile manually.',
+      'Building with AI needs at least one analyzed sample, an active brand document or a linked business with a filled profile or reference documents — or create the profile manually.',
     createManual: 'Create manually',
     createTitle: 'Create a manual profile',
     createHint:
@@ -707,6 +720,11 @@ export const en: DeepStrings<Dictionary> = {
       done: 'Done',
       todo: 'To do',
       blocked: 'Needs previous step',
+      skipped: 'Skipped',
+      skip: 'Skip this step',
+      resume: 'Undo skip',
+      skipHint:
+        'This step is optional. If you skip it, content is produced from the business documents and the documents attached to the project.',
       completed: 'Every step of this project is done! 🎉',
       completedHint: 'Start the next content from ideation or generation.',
       askAboutStep: 'Ask about this step',
@@ -731,12 +749,14 @@ export const en: DeepStrings<Dictionary> = {
         },
         add_samples: {
           title: 'Add sample content',
-          subtitle: 'Links to content whose style you like; 3+ samples recommended.',
-          todo: 'Press "Add sample" in the "Samples" tab.\nPaste the link; for Instagram and X also paste the text/caption.\nNote why the sample matters.',
+          subtitle:
+            'Optional: links to content whose style you like (3+ samples recommended). You can skip this step.',
+          todo: 'Press "Add sample" in the "Samples" tab, or press "Skip this step" if you have none.\nPaste the link; for Instagram and X also paste the text/caption.\nNote why the sample matters.',
         },
         analyze_samples: {
           title: 'Analyze samples with AI',
-          subtitle: 'Every sample needs a successful analysis.',
+          subtitle:
+            'Every added sample needs a successful analysis. Skipping the samples step skips this one too.',
           todo: 'Check the analysis status on each sample card.\nPress "Analyze with AI" for unanalyzed samples.\nIf analysis fails, add the text manually and retry.',
         },
         build_profile: {

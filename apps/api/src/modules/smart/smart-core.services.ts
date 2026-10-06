@@ -358,6 +358,9 @@ export class ErrorTrackerService {
 
 // ───────────────────────────── walker progress ─────────────────────────────
 
+/** Steps the admin may skip; they stay optional, content then rests on the documents. */
+const SKIPPABLE_STEPS: readonly WalkerStepKey[] = ['add_samples', 'analyze_samples'];
+
 @Injectable()
 export class WalkerProgressService {
   constructor(private readonly prisma: PrismaService) {}
@@ -365,7 +368,12 @@ export class WalkerProgressService {
   async progress(topicId?: string | null): Promise<WalkerProgress> {
     const topic = topicId ? await this.prisma.topic.findUnique({ where: { id: topicId } }) : null;
     if (!topic) {
-      const steps = STEP_KEYS.map((key, i) => ({ key, done: false, blocked: i > 0 }));
+      const steps = STEP_KEYS.map((key, i) => ({
+        key,
+        done: false,
+        blocked: i > 0,
+        ...(SKIPPABLE_STEPS.includes(key) ? { skippable: true, skipped: false } : {}),
+      }));
       return {
         topic: null,
         steps,
@@ -417,12 +425,14 @@ export class WalkerProgressService {
       }),
     ]);
 
+    // Sample contents are optional: skipping settles both sample steps (docs/19-optional-samples.md).
+    const skipped = topic.samplesSkippedAt !== null;
     const done: Record<WalkerStepKey, boolean> = {
       select_topic: true,
       describe_topic: topic.description.trim().length >= 30,
       principles: principles > 0,
-      add_samples: samples > 0,
-      analyze_samples: samples > 0 && analyzed === samples,
+      add_samples: skipped || samples > 0,
+      analyze_samples: skipped || (samples > 0 && analyzed === samples),
       build_profile: profiles > 0,
       approve_profile: !!topic.activeProfileId,
       ideate: ideas > 0,
@@ -443,6 +453,11 @@ export class WalkerProgressService {
       review_content: 'generate_content',
       approve_content: 'generate_content',
     };
+    // "Skipped" only when the work itself does not exist, so finished steps never look skipped.
+    const isReallyDone: Partial<Record<WalkerStepKey, boolean>> = {
+      add_samples: samples > 0,
+      analyze_samples: samples > 0 && analyzed === samples,
+    };
     const steps: WalkerStepProgress[] = STEP_KEYS.map((key) => {
       const pre = prerequisite[key];
       const c = counts[key];
@@ -451,11 +466,19 @@ export class WalkerProgressService {
         done: done[key],
         blocked: pre ? !done[pre] : false,
         ...(c ? { current: c[0], target: c[1] } : {}),
+        ...(SKIPPABLE_STEPS.includes(key)
+          ? { skippable: true, skipped: skipped && !isReallyDone[key] }
+          : {}),
       };
     });
     const next = steps.find((s) => !s.done)?.key ?? null;
     return {
-      topic: { id: topic.id, title: topic.title, activeProfileId: topic.activeProfileId },
+      topic: {
+        id: topic.id,
+        title: topic.title,
+        activeProfileId: topic.activeProfileId,
+        samplesSkipped: skipped,
+      },
       steps,
       nextStep: next,
       completed: next === null,

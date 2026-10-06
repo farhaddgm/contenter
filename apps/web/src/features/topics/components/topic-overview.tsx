@@ -11,9 +11,22 @@ export function TopicOverview({ topic }: { topic: Topic }) {
   const t = useT();
   const samples = useSamples(topic.id);
   const analyzed = samples.data?.some((s) => s.analysisStatus === 'DONE') ?? false;
+  // Sample contents are optional: skipping settles both sample steps (docs/19-optional-samples.md).
+  const skipped = !!topic.samplesSkippedAt;
+  const sampleCount = topic._count?.samples ?? 0;
   const steps = [
-    { done: (topic._count?.samples ?? 0) > 0, label: t('topics.steps.samples'), tab: 'samples' },
-    { done: analyzed, label: t('topics.steps.analyze'), tab: 'samples' },
+    {
+      done: skipped || sampleCount > 0,
+      skipped: skipped && sampleCount === 0,
+      label: t('topics.steps.samples'),
+      tab: 'samples',
+    },
+    {
+      done: skipped || analyzed,
+      skipped: skipped && !analyzed,
+      label: t('topics.steps.analyze'),
+      tab: 'samples',
+    },
     { done: !!topic.activeProfileId, label: t('topics.steps.profile'), tab: 'profile' },
     { done: (topic._count?.ideas ?? 0) > 0, label: t('topics.steps.ideas'), tab: 'ideas' },
     { done: (topic._count?.contents ?? 0) > 0, label: t('topics.steps.contents'), tab: 'contents' },
@@ -56,6 +69,11 @@ export function TopicOverview({ topic }: { topic: Topic }) {
                 <span className={cn(s.done && 'text-muted-foreground line-through decoration-1')}>
                   {i + 1}. {s.label}
                 </span>
+                {s.skipped && (
+                  <span className="ms-auto text-xs text-muted-foreground">
+                    {t('topics.steps.skipped')}
+                  </span>
+                )}
               </Link>
             </li>
           ))}

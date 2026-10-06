@@ -177,6 +177,13 @@ export const UpdateTopicSchema = patchOf(CreateTopicSchema).extend({
 });
 export type UpdateTopicInput = z.input<typeof UpdateTopicSchema>;
 
+/**
+ * Sample contents are optional: the admin may skip them, and content is then produced from the
+ * business documents and the documents attached to the project (docs/19-optional-samples.md).
+ */
+export const SetSamplesSkippedSchema = z.object({ skipped: z.boolean() });
+export type SetSamplesSkippedInput = z.infer<typeof SetSamplesSkippedSchema>;
+
 export const TopicListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(TopicStatus).optional(),
   businessId: z.string().optional(),

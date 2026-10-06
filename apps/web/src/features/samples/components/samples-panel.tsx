@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCw,
   ScanSearch,
+  SkipForward,
   Trash2,
   Video,
 } from 'lucide-react';
@@ -20,7 +21,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/table';
 import { useT } from '@/i18n';
-import { useCanEditTopic } from '@/features/topics/api/topics';
+import { useCanEditTopic, useSetSamplesSkipped, useTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -183,6 +184,14 @@ export function SamplesPanel({ topicId }: { topicId: string }) {
   const drawer = useDisclosure();
   const editable = useCanEditTopic(topicId);
   const { data, isLoading } = useSamples(topicId);
+  const topic = useTopic(topicId);
+  const skip = useSetSamplesSkipped(topicId);
+  const skipped = !!topic.data?.samplesSkippedAt;
+  const setSkipped = (value: boolean) =>
+    skip.mutate(value, {
+      onSuccess: () => notify.info(t(value ? 'samples.skippedToast' : 'samples.resumedToast')),
+      onError: (e) => notify.error(t('common.error'), e.message),
+    });
 
   return (
     <div className="space-y-4">
@@ -192,11 +201,45 @@ export function SamplesPanel({ topicId }: { topicId: string }) {
           <p className="text-sm text-muted-foreground">{t('samples.subtitle')}</p>
         </div>
         {editable && (
-          <Button icon={<Plus />} onClick={drawer.open}>
-            {t('samples.add')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {!skipped && !data?.length && (
+              <Button
+                variant="outline"
+                icon={<SkipForward />}
+                isLoading={skip.isPending}
+                onClick={() => setSkipped(true)}
+              >
+                {t('samples.skip')}
+              </Button>
+            )}
+            <Button icon={<Plus />} onClick={drawer.open}>
+              {t('samples.add')}
+            </Button>
+          </div>
         )}
       </div>
+      {skipped && (
+        <Card className="border-primary/30 bg-primary/5">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="space-y-1">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <SkipForward className="size-4 text-primary" /> {t('samples.skippedTitle')}
+              </p>
+              <p className="text-sm leading-7 text-muted-foreground">{t('samples.skippedHint')}</p>
+            </div>
+            {editable && (
+              <Button
+                size="sm"
+                variant="outline"
+                isLoading={skip.isPending}
+                onClick={() => setSkipped(false)}
+              >
+                {t('samples.resume')}
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
       {isLoading ? (
         <PageSpinner />
       ) : !data?.length ? (
@@ -204,7 +247,11 @@ export function SamplesPanel({ topicId }: { topicId: string }) {
           <EmptyState
             icon={<Link2 />}
             title={t('samples.empty')}
-            description={t('samples.emptyHint')}
+            description={
+              editable && !skipped
+                ? `${t('samples.emptyHint')} ${t('samples.skipHint')}`
+                : t('samples.emptyHint')
+            }
             action={
               editable && (
                 <Button icon={<Plus />} onClick={drawer.open}>

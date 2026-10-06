@@ -12,17 +12,20 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   CreatePrincipleSchema,
   CreateTopicSchema,
+  SetSamplesSkippedSchema,
   TopicListQuerySchema,
   UpdatePrincipleSchema,
   UpdateTopicSchema,
   type CreatePrincipleInput,
   type CreateTopicInput,
+  type SetSamplesSkippedInput,
   type UpdatePrincipleInput,
   type UpdateTopicInput,
 } from '@contenter/shared';
@@ -127,6 +130,31 @@ export class TopicsService {
     return topic;
   }
 
+  /**
+   * Sample contents are optional. Skipping settles the sample steps and content is produced from
+   * the business documents and the documents attached to the project (docs/19-optional-samples.md).
+   * Idempotent: skipping twice keeps the first timestamp.
+   */
+  async setSamplesSkipped(id: string, { skipped }: SetSamplesSkippedInput, user: AuthUser) {
+    const current = await this.prisma.topic.findUnique({
+      where: { id },
+      select: { samplesSkippedAt: true },
+    });
+    if (!current) throw new NotFoundException('Topic not found');
+    if (!!current.samplesSkippedAt === skipped) return this.get(id, user);
+    await this.prisma.topic.update({
+      where: { id },
+      data: { samplesSkippedAt: skipped ? new Date() : null },
+    });
+    this.audit.log({
+      userId: user.id,
+      action: skipped ? 'topic.samples_skip' : 'topic.samples_resume',
+      entityType: 'Topic',
+      entityId: id,
+    });
+    return this.get(id, user);
+  }
+
   async remove(id: string, user: AuthUser) {
     await this.prisma.topic.delete({ where: { id } });
     this.audit.log({ userId: user.id, action: 'topic.delete', entityType: 'Topic', entityId: id });
@@ -225,6 +253,17 @@ export class TopicsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.topics.update(id, body, user);
+  }
+
+  /** Skip (or resume) the optional sample-contents step. */
+  @TopicScoped('topic')
+  @Put(':id/samples-skipped')
+  setSamplesSkipped(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(SetSamplesSkippedSchema)) body: SetSamplesSkippedInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.topics.setSamplesSkipped(id, body, user);
   }
 
   @Delete(':id')

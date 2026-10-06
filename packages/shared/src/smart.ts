@@ -168,10 +168,19 @@ export interface WalkerStepProgress {
   target?: number;
   /** A previous step must be done first. */
   blocked: boolean;
+  /** The admin may skip this step (sample contents). */
+  skippable?: boolean;
+  /** Done because the admin skipped it, not because the work exists. */
+  skipped?: boolean;
 }
 
 export interface WalkerProgress {
-  topic: { id: string; title: string; activeProfileId: string | null } | null;
+  topic: {
+    id: string;
+    title: string;
+    activeProfileId: string | null;
+    samplesSkipped: boolean;
+  } | null;
   steps: WalkerStepProgress[];
   nextStep: WalkerStepKey | null;
   completed: boolean;
