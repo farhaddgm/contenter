@@ -111,7 +111,9 @@ main() {
 
   # ── 6. Cleanup (keeps the disk from filling up again) ──────────────────────
   say "Cleaning up old build leftovers"
-  docker builder prune -f --filter until=168h >/dev/null || true # build cache older than 7 days
+  # Cap the build cache by size, not age: frequent auto deploys can pile up tens of GB within
+  # a week. The newest 8 GB stay so the next build is still fast.
+  docker builder prune -f --keep-storage 8GB >/dev/null || true
   docker image prune -f --filter until=168h >/dev/null || true    # untagged images older than 7 days (recent ones stay for rollback)
   ok "$(free_gb)G free on disk"
 
