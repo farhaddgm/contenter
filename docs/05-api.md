@@ -27,6 +27,7 @@
 | GET | `/topics?page&pageSize&q&status&businessId` | فهرست صفحه‌بندی‌شده با شمارنده‌ها و `business` |
 | POST | `/topics` | ایجاد (`businessId` اختیاری؛ `null` = بدون کسب‌وکار) |
 | GET / PATCH | `/topics/:id` | مشاهده / ویرایش (از جمله `status`) |
+| PUT | `/topics/:id/samples-skipped` | `{ skipped }` — رد کردن (یا بازگرداندنِ) مرحلهٔ اختیاریِ نمونه‌محتوا؛ ایدمپوتنت؛ نیازمند دسترسی ویرایش ([19-optional-samples.md](19-optional-samples.md)) |
 | DELETE | `/topics/:id` | حذف (فقط ADMIN) |
 | GET / POST | `/topics/:id/principles` | اصول موضوع |
 | GET / POST | `/principles/global` | اصول سراسری (ایجاد فقط توسط ADMIN) |
@@ -77,7 +78,7 @@
 | متد | مسیر | توضیح |
 |---|---|---|
 | GET | `/topics/:id/profiles` | نسخه‌ها (`isActive`) |
-| POST | `/topics/:id/profiles/build` | **۲۰۲** — `{ sampleIds? }` ← کار `BUILD_PROFILE`. به حداقل یک نمونهٔ تحلیل‌شده **یا** یک سند برند فعال نیاز دارد. |
+| POST | `/topics/:id/profiles/build` | **۲۰۲** — `{ sampleIds? }` ← کار `BUILD_PROFILE`. به حداقل یک نمونهٔ تحلیل‌شده، یک سند برند فعال، یک بخش پرشدهٔ پروفایل کسب‌وکار **یا** یک سند مرجع قابل‌استفادهٔ کسب‌وکار نیاز دارد. |
 | POST | `/topics/:id/profiles` | ایجاد دستی نسخهٔ `DRAFT` بدون AI — `{ summary?, styleGuide?, traits?[] }` |
 | POST | `/profiles/:id/duplicate` | «نسخهٔ جدید از روی این نسخه»: کپی به یک `DRAFT` جدید (با `basedOnVersion`) |
 | GET / PATCH | `/profiles/:id` | مشاهده همراه مشخصه‌ها / ویرایش `summary` و `styleGuide` (فقط `DRAFT`، وگرنه ۴۰۹) |

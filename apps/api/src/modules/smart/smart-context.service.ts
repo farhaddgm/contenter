@@ -172,6 +172,9 @@ export class SmartContextBuilder {
           } (sent to every AI job of this topic)`
         : '- business: none linked (AI jobs get no business profile)',
       '### Samples',
+      topic.samplesSkippedAt
+        ? '- the admin SKIPPED the sample-contents step: content rests on the business documents and the documents attached to the project'
+        : '',
       ...(topic.samples.length
         ? topic.samples.map(
             (s) =>

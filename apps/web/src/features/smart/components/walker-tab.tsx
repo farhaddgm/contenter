@@ -8,6 +8,7 @@ import {
   Lock,
   MessageSquareText,
   Plus,
+  SkipForward,
   Wand2,
 } from 'lucide-react';
 import type { WalkerStepKey } from '@contenter/shared';
@@ -19,7 +20,8 @@ import { useT, type TranslationKey } from '@/i18n';
 import { track } from '@/lib/tracker';
 import { cn } from '@/utils/cn';
 import { formatNumber, formatRelative } from '@/utils/format';
-import { useTopics } from '@/features/topics/api/topics';
+import { useSetSamplesSkipped, useTopics } from '@/features/topics/api/topics';
+import { notify } from '@/stores/notifications';
 import { useSmartActivity, useWalkerProgress } from '../api';
 import { useSmart } from '../store';
 import { stepHref, WALKER_STEPS } from '../walker-steps';
@@ -34,6 +36,7 @@ export function WalkerTab() {
   const progress = useWalkerProgress(walkerTopicId, true);
   const topics = useTopics({ page: 1, pageSize: 50, status: 'ACTIVE' });
   const activity = useSmartActivity(true);
+  const skip = useSetSamplesSkipped(walkerTopicId);
 
   const index = WALKER_STEPS.indexOf(walkerStep);
   const total = WALKER_STEPS.length;
@@ -50,7 +53,17 @@ export function WalkerTab() {
     }
   };
 
-  const statusBadge = current?.done ? (
+  const setSkipped = (value: boolean) =>
+    skip.mutate(value, {
+      onSuccess: () => notify.info(t(value ? 'samples.skippedToast' : 'samples.resumedToast')),
+      onError: (e) => notify.error(t('common.error'), e.message),
+    });
+
+  const statusBadge = current?.skipped ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+      <SkipForward className="size-3" /> {t('smart.walker.skipped')}
+    </span>
+  ) : current?.done ? (
     <span className="inline-flex items-center gap-1 rounded-full bg-success/12 px-2 py-0.5 text-[11px] font-medium text-success">
       <CheckCircle2 className="size-3" /> {t('smart.walker.done')}
     </span>
@@ -112,7 +125,7 @@ export function WalkerTab() {
                 title={t(stepKey(key, 'title'))}
                 className={cn(
                   'h-1.5 flex-1 rounded-full transition-all',
-                  s?.done ? 'bg-success' : 'bg-muted',
+                  s?.skipped ? 'bg-success/40' : s?.done ? 'bg-success' : 'bg-muted',
                   i === index && 'ring-2 ring-primary ring-offset-1 ring-offset-card',
                 )}
               />
@@ -183,6 +196,24 @@ export function WalkerTab() {
               {t('smart.walker.askAboutStep')}
             </Button>
           </div>
+          {current?.skippable && walkerTopicId && (current.skipped || !current.done) && (
+            <div className="mt-3 rounded-lg border border-dashed p-3">
+              {!current.skipped && (
+                <p className="mb-2 text-xs leading-6 text-muted-foreground">
+                  {t('smart.walker.skipHint')}
+                </p>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                icon={<SkipForward />}
+                isLoading={skip.isPending}
+                onClick={() => setSkipped(!current.skipped)}
+              >
+                {current.skipped ? t('smart.walker.resume') : t('smart.walker.skip')}
+              </Button>
+            </div>
+          )}
           {data?.nextStep && data.nextStep !== walkerStep && walkerTopicId && (
             <button
               className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-xs font-medium text-primary hover:bg-primary/5"

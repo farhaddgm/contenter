@@ -61,10 +61,16 @@ export function AiContextCard({ topicId }: { topicId: string }) {
           label={t('aiContext.business')}
           value={
             data.business
-              ? t('aiContext.businessValue', {
-                  name: data.business.name,
-                  filled: formatNumber(data.business.filledSections),
-                })
+              ? t(
+                  data.business.references
+                    ? 'aiContext.businessValueDocs'
+                    : 'aiContext.businessValue',
+                  {
+                    name: data.business.name,
+                    filled: formatNumber(data.business.filledSections),
+                    docs: formatNumber(data.business.references),
+                  },
+                )
               : t('aiContext.none')
           }
           usedIn={used(t('aiContext.jobsEverything'))}
@@ -78,10 +84,14 @@ export function AiContextCard({ topicId }: { topicId: string }) {
         <Source
           icon={<FileSearch />}
           label={t('aiContext.samples')}
-          value={formatNumber(data.analyzedSamples)}
+          value={
+            data.samplesSkipped && !data.analyzedSamples
+              ? t('aiContext.samplesSkipped')
+              : formatNumber(data.analyzedSamples)
+          }
           usedIn={used(t('aiContext.jobsProfile'))}
           to={paths.app.topic.getHref(topicId, 'samples')}
-          empty={!data.analyzedSamples}
+          empty={!data.analyzedSamples && !data.samplesSkipped}
         />
         <Source
           icon={<ShieldCheck />}

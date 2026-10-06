@@ -102,7 +102,19 @@ export class BrandDocsService {
       where: { id: topicId },
       select: {
         activeProfileId: true,
-        business: { select: { id: true, name: true, sections: { select: { content: true } } } },
+        samplesSkippedAt: true,
+        business: {
+          select: {
+            id: true,
+            name: true,
+            sections: { select: { content: true } },
+            _count: {
+              select: {
+                references: { where: { status: 'READY', isActive: true, content: { not: '' } } },
+              },
+            },
+          },
+        },
       },
     });
     const [analyzedSamples, topicPrinciples, globalPrinciples, docs, profile] = await Promise.all([
@@ -142,8 +154,10 @@ export class BrandDocsService {
             id: topic.business.id,
             name: topic.business.name,
             filledSections: topic.business.sections.filter((s) => s.content.trim()).length,
+            references: topic.business._count.references,
           }
         : null,
+      samplesSkipped: topic.samplesSkippedAt !== null,
     };
   }
 }

@@ -64,6 +64,22 @@ export function useUpdateTopic(id: string) {
   });
 }
 
+/**
+ * Skips (or resumes) the optional sample-contents step; content is then produced from the
+ * business documents and the documents attached to the project (docs/19-optional-samples.md).
+ */
+export function useSetSamplesSkipped(topicId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (skipped: boolean) =>
+      api.put<Topic>(`/topics/${topicId}/samples-skipped`, { skipped }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: topicKeys.all });
+      void qc.invalidateQueries({ queryKey: ['smart', 'progress'] });
+    },
+  });
+}
+
 export function useDeleteTopic() {
   const qc = useQueryClient();
   return useMutation({

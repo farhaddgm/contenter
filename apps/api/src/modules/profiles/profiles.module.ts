@@ -69,7 +69,7 @@ export class ProfilesService {
 
   async build(topicId: string, input: BuildProfileInput, user: AuthUser) {
     const { maxSamplesPerProfile } = await this.settings.getAi();
-    const [analyzed, brandDocs, businessSections] = await Promise.all([
+    const [analyzed, brandDocs, businessSections, businessDocs] = await Promise.all([
       this.prisma.sampleContent.count({
         where: {
           topicId,
@@ -81,10 +81,18 @@ export class ProfilesService {
       this.prisma.businessSection.count({
         where: { business: { topics: { some: { id: topicId } } }, content: { not: '' } },
       }),
+      this.prisma.businessReference.count({
+        where: {
+          business: { topics: { some: { id: topicId } } },
+          status: 'READY',
+          isActive: true,
+          content: { not: '' },
+        },
+      }),
     ]);
-    if (!analyzed && !brandDocs && !businessSections)
+    if (!analyzed && !brandDocs && !businessSections && !businessDocs)
       throw new BadRequestException(
-        'Analyze at least one sample, add a brand document or link a business with a filled profile before building a profile with AI',
+        'Analyze at least one sample, add a brand document, or link a business with a filled profile or reference documents before building a profile with AI',
       );
 
     const sampleIds = input.sampleIds?.length

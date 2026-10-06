@@ -366,7 +366,8 @@ export function ProfilePanel({
   const analyzedCount = samples.data?.filter((s) => s.analysisStatus === 'DONE').length ?? 0;
   const activeDocs = brandDocs.data?.filter((d) => d.isActive).length ?? 0;
   const businessSections = aiContext.data?.business?.filledSections ?? 0;
-  const canBuild = analyzedCount > 0 || activeDocs > 0 || businessSections > 0;
+  const businessDocs = aiContext.data?.business?.references ?? 0;
+  const canBuild = analyzedCount > 0 || activeDocs > 0 || businessSections > 0 || businessDocs > 0;
   // Approved and archived versions are locked; changes go through a new version.
   const isDraft = profile.data?.status === 'DRAFT';
   const editable = canWrite && isDraft;
