@@ -33,6 +33,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Tags & campaigns (docs/20-tags-campaigns.md)
 - `Tag` and `Campaign` belong to one topic, so they are guarded with `@TopicScoped('tag' | 'campaign')`; a tag/campaign id from another topic is a 400 (`TagsService.assertInTopic`, the content PATCH check). Tag color is a plain string checked by `TagColor` in `packages/shared`. Delete leaves ideas/contents alone (links only).
 
+## Review workflow (docs/21-review-workflow.md)
+- Content status changes only through `POST /contents/:id/review/:action` (`ReviewsService.act`); `PATCH /contents/:id` refuses `status`. The rules live once in `packages/shared/src/workflow.ts` (`reviewActionsFor` / `applyReviewAction`); the API returns `review.actions` for the caller and the web only renders those — never re-derive roles in the client. Anything that changes reviewed text (manual edit, restore, AI revise) must call `ReviewsService.resetAfterEdit`. Comments are `@TopicScoped('comment')`.
+
 ## Topic & business access (docs/17-project-access.md)
 - EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 

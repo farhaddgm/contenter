@@ -55,6 +55,10 @@ function setup(grant: AccessLevel | null, meta: AccessScopeMeta | undefined) {
       findUnique: async ({ where }: { where: { id: string } }) =>
         where.id === 'k1' ? { topicId: 't1' } : null,
     },
+    contentComment: {
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        where.id === 'm1' ? { content: { topicId: 't1' } } : null,
+    },
     principle: { findUnique: async () => ({ topicId: null }) },
   } as unknown as PrismaService;
   const reflector = { get: () => meta } as unknown as Reflector;
@@ -135,6 +139,18 @@ describe('AccessGuard', () => {
     ).rejects.toThrow(ForbiddenException);
     await expect(
       setup('EDIT', onCampaign).canActivate(ctx('PATCH', 'VIEWER', { id: 'k1' })),
+    ).resolves.toBe(true);
+  });
+  it('guards a comment through the topic of its content', async () => {
+    const onComment: AccessScopeMeta = { via: 'comment', param: 'id' };
+    await expect(
+      setup(null, onComment).canActivate(ctx('PATCH', 'EDITOR', { id: 'm1' })),
+    ).rejects.toThrow(NotFoundException);
+    await expect(
+      setup('VIEW', onComment).canActivate(ctx('DELETE', 'EDITOR', { id: 'm1' })),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      setup('EDIT', onComment).canActivate(ctx('PATCH', 'EDITOR', { id: 'm1' })),
     ).resolves.toBe(true);
   });
   it('lets admins through without looking anything up', async () => {

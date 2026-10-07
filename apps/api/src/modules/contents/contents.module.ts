@@ -35,6 +35,8 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { ReviewsModule } from '../reviews/reviews.module';
+import { ReviewsService } from '../reviews/reviews.service';
 import { TAG_SELECT } from '../tags/tag-select';
 
 const LIST_INCLUDE = {
@@ -52,6 +54,7 @@ export class ContentsService {
     private readonly jobs: AiJobsService,
     private readonly audit: AuditService,
     private readonly access: AccessService,
+    private readonly reviews: ReviewsService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
@@ -86,6 +89,7 @@ export class ContentsService {
         versions: { orderBy: { version: 'desc' } },
         tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
         campaign: { select: { id: true, name: true, status: true } },
+        submittedBy: { select: { id: true, name: true } },
       },
     });
     if (!c) throw new NotFoundException('Content not found');
@@ -93,11 +97,17 @@ export class ContentsService {
   }
 
   /**
-   * Content with its versions plus the brand terminology check of the current version: the
-   * linked business's USE/AVOID terms matched by code (checkTerms), never by the model.
+   * Content with its versions plus the brand terminology check of the current version (the
+   * linked business's USE/AVOID terms matched by code, `checkTerms`, never by the model) and the
+   * review workflow: what the caller may do now and the history.
    */
-  async detail(id: string) {
-    const c = await this.get(id);
+  async detail(id: string, user: AuthUser) {
+    const base = await this.get(id);
+    const [review, reviews] = await Promise.all([
+      this.reviews.info(base, user),
+      this.reviews.history(id),
+    ]);
+    const c = { ...base, review, reviews };
     const v = c.currentVersion;
     if (!v) return { ...c, termIssues: [] };
     const topic = await this.prisma.topic.findUnique({
@@ -151,6 +161,8 @@ export class ContentsService {
     if (content.status === 'GENERATING')
       throw new BadRequestException('A generation is already in progress');
     if (!content.currentVersionId) throw new BadRequestException('Nothing to revise yet');
+    // the revision replaces the reviewed text: back to DRAFT first, so the history shows why
+    await this.reviews.resetAfterEdit(this.prisma, id, user.id);
     await this.prisma.content.update({ where: { id }, data: { status: 'GENERATING' } });
     const job = await this.jobs.enqueue({
       type: 'REVISE_CONTENT',
@@ -182,6 +194,7 @@ export class ContentsService {
         where: { id },
         data: { currentVersionId: v.id, title: data.title },
       });
+      await this.reviews.resetAfterEdit(tx, id, user.id);
     });
     this.audit.log({
       userId: user.id,
@@ -197,9 +210,17 @@ export class ContentsService {
       where: { id: versionId, contentId: id },
     });
     if (!v) throw new NotFoundException('Version not found');
-    await this.prisma.content.update({
-      where: { id },
-      data: { currentVersionId: v.id, title: v.title },
+    await this.prisma.$transaction(async (tx) => {
+      const before = await tx.content.findUnique({
+        where: { id },
+        select: { currentVersionId: true },
+      });
+      await tx.content.update({
+        where: { id },
+        data: { currentVersionId: v.id, title: v.title },
+      });
+      // restoring the version that is already current changes no text
+      if (before?.currentVersionId !== v.id) await this.reviews.resetAfterEdit(tx, id, user.id);
     });
     this.audit.log({
       userId: user.id,
@@ -212,8 +233,9 @@ export class ContentsService {
   }
 
   async update(id: string, input: UpdateContentInput, user: AuthUser) {
-    if (input.status === 'GENERATING' || input.status === 'FAILED') {
-      throw new BadRequestException('Status is managed by the system');
+    if (input.status) {
+      // every status change is a review step with its own rules and history
+      throw new BadRequestException('Change the status with POST /contents/:id/review/:action');
     }
     if (input.campaignId) {
       const content = await this.prisma.content.findUnique({
@@ -274,8 +296,8 @@ export class ContentsController {
 
   @TopicScoped('content')
   @Get('contents/:id')
-  get(@Param('id') id: string) {
-    return this.contents.detail(id);
+  get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.contents.detail(id, user);
   }
 
   @TopicScoped('content')
@@ -328,6 +350,7 @@ export class ContentsController {
 }
 
 @Module({
+  imports: [ReviewsModule],
   controllers: [ContentsController],
   providers: [ContentsService],
 })

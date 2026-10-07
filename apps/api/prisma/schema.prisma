@@ -64,6 +64,10 @@ model User {
   topicGrants         TopicMember[]             @relation("TopicMemberGrantedBy")
   businessMemberships BusinessMember[]          @relation("BusinessMemberUser")
   businessGrants      BusinessMember[]          @relation("BusinessMemberGrantedBy")
+  submittedContents   Content[]                 @relation("ContentSubmitter")
+  contentReviews      ContentReview[]
+  contentComments     ContentComment[]          @relation("CommentAuthor")
+  resolvedComments    ContentComment[]          @relation("CommentResolver")
 }
 
 model RefreshToken {
@@ -896,6 +900,23 @@ enum VersionSource {
   ADMIN
 }
 
+/// Where an IN_REVIEW content waits: with an editor first, then (optionally) the final approver
+enum ReviewStage {
+  EDITORIAL
+  FINAL
+}
+
+enum ReviewDecision {
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+  WITHDRAWN
+  REOPENED
+  /// the text changed after review, so the content went back to DRAFT
+  RESET
+}
+
 model Content {
   id               String        @id @default(cuid())
   topicId          String
@@ -906,6 +927,10 @@ model Content {
   brief            String        @default("")
   format           ContentFormat @default(POST)
   status           ContentStatus @default(GENERATING)
+  /// Set while status is IN_REVIEW (docs/21-review-workflow.md)
+  reviewStage      ReviewStage?
+  submittedById    String?
+  submittedAt      DateTime?
   currentVersionId String?       @unique
   lastJobId        String?
   createdById      String?
@@ -919,10 +944,55 @@ model Content {
   currentVersion ContentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   versions       ContentVersion[] @relation("ContentVersions")
   tags           Tag[]
+  submittedBy    User?            @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviews        ContentReview[]
+  comments       ContentComment[]
 
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
   @@index([campaignId])
+}
+
+/// One step of a content's review history (submit, approve, request changes …).
+model ContentReview {
+  id        String         @id @default(cuid())
+  contentId String
+  /// The version the decision was about
+  versionId String?
+  stage     ReviewStage?
+  decision  ReviewDecision
+  actorId   String?
+  note      String         @default("")
+  createdAt DateTime       @default(now())
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([contentId, createdAt])
+}
+
+/// A comment on a draft; replies are one level deep (`parentId` points at a top-level comment).
+model ContentComment {
+  id           String    @id @default(cuid())
+  contentId    String
+  /// The version the author was looking at
+  versionId    String?
+  parentId     String?
+  authorId     String?
+  body         String
+  resolvedAt   DateTime?
+  resolvedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  content    Content          @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  version    ContentVersion?  @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  parent     ContentComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    ContentComment[] @relation("CommentReplies")
+  author     User?            @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  resolvedBy User?            @relation("CommentResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([contentId, createdAt])
 }
 
 model ContentVersion {
@@ -940,8 +1010,9 @@ model ContentVersion {
   jobId     String?
   createdAt DateTime      @default(now())
 
-  content   Content  @relation("ContentVersions", fields: [contentId], references: [id], onDelete: Cascade)
-  currentOf Content? @relation("CurrentVersion")
+  content   Content          @relation("ContentVersions", fields: [contentId], references: [id], onDelete: Cascade)
+  currentOf Content?         @relation("CurrentVersion")
+  comments  ContentComment[]
 
   @@unique([contentId, version])
 }

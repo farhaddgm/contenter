@@ -72,7 +72,11 @@ function TagFormDialog({
           render={({ field }) => (
             <Field label={t('tags.color')}>
               {() => (
-                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('tags.color')}>
+                <div
+                  className="flex flex-wrap gap-2"
+                  role="radiogroup"
+                  aria-label={t('tags.color')}
+                >
                   {TagColor.map((c) => (
                     <button
                       key={c}

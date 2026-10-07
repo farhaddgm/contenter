@@ -1,10 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Content,
+  ContentComment,
   ContentStatus,
+  CreateCommentInput,
   EditContentVersionInput,
   GenerateContentInput,
   Paginated,
+  ReviewAction,
+  UpdateCommentInput,
   UpdateContentInput,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
@@ -101,5 +105,65 @@ export function useDeleteContent() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/contents/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+}
+
+// ---------- review workflow ----------
+
+/** One step of the workflow; the server decides whether the caller may take it. */
+export function useReviewAction(id: string) {
+  const invalidate = useInvalidateContent(id);
+  return useMutation({
+    mutationFn: ({ action, note }: { action: ReviewAction; note?: string }) =>
+      api.post<{ status: ContentStatus; reviewStage: string | null }>(
+        `/contents/${id}/review/${action}`,
+        { note },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+// ---------- comments ----------
+
+export const commentKeys = {
+  all: ['comments'] as const,
+  content: (contentId: string) => ['comments', contentId] as const,
+};
+
+export function useComments(contentId: string) {
+  return useQuery({
+    queryKey: commentKeys.content(contentId),
+    queryFn: () => api.get<ContentComment[]>(`/contents/${contentId}/comments`),
+  });
+}
+
+function useInvalidateComments(contentId: string) {
+  const qc = useQueryClient();
+  return () => void qc.invalidateQueries({ queryKey: commentKeys.content(contentId) });
+}
+
+export function useCreateComment(contentId: string) {
+  const invalidate = useInvalidateComments(contentId);
+  return useMutation({
+    mutationFn: (data: CreateCommentInput) =>
+      api.post<ContentComment>(`/contents/${contentId}/comments`, data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateComment(contentId: string) {
+  const invalidate = useInvalidateComments(contentId);
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateCommentInput }) =>
+      api.patch<ContentComment>(`/comments/${id}`, data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteComment(contentId: string) {
+  const invalidate = useInvalidateComments(contentId);
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/comments/${id}`),
+    onSuccess: invalidate,
   });
 }

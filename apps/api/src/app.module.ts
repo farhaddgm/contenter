@@ -20,6 +20,7 @@ import { IdeasModule } from './modules/ideas/ideas.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SamplesModule } from './modules/samples/samples.module';
 import { GoogleAccessModule } from './modules/google-access/google-access.module';
 import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
@@ -54,6 +55,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     BrandDocsModule,
     IdeasModule,
     ContentsModule,
+    ReviewsModule,
     TagsModule,
     CampaignsModule,
     JobsModule,

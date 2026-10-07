@@ -54,7 +54,10 @@ describe('shared schemas', () => {
 
 describe('tag and campaign schemas', () => {
   it('trims tag names and defaults the color', () => {
-    expect(CreateTagSchema.parse({ name: '  آموزشی ' })).toEqual({ name: 'آموزشی', color: 'slate' });
+    expect(CreateTagSchema.parse({ name: '  آموزشی ' })).toEqual({
+      name: 'آموزشی',
+      color: 'slate',
+    });
     expect(CreateTagSchema.safeParse({ name: '' }).success).toBe(false);
     expect(CreateTagSchema.safeParse({ name: 'x', color: 'chartreuse' }).success).toBe(false);
   });

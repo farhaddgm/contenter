@@ -149,7 +149,10 @@ function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void })
           selected={idea.tags ?? []}
           disabled={!editable}
           onChange={(tagIds) =>
-            setTags.mutate({ tagIds }, { onError: (e) => notify.error(t('common.error'), e.message) })
+            setTags.mutate(
+              { tagIds },
+              { onError: (e) => notify.error(t('common.error'), e.message) },
+            )
           }
         />
         {idea.hook && (
