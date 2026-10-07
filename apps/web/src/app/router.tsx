@@ -59,6 +59,10 @@ const router = createBrowserRouter([
         path: paths.app.contents.path,
         lazy: lazyRoute(() => import('./routes/app/contents/contents')),
       },
+      {
+        path: paths.app.notifications.path,
+        lazy: lazyRoute(() => import('./routes/app/notifications')),
+      },
       { path: paths.app.search.path, lazy: lazyRoute(() => import('./routes/app/search')) },
       {
         path: paths.app.calendar.path,

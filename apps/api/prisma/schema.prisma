@@ -68,6 +68,8 @@ model User {
   contentReviews      ContentReview[]
   contentComments     ContentComment[]          @relation("CommentAuthor")
   resolvedComments    ContentComment[]          @relation("CommentResolver")
+  notifications       Notification[]
+  notificationPrefs   NotificationPreference[]
 }
 
 model RefreshToken {
@@ -939,6 +941,8 @@ model Content {
   /// Set by hand once the content is live elsewhere; a published content is frozen
   publishedAt      DateTime?
   publishedUrl     String?
+  /// The `scheduledAt` the "time to publish" reminder was already sent for (docs/25-notifications.md)
+  dueNotifiedFor   DateTime?
   currentVersionId String?       @unique
   lastJobId        String?
   createdById      String?
@@ -957,6 +961,7 @@ model Content {
   repurposed     Content[]        @relation("Repurposed")
   reviews        ContentReview[]
   comments       ContentComment[]
+  notifications  Notification[]
 
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
@@ -1028,6 +1033,76 @@ model ContentVersion {
   comments  ContentComment[]
 
   @@unique([contentId, version])
+}
+
+// ─────────────────────────────── Notifications ───────────────────────────────
+
+enum NotificationEvent {
+  REVIEW_SUBMITTED
+  REVIEW_FINAL_NEEDED
+  REVIEW_APPROVED
+  REVIEW_CHANGES_REQUESTED
+  REVIEW_REJECTED
+  COMMENT_ADDED
+  COMMENT_REPLIED
+  CONTENT_DUE
+}
+
+enum DeliveryChannel {
+  EMAIL
+  WEBHOOK
+}
+
+enum DeliveryStatus {
+  SENT
+  FAILED
+}
+
+/// One notification of one user. The text is not stored: `params` is rendered in the reader's
+/// language (packages/shared/src/notifications.ts).
+model Notification {
+  id        String            @id @default(cuid())
+  userId    String
+  event     NotificationEvent
+  contentId String?
+  params    Json
+  /// App path the notification leads to
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+/// A user's choice per event; a missing row means the defaults (NOTIFICATION_DEFAULTS)
+model NotificationPreference {
+  id     String            @id @default(cuid())
+  userId String
+  event  NotificationEvent
+  inApp  Boolean           @default(true)
+  email  Boolean           @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, event])
+}
+
+/// Outcome of one e-mail or webhook send, kept for a few weeks so a failing channel can be found
+model NotificationDelivery {
+  id             String            @id @default(cuid())
+  channel        DeliveryChannel
+  event          NotificationEvent
+  /// The address, or the host of the webhook
+  target         String
+  status         DeliveryStatus
+  error          String?
+  attempts       Int               @default(1)
+  createdAt      DateTime          @default(now())
+
+  @@index([createdAt])
 }
 
 // ─────────────────────────────── AI & Ops ───────────────────────────────

@@ -3,12 +3,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { ContentComment, CreateCommentInput, UpdateCommentInput } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuthUser } from '../../common/auth.decorators';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const COMMENT_INCLUDE = {
   author: { select: { id: true, name: true } },
@@ -32,9 +34,12 @@ function toDto(row: CommentRow): ContentComment {
 /** Comments on a draft: top-level threads with one level of replies (docs/21-review-workflow.md). */
 @Injectable()
 export class CommentsService {
+  private readonly logger = new Logger(CommentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Threads oldest first, each with its replies oldest first. */
@@ -57,7 +62,13 @@ export class CommentsService {
   async create(contentId: string, input: CreateCommentInput, user: AuthUser) {
     const content = await this.prisma.content.findUnique({
       where: { id: contentId },
-      select: { currentVersionId: true },
+      select: {
+        currentVersionId: true,
+        title: true,
+        topicId: true,
+        createdById: true,
+        submittedById: true,
+      },
     });
     if (!content) throw new NotFoundException('Content not found');
 
@@ -98,7 +109,44 @@ export class CommentsService {
       entityId: contentId,
       meta: { commentId: row.id },
     });
+    try {
+      await this.tell(contentId, content, input, user);
+    } catch (err) {
+      this.logger.warn(`could not notify about a comment: ${(err as Error).message}`);
+    }
     return toDto(row);
+  }
+
+  /** A new thread tells the people around the content; a reply tells the thread and them. */
+  private async tell(
+    contentId: string,
+    content: {
+      title: string;
+      topicId: string;
+      createdById: string | null;
+      submittedById: string | null;
+    },
+    input: CreateCommentInput,
+    user: AuthUser,
+  ) {
+    // the people who already spoke on this thread (or, for a new thread, anywhere on the content)
+    const earlier = await this.prisma.contentComment.findMany({
+      where: input.parentId
+        ? { OR: [{ id: input.parentId }, { parentId: input.parentId }] }
+        : { contentId },
+      select: { authorId: true },
+    });
+    const recipients = await this.notifications.participantsOf(
+      { id: contentId, ...content },
+      earlier.map((c) => c.authorId),
+    );
+    await this.notifications.notify({
+      event: input.parentId ? 'COMMENT_REPLIED' : 'COMMENT_ADDED',
+      recipients,
+      actor: { id: user.id },
+      content: { id: contentId, title: content.title, topicId: content.topicId },
+      note: input.body,
+    });
   }
 
   async update(id: string, input: UpdateCommentInput, user: AuthUser) {

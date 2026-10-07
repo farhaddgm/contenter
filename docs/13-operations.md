@@ -108,6 +108,7 @@ df -h /
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ورود با جیمیل ([11-google-login.md](11-google-login.md)) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | کلیدهای امنیتی ورود؛ هرگز پاک یا عوض نکنید مگر عمداً |
 | `INTEGRATION_TOKEN` | توکن خواندن کسب‌وکارها برای Docoo ([18-docoo-integration.md](18-docoo-integration.md)). خالی = خاموش؛ حداقل ۳۲ نویسه |
+| `SMTP_URL` / `MAIL_FROM` | سرور SMTP برای ایمیل اعلان‌ها، مثلاً `smtps://user:pass@smtp.example.com:465` ([25-notifications.md](25-notifications.md)). خالی = ایمیل خاموش (اعلان درون‌برنامه‌ای و وب‌هوک کار می‌کنند). `APP_URL` هم باید درست باشد چون پیوند ایمیل از آن ساخته می‌شود |
 | `FETCH_PROXY_URL` / `FETCH_PROXY_HOSTS` | پراکسی خروجی برای خواندن لینک‌ها (پایین را ببینید). پیش‌فرض: خالی / `ir` |
 
 اگر فقط بخشی از متغیرهای `GOOGLE_*` مقدار داشته باشد، دکمهٔ «ورود با گوگل» بی‌صدا پنهان می‌شود. از این پس `deploy.sh` در این حالت متوقف می‌شود و API هم هنگام شروع هشدار می‌دهد. `GOOGLE_CLIENT_SECRET` فقط در Google Cloud Console است (Credentials ← OAuth client). اگر از `.env` پاک شد، باید از همان‌جا دوباره برداشته شود.

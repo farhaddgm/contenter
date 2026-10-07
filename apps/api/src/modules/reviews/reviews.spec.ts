@@ -10,6 +10,7 @@ import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuthUser } from '../../common/auth.decorators';
 import type { AuditService } from '../audit/audit.service';
 import type { SettingsService } from '../settings/settings.module';
+import type { NotificationsService } from '../notifications/notifications.service';
 import { CommentsService } from './comments.service';
 import { ReviewsService } from './reviews.service';
 
@@ -18,6 +19,20 @@ const editor: AuthUser = { id: 'ed', email: 'e@x.test', role: 'EDITOR' };
 const author: AuthUser = { id: 'au', email: 'u@x.test', role: 'VIEWER' };
 
 const audit = { log: vi.fn() } as unknown as AuditService;
+
+/** The recipient lookups answer with fixed ids, so a test can see who would be told. */
+function fakeNotifications(over: Record<string, unknown> = {}) {
+  const notify = vi.fn(async () => undefined);
+  const notifications = {
+    reviewersOf: async () => ['rev1', 'rev2'],
+    admins: async () => ['adm1'],
+    authorsOf: async () => ['au'],
+    participantsOf: async () => ['p1', 'p2'],
+    notify,
+    ...over,
+  } as unknown as NotificationsService;
+  return { notifications, notify };
+}
 const settings = (requireFinalApproval = true) =>
   ({ getWorkflow: async () => ({ requireFinalApproval }) }) as unknown as SettingsService;
 
@@ -28,7 +43,15 @@ interface Stored {
   currentVersionId: string | null;
 }
 
-function setup(stored: Stored | null, opts: { raceLost?: boolean; requireFinal?: boolean } = {}) {
+function setup(
+  stored: Stored | null,
+  opts: {
+    raceLost?: boolean;
+    requireFinal?: boolean;
+    notifications?: Record<string, unknown>;
+  } = {},
+) {
+  const { notifications, notify } = fakeNotifications(opts.notifications);
   const updateMany = vi.fn(async () => ({ count: opts.raceLost ? 0 : 1 }));
   const update = vi.fn(async () => ({}));
   const create = vi.fn(async () => ({}));
@@ -41,8 +64,9 @@ function setup(stored: Stored | null, opts: { raceLost?: boolean; requireFinal?:
     prisma as unknown as PrismaService,
     audit,
     settings(opts.requireFinal),
+    notifications,
   );
-  return { svc, updateMany, update, create, tx };
+  return { svc, updateMany, update, create, tx, notify };
 }
 
 const draft: Stored = {
@@ -257,8 +281,9 @@ describe('CommentsService', () => {
     ...over,
   });
 
+  const notified = fakeNotifications();
   const make = (prisma: Record<string, unknown>) =>
-    new CommentsService(prisma as unknown as PrismaService, audit);
+    new CommentsService(prisma as unknown as PrismaService, audit, notified.notifications);
 
   it('nests replies under their thread, oldest first', async () => {
     const svc = make({
@@ -351,5 +376,179 @@ describe('CommentsService', () => {
       contentComment: { findUnique: async () => row({ parentId: 'k0' }), update },
     });
     await expect(reply.update('k1', { resolved: true }, editor)).rejects.toThrow(/top-level/);
+  });
+});
+
+describe('who is told about a review step', () => {
+  const about = { id: 'c1', title: 'عنوان', topicId: 't1' };
+  const withTitle = (stored: Stored): Stored & { id: string; title: string; topicId: string } => ({
+    ...stored,
+    id: 'c1',
+    title: 'عنوان',
+    topicId: 't1',
+  });
+
+  it('tells the reviewers about a submission, not the submitter', async () => {
+    const { svc, notify } = setup(withTitle(draft));
+    await svc.act('c1', 'submit', {}, author);
+    expect(notify).toHaveBeenCalledWith({
+      event: 'REVIEW_SUBMITTED',
+      recipients: ['rev1', 'rev2'],
+      actor: { id: 'au' },
+      content: about,
+      note: undefined,
+    });
+  });
+
+  it('tells the admins when an editor passes the content on', async () => {
+    const { svc, notify } = setup(withTitle(inReview('EDITORIAL')));
+    await svc.act('c1', 'approve', {}, editor);
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'REVIEW_FINAL_NEEDED', recipients: ['adm1'] }),
+    );
+  });
+
+  it('tells the authors about an approval: final stage, one-stage flow, finalize', async () => {
+    for (const [stored, action, user, requireFinal] of [
+      [inReview('FINAL'), 'approve', admin, true],
+      [inReview('EDITORIAL'), 'approve', editor, false],
+      [draft, 'finalize', admin, true],
+    ] as const) {
+      const { svc, notify } = setup(withTitle(stored), { requireFinal });
+      await svc.act('c1', action, {}, user);
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'REVIEW_APPROVED', recipients: ['au'] }),
+      );
+    }
+  });
+
+  it('tells the authors why changes were asked for or the content was rejected', async () => {
+    const asked = setup(withTitle(inReview('EDITORIAL')));
+    await asked.svc.act('c1', 'request_changes', { note: 'لحن را رسمی‌تر کنید' }, editor);
+    expect(asked.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'REVIEW_CHANGES_REQUESTED',
+        recipients: ['au'],
+        note: 'لحن را رسمی‌تر کنید',
+      }),
+    );
+    const rejected = setup(withTitle(inReview('EDITORIAL')));
+    await rejected.svc.act('c1', 'reject', { note: 'خارج از موضوع' }, editor);
+    expect(rejected.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'REVIEW_REJECTED', note: 'خارج از موضوع' }),
+    );
+  });
+
+  it('stays quiet for a withdrawal and a reopen', async () => {
+    const withdrawn = setup(withTitle(inReview('EDITORIAL')));
+    await withdrawn.svc.act('c1', 'withdraw', {}, author);
+    expect(withdrawn.notify).not.toHaveBeenCalled();
+    const reopened = setup(withTitle({ ...draft, status: 'APPROVED' }));
+    await reopened.svc.act('c1', 'reopen', {}, author);
+    expect(reopened.notify).not.toHaveBeenCalled();
+  });
+
+  it('does not tell anyone about a step that was refused', async () => {
+    const { svc, notify } = setup(withTitle(draft));
+    await expect(svc.act('c1', 'approve', {}, admin)).rejects.toThrow();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('still completes the step when looking up the recipients fails', async () => {
+    const { svc, updateMany } = setup(withTitle(draft), {
+      notifications: {
+        reviewersOf: async () => {
+          throw new Error('db hiccup');
+        },
+      },
+    });
+    await expect(svc.act('c1', 'submit', {}, author)).resolves.toMatchObject({
+      status: 'IN_REVIEW',
+    });
+    expect(updateMany).toHaveBeenCalled();
+  });
+});
+
+describe('who is told about a comment', () => {
+  const content = {
+    currentVersionId: 'v1',
+    title: 'عنوان',
+    topicId: 't1',
+    createdById: 'creator',
+    submittedById: null,
+  };
+  const created = (over: Record<string, unknown> = {}) => ({
+    id: 'k9',
+    contentId: 'c1',
+    versionId: 'v1',
+    parentId: null,
+    authorId: 'au',
+    body: 'نظر',
+    resolvedAt: null,
+    resolvedById: null,
+    createdAt: new Date('2026-10-08T10:00:00Z'),
+    updatedAt: new Date('2026-10-08T10:00:00Z'),
+    author: { id: 'au', name: 'A' },
+    resolvedBy: null,
+    version: { version: 1 },
+    ...over,
+  });
+
+  function build(
+    opts: {
+      parent?: unknown;
+      earlier?: { authorId: string | null }[];
+      notifications?: Record<string, unknown>;
+    } = {},
+  ) {
+    const n = fakeNotifications(opts.notifications);
+    const findMany = vi.fn(async () => opts.earlier ?? []);
+    const svc = new CommentsService(
+      {
+        content: { findUnique: async () => content },
+        contentComment: {
+          findFirst: async () => opts.parent ?? null,
+          create: async ({ data }: { data: Record<string, unknown> }) => created(data),
+          findMany,
+        },
+      } as unknown as PrismaService,
+      audit,
+      n.notifications,
+    );
+    return { svc, notify: n.notify, findMany };
+  }
+
+  it('tells the people around the content about a new thread', async () => {
+    const { svc, notify, findMany } = build({ earlier: [{ authorId: 'x' }, { authorId: null }] });
+    await svc.create('c1', { body: 'قلاب ضعیف است' }, author);
+    // for a new thread the commenters of the whole content count
+    expect(findMany.mock.calls[0]![0].where).toEqual({ contentId: 'c1' });
+    expect(notify).toHaveBeenCalledWith({
+      event: 'COMMENT_ADDED',
+      recipients: ['p1', 'p2'],
+      actor: { id: 'au' },
+      content: { id: 'c1', title: 'عنوان', topicId: 't1' },
+      note: 'قلاب ضعیف است',
+    });
+  });
+
+  it('tells the thread about a reply, looking only at that thread', async () => {
+    const { svc, notify, findMany } = build({ parent: { parentId: null, versionId: 'v1' } });
+    await svc.create('c1', { body: 'موافقم', parentId: 'k1' }, author);
+    expect(findMany.mock.calls[0]![0].where).toEqual({
+      OR: [{ id: 'k1' }, { parentId: 'k1' }],
+    });
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ event: 'COMMENT_REPLIED' }));
+  });
+
+  it('still saves the comment when looking up the recipients fails', async () => {
+    const { svc } = build({
+      notifications: {
+        participantsOf: async () => {
+          throw new Error('db hiccup');
+        },
+      },
+    });
+    await expect(svc.create('c1', { body: 'نظر' }, author)).resolves.toMatchObject({ id: 'k9' });
   });
 });
