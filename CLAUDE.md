@@ -26,6 +26,7 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 
 ## Docoo service API (docs/18-docoo-integration.md)
 - `GET /api/integrations/docoo/{ping,businesses,businesses/:id/export}`: read-only, bearer `INTEGRATION_TOKEN` (route absent when unset), not tied to users/roles. The export document (`DocooBusinessExport` in `packages/shared/src/integration.ts`, built by the pure `buildDocooExport`) must stay deterministic apart from `exportedAt` — Docoo hashes it to detect changes — and must never contain people, files or secrets. Add fields additively; bump `DOCOO_EXPORT_SCHEMA_VERSION` only for breaking changes.
+- Bee Researcher (docs/26-researcher-integration.md): `/api/integrations/researcher/...` reuses `DocooExportService` with its own `RESEARCHER_INTEGRATION_TOKEN` (off when unset or equal to `INTEGRATION_TOKEN`) and an allowlist (`RESEARCHER_BUSINESS_ACCESS` selected/all + `RESEARCHER_BUSINESS_IDS`); every query must pass `allowedIds()`, and a non-allowed id is a 404 before any DB read.
 
 ## Optional samples (docs/19-optional-samples.md)
 - Sample contents are optional: `Topic.samplesSkippedAt` (set by `PUT /topics/:id/samples-skipped`) settles the `add_samples` / `analyze_samples` Walker steps. A topic with no analyzed samples (or skipped) gets the business's READY+active references as `documents` from `ContextLoader.business()`; `formatBusiness` appends them as `[DOCUMENTS]` in the `business` variable — never add a prompt variable for it.

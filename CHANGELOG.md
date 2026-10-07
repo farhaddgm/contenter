@@ -2,6 +2,14 @@
 
 قالب بر اساس [Keep a Changelog](https://keepachangelog.com/) و نسخه‌گذاری [SemVer](https://semver.org/).
 
+## [0.16.0] — 2026-10-07
+
+### افزوده شد
+- **اتصال فقط‌خواندنی Bee Researcher** ([docs/26-researcher-integration.md](docs/26-researcher-integration.md)): مسیرهای `GET /api/integrations/researcher/{ping,businesses,businesses/:id/export}` با توکن مستقل `RESEARCHER_INTEGRATION_TOKEN` (جدا از Docoo) و فهرست مجاز کسب‌وکارها (`RESEARCHER_BUSINESS_ACCESS` = `selected` یا `all`، و `RESEARCHER_BUSINESS_IDS`). پیش‌فرض: خاموش و بدون دسترسی به هیچ کسب‌وکاری. خروجی همان قرارداد Docoo است و با `integration.researcher_export` در گزارش فعالیت ثبت می‌شود.
+
+### نکتهٔ استقرار
+- migration ندارد. تا `RESEARCHER_INTEGRATION_TOKEN` در `apps/api/.env` نباشد مسیرها ۴۰۴ می‌دهند. API Docoo تغییری نکرده است.
+
 ## [0.15.1] — 2026-10-07
 
 ### تغییر کرد
