@@ -27,6 +27,7 @@ export const paths = {
       getHref: (id: string) => `/app/businesses/discover/${id}`,
     },
     contents: { path: 'contents', getHref: () => '/app/contents' },
+    calendar: { path: 'calendar', getHref: () => '/app/calendar' },
     content: { path: 'contents/:contentId', getHref: (id: string) => `/app/contents/${id}` },
     account: { path: 'account', getHref: () => '/app/account' },
     admin: {

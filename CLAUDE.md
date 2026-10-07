@@ -36,6 +36,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Review workflow (docs/21-review-workflow.md)
 - Content status changes only through `POST /contents/:id/review/:action` (`ReviewsService.act`); `PATCH /contents/:id` refuses `status`. The rules live once in `packages/shared/src/workflow.ts` (`reviewActionsFor` / `applyReviewAction`); the API returns `review.actions` for the caller and the web only renders those — never re-derive roles in the client. Anything that changes reviewed text (manual edit, restore, AI revise) must call `ReviewsService.resetAfterEdit`. Comments are `@TopicScoped('comment')`.
 
+## Calendar & publishing (docs/22-calendar-publishing.md)
+- Only APPROVED content has `scheduledAt`; leaving APPROVED or changing the text clears it (`ReviewsService`). A content with `publishedAt` is frozen: edit/restore/AI revise and every review step answer 409 until unpublished. Publishing on platforms is manual — the app only records it. Calendar dates in the web come from `Intl` (`utils/calendar.ts`), never a hand-written Jalali converter.
+
 ## Topic & business access (docs/17-project-access.md)
 - EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 

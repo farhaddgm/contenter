@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Loader2, Search } from 'lucide-react';
-import type { Content, ContentStatus } from '@contenter/shared';
+import { calendarStateOf, type Content, type ContentStatus } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/form-controls';
@@ -10,7 +10,7 @@ import { EmptyState, Pagination, Table, type Column } from '@/components/ui/tabl
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatNumber, formatRelative } from '@/utils/format';
+import { formatDate, formatNumber, formatRelative } from '@/utils/format';
 import { useCampaigns } from '@/features/campaigns/api/campaigns';
 import { useTags } from '@/features/tags/api/tags';
 import { TagChips } from '@/features/tags/components/tag-chip';
@@ -106,6 +106,27 @@ export function ContentsTable({
           )}
         </div>
       ),
+    },
+    {
+      key: 'publishing',
+      header: t('calendar.publishing'),
+      cell: (c) => {
+        const state = calendarStateOf(c);
+        return state ? (
+          <div className="space-y-0.5 text-xs">
+            <Badge
+              tone={state === 'PUBLISHED' ? 'success' : state === 'OVERDUE' ? 'danger' : 'primary'}
+            >
+              {t(`calendar.state.${state}`)}
+            </Badge>
+            <p className="text-muted-foreground">
+              {formatDate(c.publishedAt ?? c.scheduledAt, false)}
+            </p>
+          </div>
+        ) : (
+          '—'
+        );
+      },
     },
     {
       key: 'score',

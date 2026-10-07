@@ -124,7 +124,7 @@ SystemSetting  (key/value JSON)
 - `Idea`: `title`، `angle`، `hook`، `format`، `outline[]`، `rationale`، `status` (`PROPOSED`، `SHORTLISTED`، `REJECTED` یا `USED`) و `score`
 
 ### Content و ContentVersion
-- `Content`: `title`، `format`، `status` (`GENERATING`، `DRAFT`، `IN_REVIEW`، `APPROVED`، `REJECTED` یا `FAILED`)، `ideaId?`، `brief?`، `profileId?`، `campaignId?`، `reviewStage?` (فقط در `IN_REVIEW`: `EDITORIAL` یا `FINAL`) و `currentVersionId`. وضعیت فقط با گام‌های گردش تأیید عوض می‌شود
+- `Content`: `title`، `format`، `status` (`GENERATING`، `DRAFT`، `IN_REVIEW`، `APPROVED`، `REJECTED` یا `FAILED`)، `ideaId?`، `brief?`، `profileId?`، `campaignId?`، `reviewStage?` (فقط در `IN_REVIEW`: `EDITORIAL` یا `FINAL`)، `scheduledAt?`، `publishedAt?`، `publishedUrl?` ([22-calendar-publishing.md](22-calendar-publishing.md)) و `currentVersionId`. وضعیت فقط با گام‌های گردش تأیید عوض می‌شود
 - `ContentVersion`: `version`، `title`، `body` (Markdown)، `hashtags[]`، `cta`، `notes`، `selfCheck` (JSON: رعایت هر اصل، امتیاز و پیشنهاد)، `feedback` (بازخوردی که این نسخه در پاسخ به آن ساخته شده) و `jobId`
 
 ### AiJob

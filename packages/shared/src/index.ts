@@ -9,3 +9,4 @@ export * from './business-assets';
 export * from './business-profile';
 export * from './integration';
 export * from './workflow';
+export * from './calendar';

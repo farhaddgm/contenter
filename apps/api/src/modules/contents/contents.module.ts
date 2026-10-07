@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Body,
   Controller,
   Delete,
@@ -38,6 +39,8 @@ import { AiJobsService } from '../ai/ai-jobs.service';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { ReviewsService } from '../reviews/reviews.service';
 import { TAG_SELECT } from '../tags/tag-select';
+
+const PUBLISHED_FROZEN = 'The content is published; unpublish it before changing it';
 
 const LIST_INCLUDE = {
   topic: { select: { id: true, title: true } },
@@ -161,6 +164,7 @@ export class ContentsService {
     if (content.status === 'GENERATING')
       throw new BadRequestException('A generation is already in progress');
     if (!content.currentVersionId) throw new BadRequestException('Nothing to revise yet');
+    if (content.publishedAt) throw new ConflictException(PUBLISHED_FROZEN);
     // the revision replaces the reviewed text: back to DRAFT first, so the history shows why
     await this.reviews.resetAfterEdit(this.prisma, id, user.id);
     await this.prisma.content.update({ where: { id }, data: { status: 'GENERATING' } });
@@ -182,6 +186,7 @@ export class ContentsService {
     const content = await this.get(id);
     if (content.status === 'GENERATING')
       throw new BadRequestException('Wait for the running generation to finish');
+    if (content.publishedAt) throw new ConflictException(PUBLISHED_FROZEN);
     await this.prisma.$transaction(async (tx) => {
       const last = await tx.contentVersion.findFirst({
         where: { contentId: id },
@@ -210,6 +215,11 @@ export class ContentsService {
       where: { id: versionId, contentId: id },
     });
     if (!v) throw new NotFoundException('Version not found');
+    const frozen = await this.prisma.content.findUnique({
+      where: { id },
+      select: { publishedAt: true },
+    });
+    if (frozen?.publishedAt) throw new ConflictException(PUBLISHED_FROZEN);
     await this.prisma.$transaction(async (tx) => {
       const before = await tx.content.findUnique({
         where: { id },

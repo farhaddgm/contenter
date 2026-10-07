@@ -39,7 +39,10 @@ export class ReviewsService {
 
   /** What `user` may do with the content now, for the detail response. */
   async info(
-    content: Pick<Content, 'status' | 'reviewStage' | 'submittedById' | 'currentVersionId'>,
+    content: Pick<
+      Content,
+      'status' | 'reviewStage' | 'submittedById' | 'currentVersionId' | 'publishedAt'
+    >,
     user: AuthUser,
   ): Promise<ContentReviewInfo> {
     const workflow = await this.settings.getWorkflow();
@@ -51,6 +54,7 @@ export class ReviewsService {
           reviewStage: content.reviewStage,
           submittedById: content.submittedById,
           hasVersion: !!content.currentVersionId,
+          published: !!content.publishedAt,
         },
         { id: user.id, role: user.role },
         workflow,
@@ -84,6 +88,7 @@ export class ReviewsService {
         reviewStage: content.reviewStage,
         submittedById: content.submittedById,
         hasVersion: !!content.currentVersionId,
+        published: !!content.publishedAt,
       },
       action,
       { id: user.id, role: user.role },
@@ -109,6 +114,8 @@ export class ReviewsService {
             : next.status === 'DRAFT'
               ? { submittedById: null, submittedAt: null }
               : {}),
+          // only an approved content stays on the calendar
+          ...(next.status === 'APPROVED' ? {} : { scheduledAt: null }),
         },
       });
       if (moved.count !== 1) {
@@ -154,6 +161,8 @@ export class ReviewsService {
         reviewStage: null,
         submittedById: null,
         submittedAt: null,
+        // the plan was for the approved text, which is gone
+        scheduledAt: null,
       },
     });
     await db.contentReview.create({
