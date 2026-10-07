@@ -112,7 +112,10 @@
 | GET | `/contents?topicId&status&tagId&campaignId&q&page` | فهرست |
 | POST | `/topics/:id/contents/generate` | **۲۰۲** — `{ ideaId? , brief?, format? }` ← `{ jobId, contentId }` |
 | GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه |
-| PATCH | `/contents/:id` | `{ status?: DRAFT, IN_REVIEW, APPROVED یا REJECTED, title?, campaignId? }` |
+| PATCH | `/contents/:id` | `{ title?, campaignId? }` — `status` دیگر پذیرفته نمی‌شود (۴۰۰)؛ برای تغییر وضعیت ↓ |
+| POST | `/contents/:id/review/:action` | گام گردش تأیید: `submit`، `approve`، `finalize`، `request_changes`، `reject`، `withdraw`، `reopen` — [21-review-workflow.md](21-review-workflow.md) |
+| GET / POST | `/contents/:id/comments` | کامنت‌ها (رشته‌ها با پاسخ) / نظر تازه |
+| PATCH / DELETE | `/comments/:id` | ویرایش، «حل شد» یا حذف نظر |
 | POST | `/contents/:id/revise` | **۲۰۲** — `{ feedback }` ← کار `REVISE_CONTENT` |
 | PUT | `/contents/:id/current` | ویرایش دستی که نسخهٔ جدیدی با منبع `ADMIN` می‌سازد |
 | POST | `/contents/:id/versions/:versionId/restore` | بازگرداندن یک نسخه |

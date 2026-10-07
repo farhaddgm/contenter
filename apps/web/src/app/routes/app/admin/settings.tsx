@@ -23,6 +23,7 @@ import { notify } from '@/stores/notifications';
 import { useAiSettings, useUpdateAiSettings } from '@/features/admin/api';
 import { GoogleDriveCard } from '@/features/businesses/components/google-drive-card';
 import { GoogleAccessCard } from '@/features/settings/components/google-access-card';
+import { WorkflowCard } from '@/features/settings/components/workflow-card';
 import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
 const PROVIDER_LABEL: Record<AiProviderName, string> = {
@@ -249,6 +250,9 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
           <GoogleAccessCard />
         </div>
       )}
+      <div className="mt-6">
+        <WorkflowCard />
+      </div>
       <div className="mt-6">
         <GoogleDriveCard />
       </div>

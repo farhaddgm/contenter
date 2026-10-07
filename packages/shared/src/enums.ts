@@ -83,6 +83,21 @@ export const ContentStatus = [
 ] as const;
 export type ContentStatus = (typeof ContentStatus)[number];
 
+/** Where an IN_REVIEW content waits (docs/21-review-workflow.md). */
+export const ReviewStage = ['EDITORIAL', 'FINAL'] as const;
+export type ReviewStage = (typeof ReviewStage)[number];
+
+export const ReviewDecision = [
+  'SUBMITTED',
+  'APPROVED',
+  'CHANGES_REQUESTED',
+  'REJECTED',
+  'WITHDRAWN',
+  'REOPENED',
+  'RESET',
+] as const;
+export type ReviewDecision = (typeof ReviewDecision)[number];
+
 export const ContentFormat = [
   'POST',
   'CAROUSEL',

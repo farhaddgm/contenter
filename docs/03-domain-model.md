@@ -23,6 +23,7 @@ Idea  ──< Content
 ContentProfile ──< Content    (هر محتوا می‌داند از کدام نسخهٔ پروفایل ساخته شده)
 Topic ──< Tag >──< Idea / Content   (چندبه‌چند؛ [20-tags-campaigns.md](20-tags-campaigns.md))
 Topic ──< Campaign ──< Content      (هر محتوا حداکثر در یک کمپین)
+Content ──< ContentReview           (تاریخچهٔ بازبینی)  ·  Content ──< ContentComment  ([21-review-workflow.md](21-review-workflow.md))
 
 AiJob         (هر فراخوانی AI؛ targetType/targetId به موجودیت مرتبط اشاره می‌کند)
 PromptTemplate (key + version؛ فقط یک نسخهٔ فعال برای هر key)
@@ -123,7 +124,7 @@ SystemSetting  (key/value JSON)
 - `Idea`: `title`، `angle`، `hook`، `format`، `outline[]`، `rationale`، `status` (`PROPOSED`، `SHORTLISTED`، `REJECTED` یا `USED`) و `score`
 
 ### Content و ContentVersion
-- `Content`: `title`، `format`، `status` (`GENERATING`، `DRAFT`، `IN_REVIEW`، `APPROVED`، `REJECTED` یا `FAILED`)، `ideaId?`، `brief?`، `profileId?`، `campaignId?` و `currentVersionId`
+- `Content`: `title`، `format`، `status` (`GENERATING`، `DRAFT`، `IN_REVIEW`، `APPROVED`، `REJECTED` یا `FAILED`)، `ideaId?`، `brief?`، `profileId?`، `campaignId?`، `reviewStage?` (فقط در `IN_REVIEW`: `EDITORIAL` یا `FINAL`) و `currentVersionId`. وضعیت فقط با گام‌های گردش تأیید عوض می‌شود
 - `ContentVersion`: `version`، `title`، `body` (Markdown)، `hashtags[]`، `cta`، `notes`، `selfCheck` (JSON: رعایت هر اصل، امتیاز و پیشنهاد)، `feedback` (بازخوردی که این نسخه در پاسخ به آن ساخته شده) و `jobId`
 
 ### AiJob

@@ -9,7 +9,6 @@ import {
   RotateCcw,
   Send,
   Trash2,
-  Undo2,
   XCircle,
   AlertTriangle,
 } from 'lucide-react';
@@ -33,6 +32,8 @@ import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { useJob } from '@/features/jobs/api/jobs';
 import { useCampaigns } from '@/features/campaigns/api/campaigns';
 import { useSetContentTags } from '@/features/tags/api/tags';
+import { CommentsCard } from './comments-card';
+import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
 import { TagPicker } from '@/features/tags/components/tag-picker';
 import {
   useContent,
@@ -364,9 +365,7 @@ function OrganizeCard({ content, editable }: { content: Content; editable: boole
               placeholder={t('campaigns.none')}
               value={content.campaignId ?? ''}
               options={options}
-              onChange={(e) =>
-                update.mutate({ campaignId: e.target.value || null }, { onError })
-              }
+              onChange={(e) => update.mutate({ campaignId: e.target.value || null }, { onError })}
             />
           )}
         </Field>
@@ -383,7 +382,6 @@ export function ContentView({ contentId }: { contentId: string }) {
   const lastJob = useJob(
     content?.status === 'FAILED' || content?.status === 'GENERATING' ? content.lastJobId : null,
   );
-  const update = useUpdateContent(contentId);
   const restore = useRestoreVersion(contentId);
   const remove = useDeleteContent();
   const reviseDialog = useDisclosure();
@@ -401,9 +399,6 @@ export function ContentView({ contentId }: { contentId: string }) {
     content.versions?.find((v) => v.id === viewVersionId) ?? content.currentVersion ?? null;
   const isCurrent = version?.id === content.currentVersionId;
   const generating = content.status === 'GENERATING';
-
-  const setStatus = (status: Content['status']) =>
-    update.mutate({ status }, { onSuccess: () => notify.success(t('common.saved')) });
 
   return (
     <>
@@ -423,6 +418,9 @@ export function ContentView({ contentId }: { contentId: string }) {
             <Badge tone={statusTone[content.status]}>
               {t(`enums.contentStatus.${content.status}`)}
             </Badge>
+            {content.status === 'IN_REVIEW' && content.reviewStage && (
+              <Badge tone="warning">{t(`enums.reviewStage.${content.reviewStage}`)}</Badge>
+            )}
             <Badge tone="outline">{t(`enums.contentFormat.${content.format}`)}</Badge>
             {content.idea && <span className="text-xs">💡 {content.idea.title}</span>}
           </span>
@@ -447,30 +445,7 @@ export function ContentView({ contentId }: { contentId: string }) {
               >
                 {t('contents.editManually')}
               </Button>
-              {content.status === 'DRAFT' && (
-                <Button variant="secondary" icon={<Send />} onClick={() => setStatus('IN_REVIEW')}>
-                  {t('contents.submitReview')}
-                </Button>
-              )}
-              {(content.status === 'DRAFT' || content.status === 'IN_REVIEW') && (
-                <Button
-                  variant="success"
-                  icon={<CheckCircle2 />}
-                  onClick={() => setStatus('APPROVED')}
-                >
-                  {t('contents.approve')}
-                </Button>
-              )}
-              {content.status === 'IN_REVIEW' && (
-                <Button variant="outline" icon={<XCircle />} onClick={() => setStatus('REJECTED')}>
-                  {t('contents.reject')}
-                </Button>
-              )}
-              {(content.status === 'APPROVED' || content.status === 'REJECTED') && (
-                <Button variant="outline" icon={<Undo2 />} onClick={() => setStatus('DRAFT')}>
-                  {t('contents.backToDraft')}
-                </Button>
-              )}
+              {!generating && <ReviewActionButtons content={content} />}
               <ConfirmationDialog
                 trigger={
                   <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
@@ -573,9 +548,16 @@ export function ContentView({ contentId }: { contentId: string }) {
                 </CardBody>
               </Card>
             )}
+            <CommentsCard
+              contentId={content.id}
+              currentVersionId={content.currentVersionId}
+              viewedVersionId={version.id}
+              canWrite={editable && !generating}
+            />
           </div>
 
           <div className="space-y-4">
+            <ReviewTimelineCard content={content} />
             <OrganizeCard content={content} editable={editable} />
             {version.id === content.currentVersionId && (
               <TermIssuesCard

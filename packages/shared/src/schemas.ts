@@ -370,6 +370,29 @@ export const ReviseContentSchema = z.object({
 });
 export type ReviseContentInput = z.infer<typeof ReviseContentSchema>;
 
+/** `POST /contents/:id/review/:action`; the note is required for the actions that need a reason. */
+export const ReviewBodySchema = z.object({
+  note: z.string().trim().max(5000).optional().default(''),
+});
+export type ReviewBodyInput = z.input<typeof ReviewBodySchema>;
+
+export const CreateCommentSchema = z.object({
+  body: z.string().trim().min(1).max(5000),
+  /** The version the author was looking at; defaults to the current one. */
+  versionId: z.string().min(1).optional(),
+  /** Reply to a top-level comment of the same content. */
+  parentId: z.string().min(1).optional(),
+});
+export type CreateCommentInput = z.input<typeof CreateCommentSchema>;
+
+export const UpdateCommentSchema = z.object({
+  body: z.string().trim().min(1).max(5000).optional(),
+  resolved: z.boolean().optional(),
+});
+export type UpdateCommentInput = z.infer<typeof UpdateCommentSchema>;
+
+export const WorkflowSettingsSchema = z.object({ requireFinalApproval: z.boolean() });
+
 export const UpdateContentSchema = z.object({
   status: z.enum(ContentStatus).optional(),
   title: z.string().trim().min(1).max(300).optional(),

@@ -94,10 +94,17 @@ export function ContentsTable({
       key: 'status',
       header: t('common.status'),
       cell: (c) => (
-        <Badge tone={statusTone[c.status]}>
-          {c.status === 'GENERATING' && <Loader2 className="animate-spin" />}
-          {t(`enums.contentStatus.${c.status}`)}
-        </Badge>
+        <div className="space-y-1">
+          <Badge tone={statusTone[c.status]}>
+            {c.status === 'GENERATING' && <Loader2 className="animate-spin" />}
+            {t(`enums.contentStatus.${c.status}`)}
+          </Badge>
+          {c.status === 'IN_REVIEW' && c.reviewStage && (
+            <p className="text-[11px] text-muted-foreground">
+              {t(`enums.reviewStage.${c.reviewStage}`)}
+            </p>
+          )}
+        </div>
       ),
     },
     {

@@ -19,6 +19,8 @@ import type {
   ProfileStatus,
   Role,
   AccessLevel,
+  ReviewDecision,
+  ReviewStage,
   TagColor,
   TopicStatus,
   TraitCategory,
@@ -26,6 +28,7 @@ import type {
   TraitStatus,
 } from './enums';
 import type { SampleAnalysisResult, SelfCheck } from './ai';
+import type { ReviewAction } from './workflow';
 
 export type ISODate = string;
 
@@ -295,6 +298,9 @@ export interface Content {
   brief: string;
   format: ContentFormat;
   status: ContentStatus;
+  /** Set while the status is IN_REVIEW. */
+  reviewStage: ReviewStage | null;
+  submittedAt: ISODate | null;
   currentVersionId: string | null;
   lastJobId: string | null;
   createdAt: ISODate;
@@ -305,8 +311,49 @@ export interface Content {
   idea?: Pick<Idea, 'id' | 'title'> | null;
   tags?: Tag[];
   campaign?: Pick<Campaign, 'id' | 'name' | 'status'> | null;
+  submittedBy?: PersonRef | null;
+  /** Detail only: what the current user may do in the review workflow now. */
+  review?: ContentReviewInfo;
+  /** Detail only: newest first. */
+  reviews?: ContentReview[];
   /** Detail only: brand terminology violations of the current version (linked business). */
   termIssues?: TermIssue[];
+}
+
+export type PersonRef = Pick<User, 'id' | 'name'>;
+
+export interface ContentReviewInfo {
+  actions: ReviewAction[];
+  requireFinalApproval: boolean;
+}
+
+/** One step of the review history. */
+export interface ContentReview {
+  id: string;
+  contentId: string;
+  versionId: string | null;
+  stage: ReviewStage | null;
+  decision: ReviewDecision;
+  note: string;
+  createdAt: ISODate;
+  actor: PersonRef | null;
+}
+
+export interface ContentComment {
+  id: string;
+  contentId: string;
+  versionId: string | null;
+  /** Number of that version, for display. */
+  version: number | null;
+  parentId: string | null;
+  body: string;
+  resolvedAt: ISODate | null;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  author: PersonRef | null;
+  resolvedBy: PersonRef | null;
+  /** Top-level comments only, oldest first. */
+  replies?: ContentComment[];
 }
 
 export interface AiJob {

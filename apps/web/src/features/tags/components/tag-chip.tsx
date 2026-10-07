@@ -29,7 +29,13 @@ export const tagSwatchClass: Record<TagColor, string> = {
   pink: 'bg-pink-500',
 };
 
-export function TagChip({ tag, className }: { tag: Pick<Tag, 'name' | 'color'>; className?: string }) {
+export function TagChip({
+  tag,
+  className,
+}: {
+  tag: Pick<Tag, 'name' | 'color'>;
+  className?: string;
+}) {
   return (
     <span
       dir="auto"
