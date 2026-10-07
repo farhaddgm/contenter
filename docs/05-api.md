@@ -116,6 +116,9 @@
 | POST | `/contents/:id/review/:action` | گام گردش تأیید: `submit`، `approve`، `finalize`، `request_changes`، `reject`، `withdraw`، `reopen` — [21-review-workflow.md](21-review-workflow.md) |
 | GET / POST | `/contents/:id/comments` | کامنت‌ها (رشته‌ها با پاسخ) / نظر تازه |
 | PATCH / DELETE | `/comments/:id` | ویرایش، «حل شد» یا حذف نظر |
+| PUT | `/contents/:id/schedule` | `{ scheduledAt }` — برنامه‌ریزی انتشار ([22-calendar-publishing.md](22-calendar-publishing.md)) |
+| POST / DELETE | `/contents/:id/published` | ثبت انتشار `{ publishedAt?, url? }` / لغو آن |
+| GET | `/calendar?from&to&topicId&campaignId&tagId` | تقویم: `{ items, ready }` |
 | POST | `/contents/:id/revise` | **۲۰۲** — `{ feedback }` ← کار `REVISE_CONTENT` |
 | PUT | `/contents/:id/current` | ویرایش دستی که نسخهٔ جدیدی با منبع `ADMIN` می‌سازد |
 | POST | `/contents/:id/versions/:versionId/restore` | بازگرداندن یک نسخه |

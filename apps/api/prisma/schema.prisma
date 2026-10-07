@@ -931,6 +931,11 @@ model Content {
   reviewStage      ReviewStage?
   submittedById    String?
   submittedAt      DateTime?
+  /// Planned publish time; only an APPROVED content is scheduled (docs/22-calendar-publishing.md)
+  scheduledAt      DateTime?
+  /// Set by hand once the content is live elsewhere; a published content is frozen
+  publishedAt      DateTime?
+  publishedUrl     String?
   currentVersionId String?       @unique
   lastJobId        String?
   createdById      String?
@@ -951,6 +956,8 @@ model Content {
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
   @@index([campaignId])
+  @@index([scheduledAt])
+  @@index([publishedAt])
 }
 
 /// One step of a content's review history (submit, approve, request changes …).

@@ -29,6 +29,7 @@ import type {
 } from './enums';
 import type { SampleAnalysisResult, SelfCheck } from './ai';
 import type { ReviewAction } from './workflow';
+import type { CalendarState } from './calendar';
 
 export type ISODate = string;
 
@@ -301,6 +302,11 @@ export interface Content {
   /** Set while the status is IN_REVIEW. */
   reviewStage: ReviewStage | null;
   submittedAt: ISODate | null;
+  /** Planned publish time (approved content only). */
+  scheduledAt: ISODate | null;
+  /** Set by hand once the content is live elsewhere; a published content is frozen. */
+  publishedAt: ISODate | null;
+  publishedUrl: string | null;
   currentVersionId: string | null;
   lastJobId: string | null;
   createdAt: ISODate;
@@ -321,6 +327,29 @@ export interface Content {
 }
 
 export type PersonRef = Pick<User, 'id' | 'name'>;
+
+/** One content on the calendar, or in the "ready to schedule" list. */
+export interface CalendarItem {
+  id: string;
+  title: string;
+  format: ContentFormat;
+  status: ContentStatus;
+  topic: Pick<Topic, 'id' | 'title' | 'platform'>;
+  campaign: Pick<Campaign, 'id' | 'name'> | null;
+  tags: Tag[];
+  scheduledAt: ISODate | null;
+  publishedAt: ISODate | null;
+  publishedUrl: string | null;
+  /** null only for the "ready to schedule" list. */
+  state: CalendarState | null;
+}
+
+export interface CalendarResponse {
+  /** Planned or published inside the range. */
+  items: CalendarItem[];
+  /** Approved contents nobody has planned yet (newest first, at most 50). */
+  ready: CalendarItem[];
+}
 
 export interface ContentReviewInfo {
   actions: ReviewAction[];

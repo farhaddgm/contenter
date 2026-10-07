@@ -152,6 +152,51 @@ describe('ReviewsService.act', () => {
   });
 });
 
+describe('ReviewsService and the calendar', () => {
+  it('takes a content off the calendar when it leaves APPROVED', async () => {
+    const { svc, updateMany } = setup({
+      status: 'APPROVED',
+      reviewStage: null,
+      submittedById: null,
+      currentVersionId: 'v1',
+    });
+    await svc.act('c1', 'reopen', {}, author);
+    expect(updateMany.mock.calls[0]![0].data).toMatchObject({ status: 'DRAFT', scheduledAt: null });
+  });
+
+  it('leaves the plan alone when the content stays approved', async () => {
+    const { svc, updateMany } = setup(inReview('FINAL'));
+    await svc.act('c1', 'approve', {}, admin);
+    expect(updateMany.mock.calls[0]![0].data).not.toHaveProperty('scheduledAt');
+  });
+
+  it('drops the plan when edited text sends an approved content back to draft', async () => {
+    const { svc, tx } = setup({
+      status: 'APPROVED',
+      reviewStage: null,
+      submittedById: null,
+      currentVersionId: 'v1',
+    });
+    await svc.resetAfterEdit(tx as never, 'c1', 'ed');
+    expect(tx.content.update.mock.calls[0]![0].data).toMatchObject({ scheduledAt: null });
+  });
+
+  it('offers nothing for a published content', async () => {
+    const { svc } = setup(null);
+    const info = await svc.info(
+      {
+        status: 'APPROVED',
+        reviewStage: null,
+        submittedById: null,
+        currentVersionId: 'v1',
+        publishedAt: new Date(),
+      },
+      admin,
+    );
+    expect(info.actions).toEqual([]);
+  });
+});
+
 describe('ReviewsService.resetAfterEdit', () => {
   it('returns approved text to DRAFT and records why', async () => {
     const { svc, tx, create } = setup({
@@ -163,7 +208,13 @@ describe('ReviewsService.resetAfterEdit', () => {
     await expect(svc.resetAfterEdit(tx as never, 'c1', 'ed')).resolves.toBe(true);
     expect(tx.content.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
-      data: { status: 'DRAFT', reviewStage: null, submittedById: null, submittedAt: null },
+      data: {
+        status: 'DRAFT',
+        reviewStage: null,
+        submittedById: null,
+        submittedAt: null,
+        scheduledAt: null,
+      },
     });
     expect(create).toHaveBeenCalledWith({
       data: { contentId: 'c1', versionId: 'v2', stage: null, decision: 'RESET', actorId: 'ed' },

@@ -393,6 +393,47 @@ export type UpdateCommentInput = z.infer<typeof UpdateCommentSchema>;
 
 export const WorkflowSettingsSchema = z.object({ requireFinalApproval: z.boolean() });
 
+// ---------- calendar & publishing ----------
+/** A calendar request covers at most two months (a month grid with its edge weeks). */
+export const CALENDAR_MAX_DAYS = 62;
+
+const isoDateTime = z.iso.datetime({ offset: true });
+
+export const CalendarQuerySchema = z
+  .object({
+    from: isoDateTime,
+    to: isoDateTime,
+    topicId: z.string().optional(),
+    campaignId: z.string().optional(),
+    tagId: z.string().optional(),
+  })
+  .refine((v) => new Date(v.to) > new Date(v.from), {
+    path: ['to'],
+    message: '`to` must be after `from`',
+  })
+  .refine(
+    (v) => new Date(v.to).getTime() - new Date(v.from).getTime() <= CALENDAR_MAX_DAYS * 86_400_000,
+    {
+      path: ['to'],
+      message: `The range cannot exceed ${CALENDAR_MAX_DAYS} days`,
+    },
+  );
+export type CalendarQuery = z.infer<typeof CalendarQuerySchema>;
+
+/** `null` takes the content off the calendar. */
+export const ScheduleContentSchema = z.object({ scheduledAt: isoDateTime.nullable() });
+export type ScheduleContentInput = z.infer<typeof ScheduleContentSchema>;
+
+export const PublishContentSchema = z.object({
+  /** When it went live; defaults to now. */
+  publishedAt: isoDateTime.optional(),
+  url: z
+    .url({ protocol: /^https?$/ })
+    .max(2000)
+    .optional(),
+});
+export type PublishContentInput = z.infer<typeof PublishContentSchema>;
+
 export const UpdateContentSchema = z.object({
   status: z.enum(ContentStatus).optional(),
   title: z.string().trim().min(1).max(300).optional(),

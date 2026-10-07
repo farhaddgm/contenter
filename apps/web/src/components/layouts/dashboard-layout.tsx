@@ -7,6 +7,7 @@ import {
   NotebookPen,
   Bot,
   Building2,
+  CalendarDays,
   FileText,
   FolderKanban,
   Gauge,
@@ -45,6 +46,7 @@ const contentNav: NavItem[] = [
   { to: paths.app.businesses.getHref(), label: 'nav.businesses', icon: <Building2 /> },
   { to: paths.app.topics.getHref(), label: 'nav.topics', icon: <FolderKanban /> },
   { to: paths.app.contents.getHref(), label: 'nav.contents', icon: <FileText /> },
+  { to: paths.app.calendar.getHref(), label: 'nav.calendar', icon: <CalendarDays /> },
 ];
 
 const smartNav: NavItem[] = [

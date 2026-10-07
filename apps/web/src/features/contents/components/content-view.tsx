@@ -31,6 +31,7 @@ import { formatDate, formatNumber } from '@/utils/format';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { useJob } from '@/features/jobs/api/jobs';
 import { useCampaigns } from '@/features/campaigns/api/campaigns';
+import { SchedulePanel } from '@/features/calendar/components/schedule-panel';
 import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
 import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
@@ -399,6 +400,8 @@ export function ContentView({ contentId }: { contentId: string }) {
     content.versions?.find((v) => v.id === viewVersionId) ?? content.currentVersion ?? null;
   const isCurrent = version?.id === content.currentVersionId;
   const generating = content.status === 'GENERATING';
+  // a published content is frozen until it is unpublished
+  const frozen = !!content.publishedAt;
 
   return (
     <>
@@ -433,7 +436,7 @@ export function ContentView({ contentId }: { contentId: string }) {
                 variant="outline"
                 icon={<MessageSquareText />}
                 onClick={reviseDialog.open}
-                disabled={generating}
+                disabled={generating || frozen}
               >
                 {t('contents.revise')}
               </Button>
@@ -441,7 +444,7 @@ export function ContentView({ contentId }: { contentId: string }) {
                 variant="outline"
                 icon={<Pencil />}
                 onClick={editDrawer.open}
-                disabled={generating}
+                disabled={generating || frozen}
               >
                 {t('contents.editManually')}
               </Button>
@@ -503,7 +506,7 @@ export function ContentView({ contentId }: { contentId: string }) {
                 actions={
                   <>
                     <CopyButton text={fullText(version)} label={t('contents.copyAll')} />
-                    {!isCurrent && editable && (
+                    {!isCurrent && editable && !frozen && (
                       <Button
                         size="sm"
                         icon={<RotateCcw />}
@@ -558,12 +561,18 @@ export function ContentView({ contentId }: { contentId: string }) {
 
           <div className="space-y-4">
             <ReviewTimelineCard content={content} />
+            <Card>
+              <CardHeader title={t('calendar.publishing')} />
+              <CardBody>
+                <SchedulePanel content={content} editable={editable} />
+              </CardBody>
+            </Card>
             <OrganizeCard content={content} editable={editable} />
             {version.id === content.currentVersionId && (
               <TermIssuesCard
                 contentId={content.id}
                 issues={content.termIssues ?? []}
-                canFix={editable && !generating}
+                canFix={editable && !generating && !frozen}
               />
             )}
             <SelfCheckCard version={version} />

@@ -37,6 +37,8 @@ export interface ReviewSubject {
   submittedById: string | null;
   /** A content without a draft has nothing to review. */
   hasVersion: boolean;
+  /** A published content is frozen: unpublish it before it can be reviewed again. */
+  published?: boolean;
 }
 
 export interface ReviewActor {
@@ -71,7 +73,7 @@ export function reviewActionsFor(
   actor: ReviewActor,
   _settings: WorkflowSettings = DEFAULT_WORKFLOW,
 ): ReviewAction[] {
-  if (!subject.hasVersion) return [];
+  if (!subject.hasVersion || subject.published) return [];
   const actions: ReviewAction[] = [];
   switch (subject.status) {
     case 'DRAFT':
