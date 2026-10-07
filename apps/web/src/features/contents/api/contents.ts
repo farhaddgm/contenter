@@ -19,6 +19,8 @@ export function useContents(params: {
   page: number;
   status?: ContentStatus | '';
   topicId?: string;
+  tagId?: string;
+  campaignId?: string;
   q?: string;
   pageSize?: number;
 }) {

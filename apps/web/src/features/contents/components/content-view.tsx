@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Dialog, Drawer } from '@/components/ui/dialog';
-import { Field, Input, Textarea } from '@/components/ui/form-controls';
+import { Field, Input, Select, Textarea } from '@/components/ui/form-controls';
 import { CopyButton, MarkdownView, PageHeader } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
@@ -31,6 +31,9 @@ import { cn } from '@/utils/cn';
 import { formatDate, formatNumber } from '@/utils/format';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { useJob } from '@/features/jobs/api/jobs';
+import { useCampaigns } from '@/features/campaigns/api/campaigns';
+import { useSetContentTags } from '@/features/tags/api/tags';
+import { TagPicker } from '@/features/tags/components/tag-picker';
 import {
   useContent,
   useDeleteContent,
@@ -328,6 +331,50 @@ function SelfCheckCard({ version }: { version: ContentVersion }) {
   );
 }
 
+/** Tags and campaign of a content. */
+function OrganizeCard({ content, editable }: { content: Content; editable: boolean }) {
+  const t = useT();
+  const setTags = useSetContentTags(content.id);
+  const update = useUpdateContent(content.id);
+  const { data: campaigns = [] } = useCampaigns(content.topicId);
+  // archived campaigns stay selectable only for a content that is already in one
+  const options = campaigns
+    .filter((c) => c.status === 'ACTIVE' || c.id === content.campaignId)
+    .map((c) => ({ value: c.id, label: c.name }));
+  const onError = (e: Error) => notify.error(t('common.error'), e.message);
+  return (
+    <Card>
+      <CardHeader title={t('contents.organize')} />
+      <CardBody className="space-y-4">
+        <Field label={t('tags.title')}>
+          {() => (
+            <TagPicker
+              topicId={content.topicId}
+              selected={content.tags ?? []}
+              disabled={!editable}
+              onChange={(tagIds) => setTags.mutate({ tagIds }, { onError })}
+            />
+          )}
+        </Field>
+        <Field label={t('campaigns.one')}>
+          {(id) => (
+            <Select
+              id={id}
+              disabled={!editable}
+              placeholder={t('campaigns.none')}
+              value={content.campaignId ?? ''}
+              options={options}
+              onChange={(e) =>
+                update.mutate({ campaignId: e.target.value || null }, { onError })
+              }
+            />
+          )}
+        </Field>
+      </CardBody>
+    </Card>
+  );
+}
+
 export function ContentView({ contentId }: { contentId: string }) {
   const t = useT();
   const navigate = useNavigate();
@@ -529,6 +576,7 @@ export function ContentView({ contentId }: { contentId: string }) {
           </div>
 
           <div className="space-y-4">
+            <OrganizeCard content={content} editable={editable} />
             {version.id === content.currentVersionId && (
               <TermIssuesCard
                 contentId={content.id}

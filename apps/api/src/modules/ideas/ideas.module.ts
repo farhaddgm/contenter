@@ -27,6 +27,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { TAG_SELECT } from '../tags/tag-select';
 
 @Injectable()
 export class IdeasService {
@@ -40,12 +41,14 @@ export class IdeasService {
     const where: Prisma.IdeaWhereInput = {
       topicId,
       ...(query.status ? { status: query.status } : {}),
+      ...(query.tagId ? { tags: { some: { id: query.tagId } } } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.idea.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }, { score: 'desc' }],
+        include: { tags: { select: TAG_SELECT, orderBy: { name: 'asc' } } },
         ...paginate(query),
       }),
       this.prisma.idea.count({ where }),

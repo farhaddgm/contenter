@@ -13,6 +13,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BrandDocsModule } from './modules/brand-docs/brand-docs.module';
 import { BusinessesModule } from './modules/businesses/businesses.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ContentsModule } from './modules/contents/contents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IdeasModule } from './modules/ideas/ideas.module';
@@ -23,6 +24,7 @@ import { SamplesModule } from './modules/samples/samples.module';
 import { GoogleAccessModule } from './modules/google-access/google-access.module';
 import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { TagsModule } from './modules/tags/tags.module';
 import { TopicsModule } from './modules/topics/topics.module';
 import { UsersModule } from './modules/users/users.module';
 import { InteractionInterceptor } from './modules/smart/interaction.interceptor';
@@ -52,6 +54,8 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     BrandDocsModule,
     IdeasModule,
     ContentsModule,
+    TagsModule,
+    CampaignsModule,
     JobsModule,
     DashboardModule,
     SmartModule,

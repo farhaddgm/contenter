@@ -19,6 +19,8 @@ import { formatNumber } from '@/utils/format';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { useTrackJob } from '@/features/jobs/api/jobs';
 import { GenerateContentDialog } from '@/features/contents/components/generate-content';
+import { useSetIdeaTags, useTags } from '@/features/tags/api/tags';
+import { TagPicker } from '@/features/tags/components/tag-picker';
 import { ideaKeys, useDeleteIdea, useIdeas, useIdeate, useUpdateIdea } from '../api/ideas';
 
 function IdeateDialog({
@@ -126,6 +128,7 @@ function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void })
   const editable = useCanEditTopic(idea.topicId);
   const update = useUpdateIdea();
   const remove = useDeleteIdea();
+  const setTags = useSetIdeaTags(idea.id);
   const setStatus = (status: IdeaStatus) => update.mutate({ id: idea.id, data: { status } });
   return (
     <Card className={cn('flex flex-col', idea.status === 'REJECTED' && 'opacity-60')}>
@@ -141,6 +144,14 @@ function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void })
           <Badge tone="primary">{t(`enums.contentFormat.${idea.format}`)}</Badge>
           <Badge tone={statusTone[idea.status]}>{t(`enums.ideaStatus.${idea.status}`)}</Badge>
         </div>
+        <TagPicker
+          topicId={idea.topicId}
+          selected={idea.tags ?? []}
+          disabled={!editable}
+          onChange={(tagIds) =>
+            setTags.mutate({ tagIds }, { onError: (e) => notify.error(t('common.error'), e.message) })
+          }
+        />
         {idea.hook && (
           <p className="rounded-md border-s-4 border-primary/50 bg-primary/5 px-3 py-2 text-sm italic leading-7">
             «{idea.hook}»
@@ -229,11 +240,13 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
   const editable = useCanEditTopic(topicId);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<IdeaStatus | ''>('');
+  const [tagId, setTagId] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
   const [writeIdea, setWriteIdea] = useState<Idea | null>(null);
   const ideateDialog = useDisclosure();
   const writeDialog = useDisclosure();
-  const { data, isLoading } = useIdeas(topicId, { page, status, pageSize: 12 });
+  const tags = useTags(topicId);
+  const { data, isLoading } = useIdeas(topicId, { page, status, tagId, pageSize: 12 });
   const { isRunning } = useTrackJob(jobId, {
     invalidate: [ideaKeys.all, ['topics']],
     onDone: () => setJobId(null),
@@ -258,20 +271,35 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
         <p className="rounded-md bg-warning/10 px-3 py-2 text-sm">{t('ideas.noProfileWarning')}</p>
       )}
       {isRunning && <AiWorkingBanner hint={t('enums.jobType.IDEATE')} />}
-      <Segmented
-        value={status}
-        onChange={(v) => {
-          setStatus(v);
-          setPage(1);
-        }}
-        options={[
-          { value: '', label: t('common.all') },
-          { value: 'PROPOSED', label: t('enums.ideaStatus.PROPOSED') },
-          { value: 'SHORTLISTED', label: t('enums.ideaStatus.SHORTLISTED') },
-          { value: 'USED', label: t('enums.ideaStatus.USED') },
-          { value: 'REJECTED', label: t('enums.ideaStatus.REJECTED') },
-        ]}
-      />
+      <div className="flex flex-wrap items-center gap-3">
+        <Segmented
+          value={status}
+          onChange={(v) => {
+            setStatus(v);
+            setPage(1);
+          }}
+          options={[
+            { value: '', label: t('common.all') },
+            { value: 'PROPOSED', label: t('enums.ideaStatus.PROPOSED') },
+            { value: 'SHORTLISTED', label: t('enums.ideaStatus.SHORTLISTED') },
+            { value: 'USED', label: t('enums.ideaStatus.USED') },
+            { value: 'REJECTED', label: t('enums.ideaStatus.REJECTED') },
+          ]}
+        />
+        {!!tags.data?.length && (
+          <Select
+            className="h-9 w-44"
+            aria-label={t('tags.one')}
+            placeholder={t('tags.allTags')}
+            value={tagId}
+            onChange={(e) => {
+              setTagId(e.target.value);
+              setPage(1);
+            }}
+            options={tags.data.map((tag) => ({ value: tag.id, label: tag.name }))}
+          />
+        )}
+      </div>
       {isLoading ? (
         <PageSpinner />
       ) : !data?.items.length ? (

@@ -25,7 +25,16 @@ export type AccessKind = 'topic' | 'business';
 
 /** Which record a route parameter points at; each belongs to exactly one topic or business. */
 export type TopicVia =
-  'topic' | 'sample' | 'idea' | 'content' | 'profile' | 'trait' | 'brandDoc' | 'principle';
+  | 'topic'
+  | 'sample'
+  | 'idea'
+  | 'content'
+  | 'profile'
+  | 'trait'
+  | 'brandDoc'
+  | 'principle'
+  | 'tag'
+  | 'campaign';
 export type BusinessVia =
   | 'business'
   | 'businessReference'
@@ -148,6 +157,10 @@ export class AccessService {
       case 'principle':
         // null topic = a global principle; those are admin-only and checked by the service
         return topic(await p.principle.findUnique({ where: { id }, ...sel }));
+      case 'tag':
+        return topic(await p.tag.findUnique({ where: { id }, ...sel }));
+      case 'campaign':
+        return topic(await p.campaign.findUnique({ where: { id }, ...sel }));
       case 'business':
         return { kind: 'business', id };
       case 'businessReference':

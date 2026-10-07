@@ -95,6 +95,24 @@ export const ContentFormat = [
 ] as const;
 export type ContentFormat = (typeof ContentFormat)[number];
 
+/** Palette of a tag; stored as a plain string in the DB and checked by Zod (docs/20). */
+export const TagColor = [
+  'slate',
+  'red',
+  'orange',
+  'amber',
+  'green',
+  'teal',
+  'blue',
+  'indigo',
+  'purple',
+  'pink',
+] as const;
+export type TagColor = (typeof TagColor)[number];
+
+export const CampaignStatus = ['ACTIVE', 'ARCHIVED'] as const;
+export type CampaignStatus = (typeof CampaignStatus)[number];
+
 export const AiJobType = [
   'ANALYZE_SAMPLE',
   'BUILD_PROFILE',

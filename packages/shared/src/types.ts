@@ -7,6 +7,7 @@ import type {
   AiJobType,
   AnalysisStatus,
   BrandDocKind,
+  CampaignStatus,
   ContentFormat,
   ContentStatus,
   FetchStatus,
@@ -18,6 +19,7 @@ import type {
   ProfileStatus,
   Role,
   AccessLevel,
+  TagColor,
   TopicStatus,
   TraitCategory,
   TraitSource,
@@ -230,6 +232,31 @@ export interface Idea {
   score: number;
   status: IdeaStatus;
   createdAt: ISODate;
+  tags?: Tag[];
+}
+
+export interface Tag {
+  id: string;
+  topicId: string;
+  name: string;
+  color: TagColor;
+  createdAt: ISODate;
+  /** Topic tag list only. */
+  _count?: { contents: number; ideas: number };
+}
+
+export interface Campaign {
+  id: string;
+  topicId: string;
+  name: string;
+  description: string;
+  status: CampaignStatus;
+  startsAt: ISODate | null;
+  endsAt: ISODate | null;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** Topic campaign list only. */
+  _count?: { contents: number };
 }
 
 export interface IdeationRequest {
@@ -263,6 +290,7 @@ export interface Content {
   topicId: string;
   ideaId: string | null;
   profileId: string | null;
+  campaignId: string | null;
   title: string;
   brief: string;
   format: ContentFormat;
@@ -275,6 +303,8 @@ export interface Content {
   versions?: ContentVersion[];
   topic?: Pick<Topic, 'id' | 'title'>;
   idea?: Pick<Idea, 'id' | 'title'> | null;
+  tags?: Tag[];
+  campaign?: Pick<Campaign, 'id' | 'name' | 'status'> | null;
   /** Detail only: brand terminology violations of the current version (linked business). */
   termIssues?: TermIssue[];
 }

@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CreateCampaignSchema,
   CreateSampleSchema,
+  CreateTagSchema,
   CreateTopicSchema,
   GenerateContentSchema,
   IdeateSchema,
+  MAX_TAGS_PER_ITEM,
   PaginationQuerySchema,
+  SetTagsSchema,
+  UpdateCampaignSchema,
   UpdatePrincipleSchema,
+  UpdateTagSchema,
   UpdateTopicSchema,
 } from './schemas';
 import { UpdateBusinessSchema } from './business';
@@ -43,6 +49,49 @@ describe('shared schemas', () => {
       pageSize: 10,
     });
     expect(PaginationQuerySchema.safeParse({ pageSize: '500' }).success).toBe(false);
+  });
+});
+
+describe('tag and campaign schemas', () => {
+  it('trims tag names and defaults the color', () => {
+    expect(CreateTagSchema.parse({ name: '  آموزشی ' })).toEqual({ name: 'آموزشی', color: 'slate' });
+    expect(CreateTagSchema.safeParse({ name: '' }).success).toBe(false);
+    expect(CreateTagSchema.safeParse({ name: 'x', color: 'chartreuse' }).success).toBe(false);
+  });
+
+  it('a tag PATCH does not reset the color', () => {
+    expect(UpdateTagSchema.parse({ name: 'new' })).toEqual({ name: 'new' });
+  });
+
+  it('caps the tags of one item', () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `t${i}`);
+    expect(SetTagsSchema.safeParse({ tagIds: ids(MAX_TAGS_PER_ITEM) }).success).toBe(true);
+    expect(SetTagsSchema.safeParse({ tagIds: ids(MAX_TAGS_PER_ITEM + 1) }).success).toBe(false);
+    expect(SetTagsSchema.safeParse({ tagIds: [] }).success).toBe(true);
+  });
+
+  it('rejects a campaign that ends before it starts', () => {
+    const base = { name: 'کمپین نوروز' };
+    expect(CreateCampaignSchema.safeParse(base).success).toBe(true);
+    expect(
+      CreateCampaignSchema.safeParse({
+        ...base,
+        startsAt: '2027-03-21T00:00:00.000Z',
+        endsAt: '2027-04-02T00:00:00.000Z',
+      }).success,
+    ).toBe(true);
+    expect(
+      CreateCampaignSchema.safeParse({
+        ...base,
+        startsAt: '2027-04-02T00:00:00.000Z',
+        endsAt: '2027-03-21T00:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('a campaign PATCH keeps omitted fields out and lets dates be cleared', () => {
+    expect(UpdateCampaignSchema.parse({ status: 'ARCHIVED' })).toEqual({ status: 'ARCHIVED' });
+    expect(UpdateCampaignSchema.parse({ endsAt: null })).toEqual({ endsAt: null });
   });
 });
 
