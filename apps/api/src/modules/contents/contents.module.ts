@@ -19,12 +19,15 @@ import { Prisma } from '@prisma/client';
 import {
   checkTerms,
   ContentListQuerySchema,
+  defaultFormatFor,
+  RepurposeContentSchema,
   EditContentVersionSchema,
   GenerateContentSchema,
   ReviseContentSchema,
   UpdateContentSchema,
   type EditContentVersionInput,
   type GenerateContentInput,
+  type RepurposeContentInput,
   type ReviseContentInput,
   type UpdateContentInput,
 } from '@contenter/shared';
@@ -39,11 +42,12 @@ import { AiJobsService } from '../ai/ai-jobs.service';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { ReviewsService } from '../reviews/reviews.service';
 import { TAG_SELECT } from '../tags/tag-select';
+import { buildContentOrderBy, buildContentWhere } from './content-filters';
 
 const PUBLISHED_FROZEN = 'The content is published; unpublish it before changing it';
 
 const LIST_INCLUDE = {
-  topic: { select: { id: true, title: true } },
+  topic: { select: { id: true, title: true, platform: true } },
   idea: { select: { id: true, title: true } },
   currentVersion: { select: { id: true, version: true, selfCheck: true, createdAt: true } },
   tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
@@ -61,19 +65,11 @@ export class ContentsService {
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
-    const visible = this.access.visibleTopics(user);
-    const where: Prisma.ContentWhereInput = {
-      ...(visible ? { topic: visible } : {}),
-      ...(query.topicId ? { topicId: query.topicId } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.tagId ? { tags: { some: { id: query.tagId } } } : {}),
-      ...(query.campaignId ? { campaignId: query.campaignId } : {}),
-      ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
-    };
+    const where = buildContentWhere(query, this.access.visibleTopics(user));
     const [items, total] = await this.prisma.$transaction([
       this.prisma.content.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: buildContentOrderBy(query.sort, query.order),
         include: LIST_INCLUDE,
         ...paginate(query),
       }),
@@ -86,13 +82,18 @@ export class ContentsService {
     const c = await this.prisma.content.findUnique({
       where: { id },
       include: {
-        topic: { select: { id: true, title: true } },
+        topic: { select: { id: true, title: true, platform: true } },
         idea: { select: { id: true, title: true } },
         currentVersion: true,
         versions: { orderBy: { version: 'desc' } },
         tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
         campaign: { select: { id: true, name: true, status: true } },
         submittedBy: { select: { id: true, name: true } },
+        source: { select: { id: true, title: true, platform: true, status: true } },
+        repurposed: {
+          select: { id: true, title: true, platform: true, format: true, status: true },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
     if (!c) throw new NotFoundException('Content not found');
@@ -242,6 +243,60 @@ export class ContentsService {
     return this.get(id);
   }
 
+  /**
+   * Writes the content again for other platforms: one new content (and one queued AI job) per
+   * target. The new contents start empty and GENERATING; the runner fills them in.
+   */
+  async repurpose(id: string, input: RepurposeContentInput, user: AuthUser) {
+    const data = RepurposeContentSchema.parse(input);
+    const source = await this.prisma.content.findUnique({
+      where: { id },
+      include: { tags: { select: { id: true } } },
+    });
+    if (!source) throw new NotFoundException('Content not found');
+    if (!source.currentVersionId || source.status === 'GENERATING') {
+      throw new BadRequestException('There is no finished draft to adapt yet');
+    }
+
+    const items: { contentId: string; jobId: string; platform: string; format: string }[] = [];
+    for (const target of data.targets) {
+      const format = target.format ?? defaultFormatFor(target.platform);
+      const content = await this.prisma.content.create({
+        data: {
+          topicId: source.topicId,
+          sourceContentId: source.id,
+          platform: target.platform,
+          format,
+          title: source.title,
+          brief: data.notes,
+          status: 'GENERATING',
+          // same campaign and tags as the original
+          campaignId: source.campaignId,
+          tags: source.tags.length ? { connect: source.tags } : undefined,
+          createdById: user.id,
+        },
+      });
+      const job = await this.jobs.enqueue({
+        type: 'REPURPOSE_CONTENT',
+        targetType: 'Content',
+        targetId: content.id,
+        topicId: source.topicId,
+        input: { platform: target.platform, format, notes: data.notes, sourceContentId: source.id },
+        userId: user.id,
+      });
+      await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
+      items.push({ contentId: content.id, jobId: job.id, platform: target.platform, format });
+    }
+    this.audit.log({
+      userId: user.id,
+      action: 'content.repurpose',
+      entityType: 'Content',
+      entityId: id,
+      meta: { targets: items.map((i) => `${i.platform}:${i.format}`) },
+    });
+    return { items };
+  }
+
   async update(id: string, input: UpdateContentInput, user: AuthUser) {
     if (input.status) {
       // every status change is a review step with its own rules and history
@@ -318,6 +373,17 @@ export class ContentsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.contents.update(id, body, user);
+  }
+
+  @TopicScoped('content')
+  @Post('contents/:id/repurpose')
+  @HttpCode(202)
+  repurpose(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(RepurposeContentSchema)) body: RepurposeContentInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.contents.repurpose(id, body, user);
   }
 
   @TopicScoped('content')

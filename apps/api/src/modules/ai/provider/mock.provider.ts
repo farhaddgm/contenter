@@ -310,6 +310,26 @@ export class MockProvider implements AiProvider {
           })),
         } satisfies IdeationResult;
       }
+      case 'REPURPOSE_CONTENT': {
+        // the prompt names the target, so a repurposed mock draft differs per platform
+        const target = /<target_platform>(.*?)<[/]target_platform>/s.exec(req.user)?.[1] ?? 'OTHER';
+        return {
+          title: `سه اشتباه رایج — نسخهٔ ${target}`,
+          body: `نسخهٔ بازنویسی‌شده برای ${target}:
+
+1. بدون هدف شروع نکن.
+2. خودت را با دیگران مقایسه نکن.
+3. در اولین شکست رها نکن.`,
+          hashtags: ['#رشد'],
+          cta: 'ذخیره کن.',
+          notes: `قالب و طول متناسب با ${target}.`,
+          selfCheck: {
+            score: 7,
+            principles: [{ principle: 'لحن صمیمی', satisfied: true, note: 'حفظ شد.' }],
+            suggestions: ['یک مثال واقعی اضافه شود.'],
+          },
+        } satisfies ContentDraftResult;
+      }
       case 'GENERATE_CONTENT':
       case 'REVISE_CONTENT':
         return {

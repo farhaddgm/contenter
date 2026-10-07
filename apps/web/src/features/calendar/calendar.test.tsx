@@ -36,6 +36,7 @@ const item = (over: Partial<CalendarItem>): CalendarItem => ({
   format: 'POST',
   status: 'APPROVED',
   topic: { id: 't1', title: 'سرمایه‌گذاری', platform: 'INSTAGRAM' },
+  platform: 'INSTAGRAM',
   campaign: null,
   tags: [],
   scheduledAt: new Date(2026, 9, 10, 9, 30).toISOString(),

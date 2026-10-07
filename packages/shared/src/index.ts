@@ -10,3 +10,5 @@ export * from './business-profile';
 export * from './integration';
 export * from './workflow';
 export * from './calendar';
+export * from './search';
+export * from './repurpose';

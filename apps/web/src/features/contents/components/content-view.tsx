@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   History,
+  Layers,
   MessageSquareText,
   Pencil,
   RotateCcw,
@@ -12,7 +13,12 @@ import {
   XCircle,
   AlertTriangle,
 } from 'lucide-react';
-import type { Content, ContentVersion, TermIssue } from '@contenter/shared';
+import {
+  effectivePlatform,
+  type Content,
+  type ContentVersion,
+  type TermIssue,
+} from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -34,6 +40,7 @@ import { useCampaigns } from '@/features/campaigns/api/campaigns';
 import { SchedulePanel } from '@/features/calendar/components/schedule-panel';
 import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
+import { RepurposeDialog, RepurposedCard } from './repurpose';
 import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
 import { TagPicker } from '@/features/tags/components/tag-picker';
 import {
@@ -387,6 +394,7 @@ export function ContentView({ contentId }: { contentId: string }) {
   const remove = useDeleteContent();
   const reviseDialog = useDisclosure();
   const editDrawer = useDisclosure();
+  const repurposeDialog = useDisclosure();
   // A picked history entry is tied to the current version it was picked under,
   // so a new generation automatically brings the view back to the latest draft.
   const [viewed, setViewed] = useState<{ current: string | null; id: string } | null>(null);
@@ -425,6 +433,11 @@ export function ContentView({ contentId }: { contentId: string }) {
               <Badge tone="warning">{t(`enums.reviewStage.${content.reviewStage}`)}</Badge>
             )}
             <Badge tone="outline">{t(`enums.contentFormat.${content.format}`)}</Badge>
+            {content.topic && (
+              <Badge tone="primary">
+                {t(`enums.platform.${effectivePlatform(content, content.topic)}`)}
+              </Badge>
+            )}
             {content.idea && <span className="text-xs">💡 {content.idea.title}</span>}
           </span>
         }
@@ -447,6 +460,14 @@ export function ContentView({ contentId }: { contentId: string }) {
                 disabled={generating || frozen}
               >
                 {t('contents.editManually')}
+              </Button>
+              <Button
+                variant="outline"
+                icon={<Layers />}
+                onClick={repurposeDialog.open}
+                disabled={generating}
+              >
+                {t('repurpose.action')}
               </Button>
               {!generating && <ReviewActionButtons content={content} />}
               <ConfirmationDialog
@@ -567,6 +588,7 @@ export function ContentView({ contentId }: { contentId: string }) {
                 <SchedulePanel content={content} editable={editable} />
               </CardBody>
             </Card>
+            <RepurposedCard content={content} />
             <OrganizeCard content={content} editable={editable} />
             {version.id === content.currentVersionId && (
               <TermIssuesCard
@@ -625,6 +647,9 @@ export function ContentView({ contentId }: { contentId: string }) {
 
       {reviseDialog.isOpen && (
         <ReviseDialog contentId={content.id} open onOpenChange={reviseDialog.setIsOpen} />
+      )}
+      {repurposeDialog.isOpen && (
+        <RepurposeDialog content={content} onClose={repurposeDialog.close} />
       )}
       {editDrawer.isOpen && (
         <EditDrawer content={content} open onOpenChange={editDrawer.setIsOpen} />

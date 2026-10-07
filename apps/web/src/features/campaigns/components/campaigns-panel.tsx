@@ -162,7 +162,7 @@ function CampaignRow({ campaign, editable }: { campaign: Campaign; editable: boo
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            to={`${paths.app.topic.getHref(campaign.topicId, 'contents')}?campaign=${campaign.id}`}
+            to={`${paths.app.topic.getHref(campaign.topicId, 'contents')}?campaignId=${campaign.id}`}
             className="font-medium hover:text-primary"
             dir="auto"
           >

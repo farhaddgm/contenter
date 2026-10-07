@@ -227,3 +227,123 @@ export class ReviseContentRunner implements AiRunner {
     });
   }
 }
+
+/**
+ * Writes the same content again for another platform/format. The new `Content` shell (with
+ * `sourceContentId`, `platform` and `format`) was created in the request path; this fills it with
+ * the first version, written from the source's current draft.
+ */
+@Injectable()
+export class RepurposeContentRunner implements AiRunner {
+  readonly type = 'REPURPOSE_CONTENT' as const;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiExecutor,
+    private readonly ctx: ContextLoader,
+  ) {}
+
+  async run(job: AiJob): Promise<RunnerResult> {
+    const content = await this.prisma.content.findUniqueOrThrow({
+      where: { id: job.targetId },
+      include: {
+        topic: true,
+        source: { include: { currentVersion: true, topic: { select: { platform: true } } } },
+      },
+    });
+    const source = content.source;
+    if (!source?.currentVersion) {
+      throw new NonRetryableAiError('The source content has no draft to adapt');
+    }
+    const targetPlatform = content.platform ?? content.topic.platform;
+    const { notes } = (job.input ?? {}) as { notes?: string };
+
+    const [business, principles, profile, brandDocs] = await Promise.all([
+      this.ctx.business(content.topicId),
+      this.ctx.principles(content.topicId),
+      this.ctx.activeProfile(content.topicId),
+      this.ctx.brandDocs(content.topicId),
+    ]);
+    const cur = source.currentVersion;
+
+    const result = await this.ai.execute({
+      task: this.type,
+      promptKey: 'repurpose_content',
+      schema: ContentDraftResultSchema,
+      vars: {
+        language: content.topic.language,
+        target_platform: targetPlatform,
+        target_format: content.format,
+        // the topic block names the platform the new piece is for, not the topic's usual one
+        topic: formatTopic({ ...content.topic, platform: targetPlatform, business }),
+        business: formatBusiness(business),
+        profile: formatProfile(profile),
+        principles: formatPrinciples(principles),
+        brand_docs: formatBrandDocs(brandDocs),
+        source: [
+          `Platform: ${source.platform ?? source.topic.platform}`,
+          `Format: ${source.format}`,
+          `Title: ${cur.title}`,
+          `Body:\n${cur.body}`,
+          `Hashtags: ${cur.hashtags.join(' ')}`,
+          `CTA: ${cur.cta}`,
+        ].join('\n\n'),
+        direction: notes?.trim() || '(none)',
+      },
+    });
+
+    const draft = normalizeDraft(result.data);
+    const version = await this.prisma.$transaction(async (tx) => {
+      const v = await tx.contentVersion.create({
+        data: {
+          contentId: content.id,
+          version: 1,
+          source: 'AI',
+          jobId: job.id,
+          feedback: notes?.trim() || null,
+          ...draft,
+        },
+      });
+      await tx.content.update({
+        where: { id: content.id },
+        data: {
+          currentVersionId: v.id,
+          title: draft.title,
+          status: 'DRAFT',
+          profileId: profile?.id ?? null,
+        },
+      });
+      return v;
+    });
+
+    return {
+      output: {
+        contentId: content.id,
+        sourceContentId: source.id,
+        versionId: version.id,
+        platform: targetPlatform,
+        format: content.format,
+        score: result.data.selfCheck.score,
+      },
+      model: result.model,
+      usage: result.usage,
+      prompt: result.prompt,
+    };
+  }
+
+  async onFailure(job: AiJob) {
+    const content = await this.prisma.content.findUnique({ where: { id: job.targetId } });
+    if (!content) return;
+    await this.prisma.content.update({
+      where: { id: content.id },
+      data: { status: content.currentVersionId ? 'DRAFT' : 'FAILED' },
+    });
+  }
+
+  async onRetry(job: AiJob) {
+    await this.prisma.content.updateMany({
+      where: { id: job.targetId },
+      data: { status: 'GENERATING' },
+    });
+  }
+}

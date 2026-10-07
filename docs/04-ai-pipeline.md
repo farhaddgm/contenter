@@ -11,6 +11,7 @@
 | ایده‌پردازی | **AI** (`IDEATE`) | خروجی: `IdeationResult` ← کد ایده‌ها را ذخیره می‌کند |
 | تولید محتوا | **AI** (`GENERATE_CONTENT`) | خروجی: `ContentDraftResult` + `selfCheck` |
 | بازنویسی با بازخورد | **AI** (`REVISE_CONTENT`) | نسخهٔ جدید `ContentVersion` |
+| نسخه برای پلتفرم دیگر | **AI** (`REPURPOSE_CONTENT`) | `ContentDraftResult` ← کد محتوای تازه (با `sourceContentId`) را پر می‌کند ([23-repurposing.md](23-repurposing.md)) |
 | پاسخ دستیار اسمارت | **AI** (`SMART_CHAT`) | فقط پاسخ متنی بر اساس کانتکست فقط‌خواندنی که کد می‌سازد ([10-smart.md](10-smart.md)) |
 | یافتن کسب‌وکارهای واقعی برای کلیدواژه | **AI** (`BUSINESS_DISCOVER`) | تحقیق وب ← `BusinessDiscoveryResult`؛ ادمین کاندیدا را تأیید می‌کند ([12-businesses.md](12-businesses.md)) |
 | ساخت پروفایل کامل کسب‌وکار از وب | **AI** (`BUSINESS_BUILD`) | تحقیق وب ← `BusinessBuildResult` ← کد بخش‌ها را می‌نویسد (متن ادمین را بازنویسی نمی‌کند) |

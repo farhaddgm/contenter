@@ -923,6 +923,9 @@ model Content {
   ideaId           String?
   profileId        String?
   campaignId       String?
+  /// Set on a content made for another platform from `sourceContentId` (docs/23-repurposing.md)
+  platform         Platform?
+  sourceContentId  String?
   title            String
   brief            String        @default("")
   format           ContentFormat @default(POST)
@@ -950,6 +953,8 @@ model Content {
   versions       ContentVersion[] @relation("ContentVersions")
   tags           Tag[]
   submittedBy    User?            @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  source         Content?         @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  repurposed     Content[]        @relation("Repurposed")
   reviews        ContentReview[]
   comments       ContentComment[]
 
@@ -958,6 +963,7 @@ model Content {
   @@index([campaignId])
   @@index([scheduledAt])
   @@index([publishedAt])
+  @@index([sourceContentId])
 }
 
 /// One step of a content's review history (submit, approve, request changes …).
@@ -1039,6 +1045,7 @@ enum AiJobType {
   BUSINESS_REVISE
   BUSINESS_ASSET_ANALYZE
   BUSINESS_AUDIT
+  REPURPOSE_CONTENT
 }
 
 enum AiJobStatus {

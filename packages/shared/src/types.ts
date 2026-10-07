@@ -295,6 +295,10 @@ export interface Content {
   ideaId: string | null;
   profileId: string | null;
   campaignId: string | null;
+  /** Set when the content was made for a platform other than its topic's. */
+  platform: Platform | null;
+  /** The content this one was repurposed from. */
+  sourceContentId: string | null;
   title: string;
   brief: string;
   format: ContentFormat;
@@ -313,10 +317,14 @@ export interface Content {
   updatedAt: ISODate;
   currentVersion?: ContentVersion | null;
   versions?: ContentVersion[];
-  topic?: Pick<Topic, 'id' | 'title'>;
+  topic?: Pick<Topic, 'id' | 'title' | 'platform'>;
   idea?: Pick<Idea, 'id' | 'title'> | null;
   tags?: Tag[];
   campaign?: Pick<Campaign, 'id' | 'name' | 'status'> | null;
+  /** Detail only: the content this one was repurposed from. */
+  source?: Pick<Content, 'id' | 'title' | 'platform' | 'status'> | null;
+  /** Detail only: the contents written from this one for other platforms. */
+  repurposed?: Pick<Content, 'id' | 'title' | 'platform' | 'format' | 'status'>[];
   submittedBy?: PersonRef | null;
   /** Detail only: what the current user may do in the review workflow now. */
   review?: ContentReviewInfo;
@@ -335,6 +343,8 @@ export interface CalendarItem {
   format: ContentFormat;
   status: ContentStatus;
   topic: Pick<Topic, 'id' | 'title' | 'platform'>;
+  /** The platform it is for: its own, else its topic's. */
+  platform: Platform;
   campaign: Pick<Campaign, 'id' | 'name'> | null;
   tags: Tag[];
   scheduledAt: ISODate | null;
@@ -383,6 +393,28 @@ export interface ContentComment {
   resolvedBy: PersonRef | null;
   /** Top-level comments only, oldest first. */
   replies?: ContentComment[];
+}
+
+/** One hit of `GET /search`; `snippet` is plain text around the first match. */
+export interface SearchHit {
+  id: string;
+  title: string;
+  snippet: string;
+  topic: Pick<Topic, 'id' | 'title'> | null;
+  /** Contents: status; ideas: status; topics: none. */
+  status?: string;
+  format?: ContentFormat;
+  platform?: Platform;
+  tags?: Tag[];
+  score: number;
+}
+
+export interface SearchResponse {
+  /** The words searched for (after dropping duplicates), for highlighting. */
+  terms: string[];
+  contents: SearchHit[];
+  ideas: SearchHit[];
+  topics: SearchHit[];
 }
 
 export interface AiJob {
