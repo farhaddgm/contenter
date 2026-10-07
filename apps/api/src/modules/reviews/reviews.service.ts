@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import type { Content, Prisma } from '@prisma/client';
 import {
@@ -12,12 +13,15 @@ import {
   reviewActionsFor,
   REVIEW_ACTIONS_NEEDING_NOTE,
   type ContentReviewInfo,
+  type NotificationEvent,
   type ReviewAction,
   type ReviewBodyInput,
+  type ReviewTransition,
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuthUser } from '../../common/auth.decorators';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.module';
 
 /** The Prisma delegates the review code touches, so it also runs inside a transaction. */
@@ -31,10 +35,13 @@ export const REVIEW_INCLUDE = {
 
 @Injectable()
 export class ReviewsService {
+  private readonly logger = new Logger(ReviewsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** What `user` may do with the content now, for the detail response. */
@@ -140,7 +147,45 @@ export class ReviewsService {
       entityId: contentId,
       meta: { from: content.status, to: next.status, stage: next.stage, note: note || undefined },
     });
+    try {
+      await this.tell(content, action, next, note, user);
+    } catch (err) {
+      // looking up who to tell failed; the step itself is done and must not be reported as failed
+      this.logger.warn(`could not notify about ${action}: ${(err as Error).message}`);
+    }
     return { status: next.status, reviewStage: next.reviewStage };
+  }
+
+  /** Tells the people the step matters to; never fails the step (docs/25-notifications.md). */
+  private async tell(
+    content: Content,
+    action: ReviewAction,
+    next: ReviewTransition,
+    note: string,
+    user: AuthUser,
+  ) {
+    const about = { id: content.id, title: content.title, topicId: content.topicId };
+    const actor = { id: user.id };
+    const notify = (event: NotificationEvent, recipients: string[], withNote = false) =>
+      this.notifications.notify({
+        event,
+        recipients,
+        actor,
+        content: about,
+        note: withNote ? note : undefined,
+      });
+
+    if (action === 'submit') {
+      await notify('REVIEW_SUBMITTED', await this.notifications.reviewersOf(content.topicId));
+    } else if (action === 'approve' && next.reviewStage === 'FINAL') {
+      await notify('REVIEW_FINAL_NEEDED', await this.notifications.admins());
+    } else if (next.status === 'APPROVED') {
+      await notify('REVIEW_APPROVED', await this.notifications.authorsOf(content));
+    } else if (action === 'request_changes') {
+      await notify('REVIEW_CHANGES_REQUESTED', await this.notifications.authorsOf(content), true);
+    } else if (action === 'reject') {
+      await notify('REVIEW_REJECTED', await this.notifications.authorsOf(content), true);
+    }
   }
 
   /**

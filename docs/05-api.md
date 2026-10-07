@@ -126,6 +126,9 @@
 | POST | `/contents/:id/versions/:versionId/restore` | بازگرداندن یک نسخه |
 | DELETE | `/contents/:id` | حذف |
 
+## اعلان‌ها
+مسیرهای `/notifications` (اعلان‌ها و ترجیحات خودِ کاربر؛ همهٔ نقش‌ها) و `/admin/settings/notifications` و `/admin/notification-deliveries` (وب‌هوک و لاگ ارسال؛ فقط ADMIN) در [25-notifications.md](25-notifications.md) آمده‌اند.
+
 ## کارها و داشبورد
 | متد | مسیر | توضیح |
 |---|---|---|

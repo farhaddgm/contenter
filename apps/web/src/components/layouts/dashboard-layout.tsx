@@ -31,6 +31,7 @@ import { useAuthorization, useLogout } from '@/lib/auth';
 import { useUi } from '@/stores/ui';
 import { cn } from '@/utils/cn';
 import { Dropdown } from '@/components/ui/misc';
+import { NotificationBell } from '@/features/inbox/components/notification-bell';
 import { SearchBox } from '@/features/search/components/search-box';
 import { SmartRoot } from '@/features/smart/components/smart-root';
 import { SmartToggle } from '@/features/smart/components/smart-toggle';
@@ -226,6 +227,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           </button>
           <div className="flex-1" />
           <SearchBox />
+          <NotificationBell />
           <SmartToggle />
           <UserMenu />
         </header>
