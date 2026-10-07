@@ -98,7 +98,7 @@
 ## ایده‌ها
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET | `/topics/:id/ideas?status&tagId&page&q` | فهرست |
+| GET | `/topics/:id/ideas?status&statuses&formats&tagId&sort&page&q` | فهرست ([24-search-filters.md](24-search-filters.md)) |
 | POST | `/topics/:id/ideas/generate` | **۲۰۲** — `{ count, direction?, format? }` ← کار `IDEATE` |
 | PATCH / DELETE | `/ideas/:id` | تغییر وضعیت، ویرایش یا حذف |
 | PUT | `/ideas/:id/tags` | `{ tagIds }` — [20-tags-campaigns.md](20-tags-campaigns.md) |
@@ -109,7 +109,9 @@
 ## محتوا
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET | `/contents?topicId&status&tagId&campaignId&q&page` | فهرست |
+| GET | `/contents?topicId&q&statuses&formats&platforms&tagIds&campaignId&createdById&schedule&createdFrom&createdTo&sort&order&page` | فهرست با فیلترهای پیشرفته ([24-search-filters.md](24-search-filters.md)) |
+| GET | `/search?q&topicId&limit` | جست‌وجوی سراسری در محتواها، ایده‌ها و موضوع‌ها |
+| POST | `/contents/:id/repurpose` | **۲۰۲** — `{ targets: [{ platform, format? }], notes? }` ← کار `REPURPOSE_CONTENT` برای هر هدف ([23-repurposing.md](23-repurposing.md)) |
 | POST | `/topics/:id/contents/generate` | **۲۰۲** — `{ ideaId? , brief?, format? }` ← `{ jobId, contentId }` |
 | GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه |
 | PATCH | `/contents/:id` | `{ title?, campaignId? }` — `status` دیگر پذیرفته نمی‌شود (۴۰۰)؛ برای تغییر وضعیت ↓ |

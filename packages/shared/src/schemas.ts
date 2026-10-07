@@ -22,6 +22,7 @@ import {
   TraitStatus,
 } from './enums';
 import { AiProviderName, MODEL_REF_PATTERN } from './ai-providers';
+import { MAX_REPURPOSE_TARGETS } from './repurpose';
 
 // ---------- common ----------
 export const PaginationQuerySchema = z.object({
@@ -300,9 +301,27 @@ export const UpdateIdeaSchema = z.object({
 });
 export type UpdateIdeaInput = z.infer<typeof UpdateIdeaSchema>;
 
+/** A comma-separated query value (`a,b,c`) as a validated list; web params are plain strings. */
+const csv = <T extends z.ZodType>(item: T) =>
+  z
+    .string()
+    .transform((s) =>
+      s
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(item).max(20) as unknown as z.ZodType<z.output<T>[], string[]>);
+
+export const IdeaSort = ['newest', 'score'] as const;
+export type IdeaSort = (typeof IdeaSort)[number];
+
 export const IdeaListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(IdeaStatus).optional(),
+  statuses: csv(z.enum(IdeaStatus)).optional(),
+  formats: csv(z.enum(ContentFormat)).optional(),
   tagId: z.string().optional(),
+  sort: z.enum(IdeaSort).default('newest'),
 });
 
 // ---------- tags & campaigns ----------
@@ -451,12 +470,70 @@ export const EditContentVersionSchema = z.object({
 });
 export type EditContentVersionInput = z.input<typeof EditContentVersionSchema>;
 
+export const ContentSort = ['updated', 'created', 'scheduled', 'title'] as const;
+export type ContentSort = (typeof ContentSort)[number];
+
+/** Where a content is in the publishing plan (docs/22-calendar-publishing.md). */
+export const ScheduleFilter = ['planned', 'unplanned', 'overdue', 'published'] as const;
+export type ScheduleFilter = (typeof ScheduleFilter)[number];
+
+/** `campaignId=none` finds the contents that are in no campaign. */
+export const NO_CAMPAIGN = 'none';
+
+/**
+ * Content list filters (docs/24-search-filters.md). The single-value `status`, `tagId` and
+ * `campaignId` stay for older callers; the plural ones are comma-separated and combine with them.
+ * Different filters narrow each other; several values of one filter widen it.
+ */
 export const ContentListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(ContentStatus).optional(),
+  statuses: csv(z.enum(ContentStatus)).optional(),
+  formats: csv(z.enum(ContentFormat)).optional(),
+  /** The platform a content is for: its own, else its topic's. */
+  platforms: csv(z.enum(Platform)).optional(),
   topicId: z.string().optional(),
   tagId: z.string().optional(),
+  tagIds: csv(z.string()).optional(),
   campaignId: z.string().optional(),
+  createdById: z.string().optional(),
+  schedule: z.enum(ScheduleFilter).optional(),
+  createdFrom: z.iso.datetime({ offset: true }).optional(),
+  createdTo: z.iso.datetime({ offset: true }).optional(),
+  sort: z.enum(ContentSort).default('updated'),
+  order: z.enum(['asc', 'desc']).default('desc'),
 });
+export type ContentListQuery = z.input<typeof ContentListQuerySchema>;
+
+/** `GET /search` (docs/24-search-filters.md). */
+export const SearchQuerySchema = z.object({
+  q: z.string().trim().min(2).max(100),
+  topicId: z.string().optional(),
+  /** Hits per kind. */
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+export type SearchQuery = z.input<typeof SearchQuerySchema>;
+
+/** One or more other platforms to write a content for, each with its own format. */
+export const RepurposeContentSchema = z
+  .object({
+    targets: z
+      .array(
+        z.object({
+          platform: z.enum(Platform),
+          format: z.enum(ContentFormat).optional(),
+        }),
+      )
+      .min(1)
+      .max(MAX_REPURPOSE_TARGETS),
+    /** Direction for the writer, e.g. "shorter, more formal". */
+    notes: z.string().trim().max(2000).optional().default(''),
+  })
+  .refine(
+    (v) =>
+      new Set(v.targets.map((t) => `${t.platform}:${t.format ?? ''}`)).size === v.targets.length,
+    { path: ['targets'], message: 'Each platform and format can only be listed once' },
+  );
+export type RepurposeContentInput = z.input<typeof RepurposeContentSchema>;
 
 // ---------- jobs ----------
 export const JobListQuerySchema = PaginationQuerySchema.extend({

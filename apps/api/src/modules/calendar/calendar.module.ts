@@ -18,6 +18,7 @@ import type { Prisma } from '@prisma/client';
 import {
   calendarStateOf,
   canPublish,
+  effectivePlatform,
   canSchedule,
   CalendarQuerySchema,
   PublishContentSchema,
@@ -43,6 +44,7 @@ const ITEM_SELECT = {
   scheduledAt: true,
   publishedAt: true,
   publishedUrl: true,
+  platform: true,
   topic: { select: { id: true, title: true, platform: true } },
   campaign: { select: { id: true, name: true } },
   tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
@@ -57,6 +59,7 @@ const FUTURE_TOLERANCE_MS = 5 * 60_000;
 function toItem(row: ItemRow, now: Date): CalendarItem {
   return {
     ...row,
+    platform: effectivePlatform(row, row.topic),
     scheduledAt: row.scheduledAt?.toISOString() ?? null,
     publishedAt: row.publishedAt?.toISOString() ?? null,
     tags: row.tags.map((t) => ({

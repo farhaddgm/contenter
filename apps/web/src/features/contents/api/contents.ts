@@ -7,6 +7,7 @@ import type {
   EditContentVersionInput,
   GenerateContentInput,
   Paginated,
+  RepurposeContentInput,
   ReviewAction,
   UpdateCommentInput,
   UpdateContentInput,
@@ -19,15 +20,8 @@ export const contentKeys = {
   one: (id: string) => ['contents', id] as const,
 };
 
-export function useContents(params: {
-  page: number;
-  status?: ContentStatus | '';
-  topicId?: string;
-  tagId?: string;
-  campaignId?: string;
-  q?: string;
-  pageSize?: number;
-}) {
+/** List parameters: plain strings and numbers (see `toApiParams`); lists are comma-separated. */
+export function useContents(params: Record<string, string | number | undefined>) {
   return useQuery({
     queryKey: contentKeys.list(params),
     queryFn: () => api.get<Paginated<Content>>('/contents', { ...params }),
@@ -41,7 +35,11 @@ export function useContent(id: string) {
   return useQuery({
     queryKey: contentKeys.one(id),
     queryFn: () => api.get<Content>(`/contents/${id}`),
-    refetchInterval: (q) => (q.state.data?.status === 'GENERATING' ? 2500 : false),
+    refetchInterval: (q) =>
+      q.state.data?.status === 'GENERATING' ||
+      q.state.data?.repurposed?.some((r) => r.status === 'GENERATING')
+        ? 2500
+        : false,
   });
 }
 
@@ -165,5 +163,23 @@ export function useDeleteComment(contentId: string) {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/comments/${id}`),
     onSuccess: invalidate,
+  });
+}
+
+// ---------- repurposing ----------
+
+/** Writes the content again for other platforms; each target becomes a new content. */
+export function useRepurpose(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: RepurposeContentInput) =>
+      api.post<{ items: { contentId: string; jobId: string; platform: string; format: string }[] }>(
+        `/contents/${id}/repurpose`,
+        data,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contentKeys.one(id) });
+      void qc.invalidateQueries({ queryKey: ['contents', 'list'] });
+    },
   });
 }

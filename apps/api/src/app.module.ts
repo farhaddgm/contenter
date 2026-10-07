@@ -25,6 +25,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SamplesModule } from './modules/samples/samples.module';
 import { GoogleAccessModule } from './modules/google-access/google-access.module';
 import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
+import { SearchModule } from './modules/search/search.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { TopicsModule } from './modules/topics/topics.module';
@@ -57,6 +58,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     IdeasModule,
     ContentsModule,
     CalendarModule,
+    SearchModule,
     ReviewsModule,
     TagsModule,
     CampaignsModule,

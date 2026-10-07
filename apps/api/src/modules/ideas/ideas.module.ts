@@ -28,6 +28,7 @@ import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
 import { TAG_SELECT } from '../tags/tag-select';
+import { has, matchAllWords } from '../../common/search-where';
 
 @Injectable()
 export class IdeasService {
@@ -38,16 +39,26 @@ export class IdeasService {
   ) {}
 
   async list(topicId: string, query: z.infer<typeof IdeaListQuerySchema>) {
+    const statuses = [...(query.statuses ?? []), ...(query.status ? [query.status] : [])];
+    const words = matchAllWords<Prisma.IdeaWhereInput>(query.q, (v) => [
+      { title: has(v) },
+      { angle: has(v) },
+      { hook: has(v) },
+    ]);
     const where: Prisma.IdeaWhereInput = {
       topicId,
-      ...(query.status ? { status: query.status } : {}),
+      ...(statuses.length ? { status: { in: statuses } } : {}),
+      ...(query.formats?.length ? { format: { in: query.formats } } : {}),
       ...(query.tagId ? { tags: { some: { id: query.tagId } } } : {}),
-      ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
+      ...words,
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.idea.findMany({
         where,
-        orderBy: [{ createdAt: 'desc' }, { score: 'desc' }],
+        orderBy:
+          query.sort === 'score'
+            ? [{ score: 'desc' }, { createdAt: 'desc' }]
+            : [{ createdAt: 'desc' }, { score: 'desc' }],
         include: { tags: { select: TAG_SELECT, orderBy: { name: 'asc' } } },
         ...paginate(query),
       }),

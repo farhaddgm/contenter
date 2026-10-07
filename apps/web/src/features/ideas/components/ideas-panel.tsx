@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Lightbulb, PenLine, RotateCcw, Sparkles, Star, ThumbsDown, Trash2 } from 'lucide-react';
-import { ContentFormat, type Idea, type IdeaStatus } from '@contenter/shared';
+import { ContentFormat, IdeaSort, type Idea, type IdeaStatus } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -244,12 +244,21 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<IdeaStatus | ''>('');
   const [tagId, setTagId] = useState('');
+  const [format, setFormat] = useState('');
+  const [sort, setSort] = useState<IdeaSort>('newest');
   const [jobId, setJobId] = useState<string | null>(null);
   const [writeIdea, setWriteIdea] = useState<Idea | null>(null);
   const ideateDialog = useDisclosure();
   const writeDialog = useDisclosure();
   const tags = useTags(topicId);
-  const { data, isLoading } = useIdeas(topicId, { page, status, tagId, pageSize: 12 });
+  const { data, isLoading } = useIdeas(topicId, {
+    page,
+    status,
+    tagId,
+    formats: format,
+    sort,
+    pageSize: 12,
+  });
   const { isRunning } = useTrackJob(jobId, {
     invalidate: [ideaKeys.all, ['topics']],
     onDone: () => setJobId(null),
@@ -288,6 +297,27 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
             { value: 'USED', label: t('enums.ideaStatus.USED') },
             { value: 'REJECTED', label: t('enums.ideaStatus.REJECTED') },
           ]}
+        />
+        <Select
+          className="h-9 w-44"
+          aria-label={t('ideas.format')}
+          placeholder={t('filters.allFormats')}
+          value={format}
+          onChange={(e) => {
+            setFormat(e.target.value);
+            setPage(1);
+          }}
+          options={ContentFormat.map((f) => ({ value: f, label: t(`enums.contentFormat.${f}`) }))}
+        />
+        <Select
+          className="h-9 w-40"
+          aria-label={t('filters.sortBy')}
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value as IdeaSort);
+            setPage(1);
+          }}
+          options={IdeaSort.map((s) => ({ value: s, label: t(`filters.ideaSort.${s}`) }))}
         />
         {!!tags.data?.length && (
           <Select

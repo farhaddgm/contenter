@@ -17,7 +17,11 @@ import {
   BusinessAuditRunner,
   BusinessReviseRunner,
 } from './runners/business-extra.runners';
-import { GenerateContentRunner, ReviseContentRunner } from './runners/content.runners';
+import {
+  GenerateContentRunner,
+  RepurposeContentRunner,
+  ReviseContentRunner,
+} from './runners/content.runners';
 import { IdeateRunner } from './runners/ideate.runner';
 import { AI_RUNNERS } from './runners/runner';
 import { SmartChatRunner } from './runners/smart-chat.runner';
@@ -28,6 +32,7 @@ const RUNNERS = [
   IdeateRunner,
   GenerateContentRunner,
   ReviseContentRunner,
+  RepurposeContentRunner,
   SmartChatRunner,
   BusinessDiscoverRunner,
   BusinessBuildRunner,

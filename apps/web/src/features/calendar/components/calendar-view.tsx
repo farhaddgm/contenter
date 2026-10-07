@@ -74,7 +74,7 @@ function ItemChip({
         e.dataTransfer.effectAllowed = 'move';
       }}
       onClick={() => onOpen(item)}
-      title={`${item.title} — ${t(`enums.platform.${item.topic.platform}`)}`}
+      title={`${item.title} — ${t(`enums.platform.${item.platform}`)}`}
       className={cn(
         'flex w-full items-start gap-1 rounded-md border px-1.5 py-1 text-start text-xs leading-4 transition hover:brightness-95',
         STATE_STYLE[item.state ?? 'READY'],
@@ -171,7 +171,7 @@ function ItemDialog({ item, onClose }: { item: CalendarItem; onClose: () => void
       open
       onOpenChange={(open) => !open && onClose()}
       title={<span dir="auto">{item.title}</span>}
-      description={`${item.topic.title} · ${t(`enums.platform.${item.topic.platform}`)} · ${t(`enums.contentFormat.${item.format}`)}`}
+      description={`${item.topic.title} · ${t(`enums.platform.${item.platform}`)} · ${t(`enums.contentFormat.${item.format}`)}`}
       footer={
         <>
           <Button variant="outline" onClick={onClose}>

@@ -1,5 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Idea, IdeaStatus, IdeateInput, Paginated, UpdateIdeaInput } from '@contenter/shared';
+import type {
+  Idea,
+  IdeaSort,
+  IdeaStatus,
+  IdeateInput,
+  Paginated,
+  UpdateIdeaInput,
+} from '@contenter/shared';
 import { api } from '@/lib/api-client';
 
 export const ideaKeys = {
@@ -9,7 +16,16 @@ export const ideaKeys = {
 
 export function useIdeas(
   topicId: string,
-  params: { page: number; status?: IdeaStatus | ''; tagId?: string; pageSize?: number; q?: string },
+  params: {
+    page: number;
+    status?: IdeaStatus | '';
+    tagId?: string;
+    /** Comma-separated content formats. */
+    formats?: string;
+    sort?: IdeaSort;
+    pageSize?: number;
+    q?: string;
+  },
 ) {
   return useQuery({
     queryKey: ideaKeys.list(topicId, params),

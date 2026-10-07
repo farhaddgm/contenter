@@ -28,6 +28,10 @@ export const paths = {
     },
     contents: { path: 'contents', getHref: () => '/app/contents' },
     calendar: { path: 'calendar', getHref: () => '/app/calendar' },
+    search: {
+      path: 'search',
+      getHref: (q?: string) => `/app/search${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+    },
     content: { path: 'contents/:contentId', getHref: (id: string) => `/app/contents/${id}` },
     account: { path: 'account', getHref: () => '/app/account' },
     admin: {
