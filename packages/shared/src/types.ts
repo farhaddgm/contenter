@@ -7,6 +7,7 @@ import type {
   AiJobType,
   AnalysisStatus,
   BrandDocKind,
+  CampaignStatus,
   ContentFormat,
   ContentStatus,
   FetchStatus,
@@ -18,12 +19,17 @@ import type {
   ProfileStatus,
   Role,
   AccessLevel,
+  ReviewDecision,
+  ReviewStage,
+  TagColor,
   TopicStatus,
   TraitCategory,
   TraitSource,
   TraitStatus,
 } from './enums';
 import type { SampleAnalysisResult, SelfCheck } from './ai';
+import type { ReviewAction } from './workflow';
+import type { CalendarState } from './calendar';
 
 export type ISODate = string;
 
@@ -230,6 +236,31 @@ export interface Idea {
   score: number;
   status: IdeaStatus;
   createdAt: ISODate;
+  tags?: Tag[];
+}
+
+export interface Tag {
+  id: string;
+  topicId: string;
+  name: string;
+  color: TagColor;
+  createdAt: ISODate;
+  /** Topic tag list only. */
+  _count?: { contents: number; ideas: number };
+}
+
+export interface Campaign {
+  id: string;
+  topicId: string;
+  name: string;
+  description: string;
+  status: CampaignStatus;
+  startsAt: ISODate | null;
+  endsAt: ISODate | null;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** Topic campaign list only. */
+  _count?: { contents: number };
 }
 
 export interface IdeationRequest {
@@ -263,20 +294,127 @@ export interface Content {
   topicId: string;
   ideaId: string | null;
   profileId: string | null;
+  campaignId: string | null;
+  /** Set when the content was made for a platform other than its topic's. */
+  platform: Platform | null;
+  /** The content this one was repurposed from. */
+  sourceContentId: string | null;
   title: string;
   brief: string;
   format: ContentFormat;
   status: ContentStatus;
+  /** Set while the status is IN_REVIEW. */
+  reviewStage: ReviewStage | null;
+  submittedAt: ISODate | null;
+  /** Planned publish time (approved content only). */
+  scheduledAt: ISODate | null;
+  /** Set by hand once the content is live elsewhere; a published content is frozen. */
+  publishedAt: ISODate | null;
+  publishedUrl: string | null;
   currentVersionId: string | null;
   lastJobId: string | null;
   createdAt: ISODate;
   updatedAt: ISODate;
   currentVersion?: ContentVersion | null;
   versions?: ContentVersion[];
-  topic?: Pick<Topic, 'id' | 'title'>;
+  topic?: Pick<Topic, 'id' | 'title' | 'platform'>;
   idea?: Pick<Idea, 'id' | 'title'> | null;
+  tags?: Tag[];
+  campaign?: Pick<Campaign, 'id' | 'name' | 'status'> | null;
+  /** Detail only: the content this one was repurposed from. */
+  source?: Pick<Content, 'id' | 'title' | 'platform' | 'status'> | null;
+  /** Detail only: the contents written from this one for other platforms. */
+  repurposed?: Pick<Content, 'id' | 'title' | 'platform' | 'format' | 'status'>[];
+  submittedBy?: PersonRef | null;
+  /** Detail only: what the current user may do in the review workflow now. */
+  review?: ContentReviewInfo;
+  /** Detail only: newest first. */
+  reviews?: ContentReview[];
   /** Detail only: brand terminology violations of the current version (linked business). */
   termIssues?: TermIssue[];
+}
+
+export type PersonRef = Pick<User, 'id' | 'name'>;
+
+/** One content on the calendar, or in the "ready to schedule" list. */
+export interface CalendarItem {
+  id: string;
+  title: string;
+  format: ContentFormat;
+  status: ContentStatus;
+  topic: Pick<Topic, 'id' | 'title' | 'platform'>;
+  /** The platform it is for: its own, else its topic's. */
+  platform: Platform;
+  campaign: Pick<Campaign, 'id' | 'name'> | null;
+  tags: Tag[];
+  scheduledAt: ISODate | null;
+  publishedAt: ISODate | null;
+  publishedUrl: string | null;
+  /** null only for the "ready to schedule" list. */
+  state: CalendarState | null;
+}
+
+export interface CalendarResponse {
+  /** Planned or published inside the range. */
+  items: CalendarItem[];
+  /** Approved contents nobody has planned yet (newest first, at most 50). */
+  ready: CalendarItem[];
+}
+
+export interface ContentReviewInfo {
+  actions: ReviewAction[];
+  requireFinalApproval: boolean;
+}
+
+/** One step of the review history. */
+export interface ContentReview {
+  id: string;
+  contentId: string;
+  versionId: string | null;
+  stage: ReviewStage | null;
+  decision: ReviewDecision;
+  note: string;
+  createdAt: ISODate;
+  actor: PersonRef | null;
+}
+
+export interface ContentComment {
+  id: string;
+  contentId: string;
+  versionId: string | null;
+  /** Number of that version, for display. */
+  version: number | null;
+  parentId: string | null;
+  body: string;
+  resolvedAt: ISODate | null;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  author: PersonRef | null;
+  resolvedBy: PersonRef | null;
+  /** Top-level comments only, oldest first. */
+  replies?: ContentComment[];
+}
+
+/** One hit of `GET /search`; `snippet` is plain text around the first match. */
+export interface SearchHit {
+  id: string;
+  title: string;
+  snippet: string;
+  topic: Pick<Topic, 'id' | 'title'> | null;
+  /** Contents: status; ideas: status; topics: none. */
+  status?: string;
+  format?: ContentFormat;
+  platform?: Platform;
+  tags?: Tag[];
+  score: number;
+}
+
+export interface SearchResponse {
+  /** The words searched for (after dropping duplicates), for highlighting. */
+  terms: string[];
+  contents: SearchHit[];
+  ideas: SearchHit[];
+  topics: SearchHit[];
 }
 
 export interface AiJob {

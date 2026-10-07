@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Body,
   Controller,
   Delete,
@@ -18,12 +19,15 @@ import { Prisma } from '@prisma/client';
 import {
   checkTerms,
   ContentListQuerySchema,
+  defaultFormatFor,
+  RepurposeContentSchema,
   EditContentVersionSchema,
   GenerateContentSchema,
   ReviseContentSchema,
   UpdateContentSchema,
   type EditContentVersionInput,
   type GenerateContentInput,
+  type RepurposeContentInput,
   type ReviseContentInput,
   type UpdateContentInput,
 } from '@contenter/shared';
@@ -35,11 +39,19 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { ReviewsModule } from '../reviews/reviews.module';
+import { ReviewsService } from '../reviews/reviews.service';
+import { TAG_SELECT } from '../tags/tag-select';
+import { buildContentOrderBy, buildContentWhere } from './content-filters';
+
+const PUBLISHED_FROZEN = 'The content is published; unpublish it before changing it';
 
 const LIST_INCLUDE = {
-  topic: { select: { id: true, title: true } },
+  topic: { select: { id: true, title: true, platform: true } },
   idea: { select: { id: true, title: true } },
   currentVersion: { select: { id: true, version: true, selfCheck: true, createdAt: true } },
+  tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
+  campaign: { select: { id: true, name: true, status: true } },
 } satisfies Prisma.ContentInclude;
 
 @Injectable()
@@ -49,20 +61,15 @@ export class ContentsService {
     private readonly jobs: AiJobsService,
     private readonly audit: AuditService,
     private readonly access: AccessService,
+    private readonly reviews: ReviewsService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
-    const visible = this.access.visibleTopics(user);
-    const where: Prisma.ContentWhereInput = {
-      ...(visible ? { topic: visible } : {}),
-      ...(query.topicId ? { topicId: query.topicId } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
-    };
+    const where = buildContentWhere(query, this.access.visibleTopics(user));
     const [items, total] = await this.prisma.$transaction([
       this.prisma.content.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: buildContentOrderBy(query.sort, query.order),
         include: LIST_INCLUDE,
         ...paginate(query),
       }),
@@ -75,10 +82,18 @@ export class ContentsService {
     const c = await this.prisma.content.findUnique({
       where: { id },
       include: {
-        topic: { select: { id: true, title: true } },
+        topic: { select: { id: true, title: true, platform: true } },
         idea: { select: { id: true, title: true } },
         currentVersion: true,
         versions: { orderBy: { version: 'desc' } },
+        tags: { select: TAG_SELECT, orderBy: { name: 'asc' } },
+        campaign: { select: { id: true, name: true, status: true } },
+        submittedBy: { select: { id: true, name: true } },
+        source: { select: { id: true, title: true, platform: true, status: true } },
+        repurposed: {
+          select: { id: true, title: true, platform: true, format: true, status: true },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
     if (!c) throw new NotFoundException('Content not found');
@@ -86,11 +101,17 @@ export class ContentsService {
   }
 
   /**
-   * Content with its versions plus the brand terminology check of the current version: the
-   * linked business's USE/AVOID terms matched by code (checkTerms), never by the model.
+   * Content with its versions plus the brand terminology check of the current version (the
+   * linked business's USE/AVOID terms matched by code, `checkTerms`, never by the model) and the
+   * review workflow: what the caller may do now and the history.
    */
-  async detail(id: string) {
-    const c = await this.get(id);
+  async detail(id: string, user: AuthUser) {
+    const base = await this.get(id);
+    const [review, reviews] = await Promise.all([
+      this.reviews.info(base, user),
+      this.reviews.history(id),
+    ]);
+    const c = { ...base, review, reviews };
     const v = c.currentVersion;
     if (!v) return { ...c, termIssues: [] };
     const topic = await this.prisma.topic.findUnique({
@@ -107,7 +128,10 @@ export class ContentsService {
     const data = GenerateContentSchema.parse(input);
     await this.prisma.topic.findUniqueOrThrow({ where: { id: topicId } });
     const idea = data.ideaId
-      ? await this.prisma.idea.findFirst({ where: { id: data.ideaId, topicId } })
+      ? await this.prisma.idea.findFirst({
+          where: { id: data.ideaId, topicId },
+          include: { tags: { select: { id: true } } },
+        })
       : null;
     if (data.ideaId && !idea) throw new BadRequestException('Idea does not belong to this topic');
 
@@ -120,6 +144,8 @@ export class ContentsService {
         format: data.format ?? idea?.format ?? 'POST',
         status: 'GENERATING',
         createdById: user.id,
+        // a content written from a tagged idea starts with the idea's tags
+        ...(idea?.tags.length ? { tags: { connect: idea.tags } } : {}),
       },
     });
     const job = await this.jobs.enqueue({
@@ -139,6 +165,9 @@ export class ContentsService {
     if (content.status === 'GENERATING')
       throw new BadRequestException('A generation is already in progress');
     if (!content.currentVersionId) throw new BadRequestException('Nothing to revise yet');
+    if (content.publishedAt) throw new ConflictException(PUBLISHED_FROZEN);
+    // the revision replaces the reviewed text: back to DRAFT first, so the history shows why
+    await this.reviews.resetAfterEdit(this.prisma, id, user.id);
     await this.prisma.content.update({ where: { id }, data: { status: 'GENERATING' } });
     const job = await this.jobs.enqueue({
       type: 'REVISE_CONTENT',
@@ -158,6 +187,7 @@ export class ContentsService {
     const content = await this.get(id);
     if (content.status === 'GENERATING')
       throw new BadRequestException('Wait for the running generation to finish');
+    if (content.publishedAt) throw new ConflictException(PUBLISHED_FROZEN);
     await this.prisma.$transaction(async (tx) => {
       const last = await tx.contentVersion.findFirst({
         where: { contentId: id },
@@ -170,6 +200,7 @@ export class ContentsService {
         where: { id },
         data: { currentVersionId: v.id, title: data.title },
       });
+      await this.reviews.resetAfterEdit(tx, id, user.id);
     });
     this.audit.log({
       userId: user.id,
@@ -185,9 +216,22 @@ export class ContentsService {
       where: { id: versionId, contentId: id },
     });
     if (!v) throw new NotFoundException('Version not found');
-    await this.prisma.content.update({
+    const frozen = await this.prisma.content.findUnique({
       where: { id },
-      data: { currentVersionId: v.id, title: v.title },
+      select: { publishedAt: true },
+    });
+    if (frozen?.publishedAt) throw new ConflictException(PUBLISHED_FROZEN);
+    await this.prisma.$transaction(async (tx) => {
+      const before = await tx.content.findUnique({
+        where: { id },
+        select: { currentVersionId: true },
+      });
+      await tx.content.update({
+        where: { id },
+        data: { currentVersionId: v.id, title: v.title },
+      });
+      // restoring the version that is already current changes no text
+      if (before?.currentVersionId !== v.id) await this.reviews.resetAfterEdit(tx, id, user.id);
     });
     this.audit.log({
       userId: user.id,
@@ -199,9 +243,75 @@ export class ContentsService {
     return this.get(id);
   }
 
+  /**
+   * Writes the content again for other platforms: one new content (and one queued AI job) per
+   * target. The new contents start empty and GENERATING; the runner fills them in.
+   */
+  async repurpose(id: string, input: RepurposeContentInput, user: AuthUser) {
+    const data = RepurposeContentSchema.parse(input);
+    const source = await this.prisma.content.findUnique({
+      where: { id },
+      include: { tags: { select: { id: true } } },
+    });
+    if (!source) throw new NotFoundException('Content not found');
+    if (!source.currentVersionId || source.status === 'GENERATING') {
+      throw new BadRequestException('There is no finished draft to adapt yet');
+    }
+
+    const items: { contentId: string; jobId: string; platform: string; format: string }[] = [];
+    for (const target of data.targets) {
+      const format = target.format ?? defaultFormatFor(target.platform);
+      const content = await this.prisma.content.create({
+        data: {
+          topicId: source.topicId,
+          sourceContentId: source.id,
+          platform: target.platform,
+          format,
+          title: source.title,
+          brief: data.notes,
+          status: 'GENERATING',
+          // same campaign and tags as the original
+          campaignId: source.campaignId,
+          tags: source.tags.length ? { connect: source.tags } : undefined,
+          createdById: user.id,
+        },
+      });
+      const job = await this.jobs.enqueue({
+        type: 'REPURPOSE_CONTENT',
+        targetType: 'Content',
+        targetId: content.id,
+        topicId: source.topicId,
+        input: { platform: target.platform, format, notes: data.notes, sourceContentId: source.id },
+        userId: user.id,
+      });
+      await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
+      items.push({ contentId: content.id, jobId: job.id, platform: target.platform, format });
+    }
+    this.audit.log({
+      userId: user.id,
+      action: 'content.repurpose',
+      entityType: 'Content',
+      entityId: id,
+      meta: { targets: items.map((i) => `${i.platform}:${i.format}`) },
+    });
+    return { items };
+  }
+
   async update(id: string, input: UpdateContentInput, user: AuthUser) {
-    if (input.status === 'GENERATING' || input.status === 'FAILED') {
-      throw new BadRequestException('Status is managed by the system');
+    if (input.status) {
+      // every status change is a review step with its own rules and history
+      throw new BadRequestException('Change the status with POST /contents/:id/review/:action');
+    }
+    if (input.campaignId) {
+      const content = await this.prisma.content.findUnique({
+        where: { id },
+        select: { topicId: true },
+      });
+      const campaign = await this.prisma.campaign.findFirst({
+        where: { id: input.campaignId, topicId: content?.topicId ?? '' },
+        select: { id: true },
+      });
+      if (!campaign) throw new BadRequestException('Campaign does not belong to this topic');
     }
     await this.prisma.content.update({ where: { id }, data: input });
     this.audit.log({
@@ -251,8 +361,8 @@ export class ContentsController {
 
   @TopicScoped('content')
   @Get('contents/:id')
-  get(@Param('id') id: string) {
-    return this.contents.detail(id);
+  get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.contents.detail(id, user);
   }
 
   @TopicScoped('content')
@@ -263,6 +373,17 @@ export class ContentsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.contents.update(id, body, user);
+  }
+
+  @TopicScoped('content')
+  @Post('contents/:id/repurpose')
+  @HttpCode(202)
+  repurpose(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(RepurposeContentSchema)) body: RepurposeContentInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.contents.repurpose(id, body, user);
   }
 
   @TopicScoped('content')
@@ -305,6 +426,7 @@ export class ContentsController {
 }
 
 @Module({
+  imports: [ReviewsModule],
   controllers: [ContentsController],
   providers: [ContentsService],
 })

@@ -1,10 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Content,
+  ContentComment,
   ContentStatus,
+  CreateCommentInput,
   EditContentVersionInput,
   GenerateContentInput,
   Paginated,
+  RepurposeContentInput,
+  ReviewAction,
+  UpdateCommentInput,
   UpdateContentInput,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
@@ -15,13 +20,8 @@ export const contentKeys = {
   one: (id: string) => ['contents', id] as const,
 };
 
-export function useContents(params: {
-  page: number;
-  status?: ContentStatus | '';
-  topicId?: string;
-  q?: string;
-  pageSize?: number;
-}) {
+/** List parameters: plain strings and numbers (see `toApiParams`); lists are comma-separated. */
+export function useContents(params: Record<string, string | number | undefined>) {
   return useQuery({
     queryKey: contentKeys.list(params),
     queryFn: () => api.get<Paginated<Content>>('/contents', { ...params }),
@@ -35,7 +35,11 @@ export function useContent(id: string) {
   return useQuery({
     queryKey: contentKeys.one(id),
     queryFn: () => api.get<Content>(`/contents/${id}`),
-    refetchInterval: (q) => (q.state.data?.status === 'GENERATING' ? 2500 : false),
+    refetchInterval: (q) =>
+      q.state.data?.status === 'GENERATING' ||
+      q.state.data?.repurposed?.some((r) => r.status === 'GENERATING')
+        ? 2500
+        : false,
   });
 }
 
@@ -99,5 +103,83 @@ export function useDeleteContent() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/contents/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+}
+
+// ---------- review workflow ----------
+
+/** One step of the workflow; the server decides whether the caller may take it. */
+export function useReviewAction(id: string) {
+  const invalidate = useInvalidateContent(id);
+  return useMutation({
+    mutationFn: ({ action, note }: { action: ReviewAction; note?: string }) =>
+      api.post<{ status: ContentStatus; reviewStage: string | null }>(
+        `/contents/${id}/review/${action}`,
+        { note },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+// ---------- comments ----------
+
+export const commentKeys = {
+  all: ['comments'] as const,
+  content: (contentId: string) => ['comments', contentId] as const,
+};
+
+export function useComments(contentId: string) {
+  return useQuery({
+    queryKey: commentKeys.content(contentId),
+    queryFn: () => api.get<ContentComment[]>(`/contents/${contentId}/comments`),
+  });
+}
+
+function useInvalidateComments(contentId: string) {
+  const qc = useQueryClient();
+  return () => void qc.invalidateQueries({ queryKey: commentKeys.content(contentId) });
+}
+
+export function useCreateComment(contentId: string) {
+  const invalidate = useInvalidateComments(contentId);
+  return useMutation({
+    mutationFn: (data: CreateCommentInput) =>
+      api.post<ContentComment>(`/contents/${contentId}/comments`, data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateComment(contentId: string) {
+  const invalidate = useInvalidateComments(contentId);
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateCommentInput }) =>
+      api.patch<ContentComment>(`/comments/${id}`, data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteComment(contentId: string) {
+  const invalidate = useInvalidateComments(contentId);
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/comments/${id}`),
+    onSuccess: invalidate,
+  });
+}
+
+// ---------- repurposing ----------
+
+/** Writes the content again for other platforms; each target becomes a new content. */
+export function useRepurpose(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: RepurposeContentInput) =>
+      api.post<{ items: { contentId: string; jobId: string; platform: string; format: string }[] }>(
+        `/contents/${id}/repurpose`,
+        data,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contentKeys.one(id) });
+      void qc.invalidateQueries({ queryKey: ['contents', 'list'] });
+    },
   });
 }

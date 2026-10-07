@@ -16,6 +16,7 @@ import type {
   UpdateUserInput,
   User,
   UserAccess,
+  WorkflowSettings,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
 
@@ -204,5 +205,26 @@ export function useAuditLogs(params: { page: number; q?: string; entityType?: st
     queryKey: ['audit', params],
     queryFn: () => api.get<Paginated<AuditLog>>('/admin/audit-logs', params),
     placeholderData: keepPreviousData,
+  });
+}
+
+// ---------- review workflow settings ----------
+export function useWorkflowSettings() {
+  return useQuery({
+    queryKey: ['settings', 'workflow'],
+    queryFn: () => api.get<WorkflowSettings>('/admin/settings/workflow'),
+  });
+}
+
+export function useUpdateWorkflowSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: WorkflowSettings) =>
+      api.put<WorkflowSettings>('/admin/settings/workflow', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'workflow'] });
+      // the review info of every open content carries the setting
+      void qc.invalidateQueries({ queryKey: ['contents'] });
+    },
   });
 }

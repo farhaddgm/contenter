@@ -7,6 +7,7 @@ import {
   AiJobStatus,
   AiJobType,
   BrandDocKind,
+  CampaignStatus,
   ContentFormat,
   ContentStatus,
   IdeaStatus,
@@ -15,11 +16,13 @@ import {
   PrincipleKind,
   Role,
   AccessLevel,
+  TagColor,
   TopicStatus,
   TraitCategory,
   TraitStatus,
 } from './enums';
 import { AiProviderName, MODEL_REF_PATTERN } from './ai-providers';
+import { MAX_REPURPOSE_TARGETS } from './repurpose';
 
 // ---------- common ----------
 export const PaginationQuerySchema = z.object({
@@ -298,9 +301,75 @@ export const UpdateIdeaSchema = z.object({
 });
 export type UpdateIdeaInput = z.infer<typeof UpdateIdeaSchema>;
 
+/** A comma-separated query value (`a,b,c`) as a validated list; web params are plain strings. */
+const csv = <T extends z.ZodType>(item: T) =>
+  z
+    .string()
+    .transform((s) =>
+      s
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(item).max(20) as unknown as z.ZodType<z.output<T>[], string[]>);
+
+export const IdeaSort = ['newest', 'score'] as const;
+export type IdeaSort = (typeof IdeaSort)[number];
+
 export const IdeaListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(IdeaStatus).optional(),
+  statuses: csv(z.enum(IdeaStatus)).optional(),
+  formats: csv(z.enum(ContentFormat)).optional(),
+  tagId: z.string().optional(),
+  sort: z.enum(IdeaSort).default('newest'),
 });
+
+// ---------- tags & campaigns ----------
+export const MAX_TAGS_PER_ITEM = 20;
+
+export const CreateTagSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  color: z.enum(TagColor).default('slate'),
+});
+export type CreateTagInput = z.input<typeof CreateTagSchema>;
+
+export const UpdateTagSchema = patchOf(CreateTagSchema);
+export type UpdateTagInput = z.input<typeof UpdateTagSchema>;
+
+/** Replaces the tags of one idea or content with exactly these (all must belong to its topic). */
+export const SetTagsSchema = z.object({
+  tagIds: z.array(z.string().min(1)).max(MAX_TAGS_PER_ITEM),
+});
+export type SetTagsInput = z.infer<typeof SetTagsSchema>;
+
+const campaignDate = z.iso.datetime({ offset: true }).nullable().optional();
+
+export const CreateCampaignSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    description: z.string().trim().max(5000).optional().default(''),
+    startsAt: campaignDate,
+    endsAt: campaignDate,
+  })
+  .refine((v) => !v.startsAt || !v.endsAt || new Date(v.startsAt) <= new Date(v.endsAt), {
+    path: ['endsAt'],
+    message: 'The end date cannot be before the start date',
+  });
+export type CreateCampaignInput = z.input<typeof CreateCampaignSchema>;
+
+export const UpdateCampaignSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120).optional(),
+    description: z.string().trim().max(5000).optional(),
+    status: z.enum(CampaignStatus).optional(),
+    startsAt: campaignDate,
+    endsAt: campaignDate,
+  })
+  .refine((v) => !v.startsAt || !v.endsAt || new Date(v.startsAt) <= new Date(v.endsAt), {
+    path: ['endsAt'],
+    message: 'The end date cannot be before the start date',
+  });
+export type UpdateCampaignInput = z.infer<typeof UpdateCampaignSchema>;
 
 // ---------- contents ----------
 export const GenerateContentSchema = z
@@ -320,9 +389,75 @@ export const ReviseContentSchema = z.object({
 });
 export type ReviseContentInput = z.infer<typeof ReviseContentSchema>;
 
+/** `POST /contents/:id/review/:action`; the note is required for the actions that need a reason. */
+export const ReviewBodySchema = z.object({
+  note: z.string().trim().max(5000).optional().default(''),
+});
+export type ReviewBodyInput = z.input<typeof ReviewBodySchema>;
+
+export const CreateCommentSchema = z.object({
+  body: z.string().trim().min(1).max(5000),
+  /** The version the author was looking at; defaults to the current one. */
+  versionId: z.string().min(1).optional(),
+  /** Reply to a top-level comment of the same content. */
+  parentId: z.string().min(1).optional(),
+});
+export type CreateCommentInput = z.input<typeof CreateCommentSchema>;
+
+export const UpdateCommentSchema = z.object({
+  body: z.string().trim().min(1).max(5000).optional(),
+  resolved: z.boolean().optional(),
+});
+export type UpdateCommentInput = z.infer<typeof UpdateCommentSchema>;
+
+export const WorkflowSettingsSchema = z.object({ requireFinalApproval: z.boolean() });
+
+// ---------- calendar & publishing ----------
+/** A calendar request covers at most two months (a month grid with its edge weeks). */
+export const CALENDAR_MAX_DAYS = 62;
+
+const isoDateTime = z.iso.datetime({ offset: true });
+
+export const CalendarQuerySchema = z
+  .object({
+    from: isoDateTime,
+    to: isoDateTime,
+    topicId: z.string().optional(),
+    campaignId: z.string().optional(),
+    tagId: z.string().optional(),
+  })
+  .refine((v) => new Date(v.to) > new Date(v.from), {
+    path: ['to'],
+    message: '`to` must be after `from`',
+  })
+  .refine(
+    (v) => new Date(v.to).getTime() - new Date(v.from).getTime() <= CALENDAR_MAX_DAYS * 86_400_000,
+    {
+      path: ['to'],
+      message: `The range cannot exceed ${CALENDAR_MAX_DAYS} days`,
+    },
+  );
+export type CalendarQuery = z.infer<typeof CalendarQuerySchema>;
+
+/** `null` takes the content off the calendar. */
+export const ScheduleContentSchema = z.object({ scheduledAt: isoDateTime.nullable() });
+export type ScheduleContentInput = z.infer<typeof ScheduleContentSchema>;
+
+export const PublishContentSchema = z.object({
+  /** When it went live; defaults to now. */
+  publishedAt: isoDateTime.optional(),
+  url: z
+    .url({ protocol: /^https?$/ })
+    .max(2000)
+    .optional(),
+});
+export type PublishContentInput = z.infer<typeof PublishContentSchema>;
+
 export const UpdateContentSchema = z.object({
   status: z.enum(ContentStatus).optional(),
   title: z.string().trim().min(1).max(300).optional(),
+  /** null removes the content from its campaign. */
+  campaignId: z.string().min(1).nullable().optional(),
 });
 export type UpdateContentInput = z.infer<typeof UpdateContentSchema>;
 
@@ -335,10 +470,70 @@ export const EditContentVersionSchema = z.object({
 });
 export type EditContentVersionInput = z.input<typeof EditContentVersionSchema>;
 
+export const ContentSort = ['updated', 'created', 'scheduled', 'title'] as const;
+export type ContentSort = (typeof ContentSort)[number];
+
+/** Where a content is in the publishing plan (docs/22-calendar-publishing.md). */
+export const ScheduleFilter = ['planned', 'unplanned', 'overdue', 'published'] as const;
+export type ScheduleFilter = (typeof ScheduleFilter)[number];
+
+/** `campaignId=none` finds the contents that are in no campaign. */
+export const NO_CAMPAIGN = 'none';
+
+/**
+ * Content list filters (docs/24-search-filters.md). The single-value `status`, `tagId` and
+ * `campaignId` stay for older callers; the plural ones are comma-separated and combine with them.
+ * Different filters narrow each other; several values of one filter widen it.
+ */
 export const ContentListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(ContentStatus).optional(),
+  statuses: csv(z.enum(ContentStatus)).optional(),
+  formats: csv(z.enum(ContentFormat)).optional(),
+  /** The platform a content is for: its own, else its topic's. */
+  platforms: csv(z.enum(Platform)).optional(),
   topicId: z.string().optional(),
+  tagId: z.string().optional(),
+  tagIds: csv(z.string()).optional(),
+  campaignId: z.string().optional(),
+  createdById: z.string().optional(),
+  schedule: z.enum(ScheduleFilter).optional(),
+  createdFrom: z.iso.datetime({ offset: true }).optional(),
+  createdTo: z.iso.datetime({ offset: true }).optional(),
+  sort: z.enum(ContentSort).default('updated'),
+  order: z.enum(['asc', 'desc']).default('desc'),
 });
+export type ContentListQuery = z.input<typeof ContentListQuerySchema>;
+
+/** `GET /search` (docs/24-search-filters.md). */
+export const SearchQuerySchema = z.object({
+  q: z.string().trim().min(2).max(100),
+  topicId: z.string().optional(),
+  /** Hits per kind. */
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+export type SearchQuery = z.input<typeof SearchQuerySchema>;
+
+/** One or more other platforms to write a content for, each with its own format. */
+export const RepurposeContentSchema = z
+  .object({
+    targets: z
+      .array(
+        z.object({
+          platform: z.enum(Platform),
+          format: z.enum(ContentFormat).optional(),
+        }),
+      )
+      .min(1)
+      .max(MAX_REPURPOSE_TARGETS),
+    /** Direction for the writer, e.g. "shorter, more formal". */
+    notes: z.string().trim().max(2000).optional().default(''),
+  })
+  .refine(
+    (v) =>
+      new Set(v.targets.map((t) => `${t.platform}:${t.format ?? ''}`)).size === v.targets.length,
+    { path: ['targets'], message: 'Each platform and format can only be listed once' },
+  );
+export type RepurposeContentInput = z.input<typeof RepurposeContentSchema>;
 
 // ---------- jobs ----------
 export const JobListQuerySchema = PaginationQuerySchema.extend({

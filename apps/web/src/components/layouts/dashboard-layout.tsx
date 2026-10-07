@@ -7,6 +7,7 @@ import {
   NotebookPen,
   Bot,
   Building2,
+  CalendarDays,
   FileText,
   FolderKanban,
   Gauge,
@@ -30,6 +31,8 @@ import { useAuthorization, useLogout } from '@/lib/auth';
 import { useUi } from '@/stores/ui';
 import { cn } from '@/utils/cn';
 import { Dropdown } from '@/components/ui/misc';
+import { NotificationBell } from '@/features/inbox/components/notification-bell';
+import { SearchBox } from '@/features/search/components/search-box';
 import { SmartRoot } from '@/features/smart/components/smart-root';
 import { SmartToggle } from '@/features/smart/components/smart-toggle';
 
@@ -45,6 +48,7 @@ const contentNav: NavItem[] = [
   { to: paths.app.businesses.getHref(), label: 'nav.businesses', icon: <Building2 /> },
   { to: paths.app.topics.getHref(), label: 'nav.topics', icon: <FolderKanban /> },
   { to: paths.app.contents.getHref(), label: 'nav.contents', icon: <FileText /> },
+  { to: paths.app.calendar.getHref(), label: 'nav.calendar', icon: <CalendarDays /> },
 ];
 
 const smartNav: NavItem[] = [
@@ -222,6 +226,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             <Menu className="size-5" />
           </button>
           <div className="flex-1" />
+          <SearchBox />
+          <NotificationBell />
           <SmartToggle />
           <UserMenu />
         </header>

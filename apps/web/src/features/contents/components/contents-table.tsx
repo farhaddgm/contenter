@@ -1,17 +1,22 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
-import { Loader2, Search } from 'lucide-react';
-import type { Content, ContentStatus } from '@contenter/shared';
+import { useNavigate, useSearchParams } from 'react-router';
+import { Loader2 } from 'lucide-react';
+import { calendarStateOf, effectivePlatform, type Content } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/form-controls';
-import { Segmented } from '@/components/ui/misc';
 import { EmptyState, Pagination, Table, type Column } from '@/components/ui/table';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
-import { useDebounce } from '@/hooks/use-debounce';
-import { formatNumber, formatRelative } from '@/utils/format';
+import { formatDate, formatNumber, formatRelative } from '@/utils/format';
+import { TagChips } from '@/features/tags/components/tag-chip';
 import { useContents } from '../api/contents';
+import {
+  DEFAULT_FILTERS,
+  readFilters,
+  toApiParams,
+  writeFilters,
+  type ContentFilters,
+} from '../filters';
+import { ContentFiltersBar } from './content-filters-panel';
 
 export function ContentsTable({
   topicId,
@@ -22,24 +27,26 @@ export function ContentsTable({
 }) {
   const t = useT();
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<ContentStatus | ''>('');
-  const [q, setQ] = useState('');
-  const debouncedQ = useDebounce(q);
-  const { data, isLoading } = useContents({ page, status, topicId, q: debouncedQ });
+  // the filters live in the URL: a filtered list can be shared, and back/forward work
+  const [params, setParams] = useSearchParams();
+  const filters = readFilters(params);
+  const update = (patch: Partial<ContentFilters>) =>
+    setParams(writeFilters({ ...filters, ...patch }), { replace: true });
+  const { data, isLoading } = useContents(toApiParams(filters, { topicId }));
 
   const columns: Column<Content>[] = [
     {
       key: 'title',
       header: t('topics.fields.title'),
       cell: (c) => (
-        <div className="min-w-48">
+        <div className="min-w-48 space-y-1">
           <p className="line-clamp-1 font-medium" dir="auto">
             {c.title}
           </p>
           {c.idea && (
             <p className="line-clamp-1 text-xs text-muted-foreground">💡 {c.idea.title}</p>
           )}
+          <TagChips tags={c.tags} />
         </div>
       ),
     },
@@ -55,17 +62,70 @@ export function ContentsTable({
     {
       key: 'format',
       header: t('contents.format'),
-      cell: (c) => <Badge tone="outline">{t(`enums.contentFormat.${c.format}`)}</Badge>,
+      cell: (c) => (
+        <div className="space-y-1">
+          <Badge tone="outline">{t(`enums.contentFormat.${c.format}`)}</Badge>
+          {c.topic && (
+            <p className="text-[11px] text-muted-foreground">
+              {t(`enums.platform.${effectivePlatform(c, c.topic)}`)}
+            </p>
+          )}
+        </div>
+      ),
     },
+    ...(topicId
+      ? [
+          {
+            key: 'campaign',
+            header: t('campaigns.one'),
+            cell: (c: Content) =>
+              c.campaign ? (
+                <span className="text-xs" dir="auto">
+                  {c.campaign.name}
+                </span>
+              ) : (
+                '—'
+              ),
+          },
+        ]
+      : []),
     {
       key: 'status',
       header: t('common.status'),
       cell: (c) => (
-        <Badge tone={statusTone[c.status]}>
-          {c.status === 'GENERATING' && <Loader2 className="animate-spin" />}
-          {t(`enums.contentStatus.${c.status}`)}
-        </Badge>
+        <div className="space-y-1">
+          <Badge tone={statusTone[c.status]}>
+            {c.status === 'GENERATING' && <Loader2 className="animate-spin" />}
+            {t(`enums.contentStatus.${c.status}`)}
+          </Badge>
+          {c.status === 'IN_REVIEW' && c.reviewStage && (
+            <p className="text-[11px] text-muted-foreground">
+              {t(`enums.reviewStage.${c.reviewStage}`)}
+            </p>
+          )}
+        </div>
       ),
+    },
+    {
+      key: 'publishing',
+      header: t('calendar.publishing'),
+      cell: (c) => {
+        const state = calendarStateOf(c);
+        return state ? (
+          <div className="space-y-0.5 text-xs">
+            <Badge
+              tone={state === 'PUBLISHED' ? 'success' : state === 'OVERDUE' ? 'danger' : 'primary'}
+            >
+              {t(`calendar.state.${state}`)}
+            </Badge>
+            <p className="text-muted-foreground">
+              {formatDate(c.publishedAt ?? c.scheduledAt, false)}
+            </p>
+          </div>
+        ) : (
+          '—'
+        );
+      },
     },
     {
       key: 'score',
@@ -95,34 +155,17 @@ export function ContentsTable({
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center gap-3 border-b p-4">
-        <div className="relative w-full max-w-xs">
-          <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="ps-9"
-            placeholder={t('common.search')}
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
-        <Segmented
-          value={status}
-          onChange={(v) => {
-            setStatus(v);
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: t('common.all') },
-            { value: 'DRAFT', label: t('enums.contentStatus.DRAFT') },
-            { value: 'IN_REVIEW', label: t('enums.contentStatus.IN_REVIEW') },
-            { value: 'APPROVED', label: t('enums.contentStatus.APPROVED') },
-            { value: 'REJECTED', label: t('enums.contentStatus.REJECTED') },
-          ]}
-        />
-      </div>
+      <ContentFiltersBar
+        filters={filters}
+        onChange={update}
+        onReset={() =>
+          setParams(
+            writeFilters({ ...DEFAULT_FILTERS, sort: filters.sort, order: filters.order }),
+            { replace: true },
+          )
+        }
+        topicId={topicId}
+      />
       <Table
         data={data?.items}
         columns={columns}
@@ -135,7 +178,7 @@ export function ContentsTable({
           page={data.page}
           totalPages={data.totalPages}
           total={data.total}
-          onPageChange={setPage}
+          onPageChange={(page) => update({ page })}
         />
       )}
     </Card>

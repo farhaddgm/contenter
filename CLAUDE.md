@@ -30,6 +30,21 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Optional samples (docs/19-optional-samples.md)
 - Sample contents are optional: `Topic.samplesSkippedAt` (set by `PUT /topics/:id/samples-skipped`) settles the `add_samples` / `analyze_samples` Walker steps. A topic with no analyzed samples (or skipped) gets the business's READY+active references as `documents` from `ContextLoader.business()`; `formatBusiness` appends them as `[DOCUMENTS]` in the `business` variable — never add a prompt variable for it.
 
+## Tags & campaigns (docs/20-tags-campaigns.md)
+- `Tag` and `Campaign` belong to one topic, so they are guarded with `@TopicScoped('tag' | 'campaign')`; a tag/campaign id from another topic is a 400 (`TagsService.assertInTopic`, the content PATCH check). Tag color is a plain string checked by `TagColor` in `packages/shared`. Delete leaves ideas/contents alone (links only).
+
+## Review workflow (docs/21-review-workflow.md)
+- Content status changes only through `POST /contents/:id/review/:action` (`ReviewsService.act`); `PATCH /contents/:id` refuses `status`. The rules live once in `packages/shared/src/workflow.ts` (`reviewActionsFor` / `applyReviewAction`); the API returns `review.actions` for the caller and the web only renders those — never re-derive roles in the client. Anything that changes reviewed text (manual edit, restore, AI revise) must call `ReviewsService.resetAfterEdit`. Comments are `@TopicScoped('comment')`.
+
+## Calendar & publishing (docs/22-calendar-publishing.md)
+- Only APPROVED content has `scheduledAt`; leaving APPROVED or changing the text clears it (`ReviewsService`). A content with `publishedAt` is frozen: edit/restore/AI revise and every review step answer 409 until unpublished. Publishing on platforms is manual — the app only records it. Calendar dates in the web come from `Intl` (`utils/calendar.ts`), never a hand-written Jalali converter.
+
+## Repurposing, search & filters (docs/23-repurposing.md, docs/24-search-filters.md)
+- `REPURPOSE_CONTENT` follows the core rule: the request path only creates the empty `Content` shells (`sourceContentId`, `platform`, `format`) and enqueues jobs; `RepurposeContentRunner` writes version 1. A content's platform is `platform ?? topic.platform` (`effectivePlatform`) — use it, never `topic.platform` alone. Text search must go through `matchAllWords` / `termVariants` (shared `search.ts`) so Arabic and Persian letter/digit spellings match; never plain `contains` on a raw query. Content list filters live in the URL (`features/contents/filters.ts`).
+
+## Notifications (docs/25-notifications.md)
+- Tell people through `NotificationsService.notify()` only (never insert `Notification` rows or call SMTP/webhook directly): recipients come from roles + `usersWithAccess` (project access), the actor is never a recipient, and a notification must never fail the action that caused it — `notify` swallows errors and callers wrap recipient lookups in try/catch. Message text is built once by `notificationMessage()` (shared) from stored `params`, never stored as text. `/notifications` routes are open to every role (`@Roles('ADMIN','EDITOR','VIEWER')`) because they are the caller's own data. The webhook secret is write-only (`SecretBox`) and delivery logs keep only the host.
+
 ## Topic & business access (docs/17-project-access.md)
 - EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 

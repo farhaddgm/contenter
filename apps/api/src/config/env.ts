@@ -116,6 +116,18 @@ const EnvSchema = z.object({
   FETCH_PROXY_HOSTS: z.string().default('ir'),
   /** Allow fetching private-network URLs (never enable in production). */
   FETCH_ALLOW_PRIVATE: bool('false'),
+  /**
+   * SMTP server for e-mail notifications (docs/25-notifications.md), e.g.
+   * `smtps://user:password@smtp.example.com:465`. Empty = e-mail notifications are switched off;
+   * the in-app list and the webhook still work.
+   */
+  SMTP_URL: z
+    .string()
+    .regex(/^smtps?:[/][/]/, 'must start with smtp:// or smtps://')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** The "From" of notification e-mails. */
+  MAIL_FROM: z.string().default('Contenter <no-reply@localhost>'),
   SEED_ADMIN_EMAIL: z.string().default('admin@contenter.local'),
   SEED_ADMIN_PASSWORD: z.string().default('ChangeMe123!'),
 });

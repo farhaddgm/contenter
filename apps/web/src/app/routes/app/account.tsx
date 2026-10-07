@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/auth';
 import { notify } from '@/stores/notifications';
 import { formatDate } from '@/utils/format';
 import { useChangePassword } from '@/features/admin/api';
+import { NotificationPreferencesCard } from '@/features/inbox/components/preferences-card';
 
 export default function AccountRoute() {
   const t = useT();
@@ -113,6 +114,7 @@ export default function AccountRoute() {
             )}
           </CardBody>
         </Card>
+        <NotificationPreferencesCard />
       </div>
     </>
   );

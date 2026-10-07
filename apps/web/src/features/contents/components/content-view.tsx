@@ -4,22 +4,27 @@ import {
   CheckCircle2,
   ChevronLeft,
   History,
+  Layers,
   MessageSquareText,
   Pencil,
   RotateCcw,
   Send,
   Trash2,
-  Undo2,
   XCircle,
   AlertTriangle,
 } from 'lucide-react';
-import type { Content, ContentVersion, TermIssue } from '@contenter/shared';
+import {
+  effectivePlatform,
+  type Content,
+  type ContentVersion,
+  type TermIssue,
+} from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Dialog, Drawer } from '@/components/ui/dialog';
-import { Field, Input, Textarea } from '@/components/ui/form-controls';
+import { Field, Input, Select, Textarea } from '@/components/ui/form-controls';
 import { CopyButton, MarkdownView, PageHeader } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
@@ -31,6 +36,13 @@ import { cn } from '@/utils/cn';
 import { formatDate, formatNumber } from '@/utils/format';
 import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { useJob } from '@/features/jobs/api/jobs';
+import { useCampaigns } from '@/features/campaigns/api/campaigns';
+import { SchedulePanel } from '@/features/calendar/components/schedule-panel';
+import { useSetContentTags } from '@/features/tags/api/tags';
+import { CommentsCard } from './comments-card';
+import { RepurposeDialog, RepurposedCard } from './repurpose';
+import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
+import { TagPicker } from '@/features/tags/components/tag-picker';
 import {
   useContent,
   useDeleteContent,
@@ -328,6 +340,48 @@ function SelfCheckCard({ version }: { version: ContentVersion }) {
   );
 }
 
+/** Tags and campaign of a content. */
+function OrganizeCard({ content, editable }: { content: Content; editable: boolean }) {
+  const t = useT();
+  const setTags = useSetContentTags(content.id);
+  const update = useUpdateContent(content.id);
+  const { data: campaigns = [] } = useCampaigns(content.topicId);
+  // archived campaigns stay selectable only for a content that is already in one
+  const options = campaigns
+    .filter((c) => c.status === 'ACTIVE' || c.id === content.campaignId)
+    .map((c) => ({ value: c.id, label: c.name }));
+  const onError = (e: Error) => notify.error(t('common.error'), e.message);
+  return (
+    <Card>
+      <CardHeader title={t('contents.organize')} />
+      <CardBody className="space-y-4">
+        <Field label={t('tags.title')}>
+          {() => (
+            <TagPicker
+              topicId={content.topicId}
+              selected={content.tags ?? []}
+              disabled={!editable}
+              onChange={(tagIds) => setTags.mutate({ tagIds }, { onError })}
+            />
+          )}
+        </Field>
+        <Field label={t('campaigns.one')}>
+          {(id) => (
+            <Select
+              id={id}
+              disabled={!editable}
+              placeholder={t('campaigns.none')}
+              value={content.campaignId ?? ''}
+              options={options}
+              onChange={(e) => update.mutate({ campaignId: e.target.value || null }, { onError })}
+            />
+          )}
+        </Field>
+      </CardBody>
+    </Card>
+  );
+}
+
 export function ContentView({ contentId }: { contentId: string }) {
   const t = useT();
   const navigate = useNavigate();
@@ -336,11 +390,11 @@ export function ContentView({ contentId }: { contentId: string }) {
   const lastJob = useJob(
     content?.status === 'FAILED' || content?.status === 'GENERATING' ? content.lastJobId : null,
   );
-  const update = useUpdateContent(contentId);
   const restore = useRestoreVersion(contentId);
   const remove = useDeleteContent();
   const reviseDialog = useDisclosure();
   const editDrawer = useDisclosure();
+  const repurposeDialog = useDisclosure();
   // A picked history entry is tied to the current version it was picked under,
   // so a new generation automatically brings the view back to the latest draft.
   const [viewed, setViewed] = useState<{ current: string | null; id: string } | null>(null);
@@ -354,9 +408,8 @@ export function ContentView({ contentId }: { contentId: string }) {
     content.versions?.find((v) => v.id === viewVersionId) ?? content.currentVersion ?? null;
   const isCurrent = version?.id === content.currentVersionId;
   const generating = content.status === 'GENERATING';
-
-  const setStatus = (status: Content['status']) =>
-    update.mutate({ status }, { onSuccess: () => notify.success(t('common.saved')) });
+  // a published content is frozen until it is unpublished
+  const frozen = !!content.publishedAt;
 
   return (
     <>
@@ -376,7 +429,15 @@ export function ContentView({ contentId }: { contentId: string }) {
             <Badge tone={statusTone[content.status]}>
               {t(`enums.contentStatus.${content.status}`)}
             </Badge>
+            {content.status === 'IN_REVIEW' && content.reviewStage && (
+              <Badge tone="warning">{t(`enums.reviewStage.${content.reviewStage}`)}</Badge>
+            )}
             <Badge tone="outline">{t(`enums.contentFormat.${content.format}`)}</Badge>
+            {content.topic && (
+              <Badge tone="primary">
+                {t(`enums.platform.${effectivePlatform(content, content.topic)}`)}
+              </Badge>
+            )}
             {content.idea && <span className="text-xs">💡 {content.idea.title}</span>}
           </span>
         }
@@ -388,7 +449,7 @@ export function ContentView({ contentId }: { contentId: string }) {
                 variant="outline"
                 icon={<MessageSquareText />}
                 onClick={reviseDialog.open}
-                disabled={generating}
+                disabled={generating || frozen}
               >
                 {t('contents.revise')}
               </Button>
@@ -396,34 +457,19 @@ export function ContentView({ contentId }: { contentId: string }) {
                 variant="outline"
                 icon={<Pencil />}
                 onClick={editDrawer.open}
-                disabled={generating}
+                disabled={generating || frozen}
               >
                 {t('contents.editManually')}
               </Button>
-              {content.status === 'DRAFT' && (
-                <Button variant="secondary" icon={<Send />} onClick={() => setStatus('IN_REVIEW')}>
-                  {t('contents.submitReview')}
-                </Button>
-              )}
-              {(content.status === 'DRAFT' || content.status === 'IN_REVIEW') && (
-                <Button
-                  variant="success"
-                  icon={<CheckCircle2 />}
-                  onClick={() => setStatus('APPROVED')}
-                >
-                  {t('contents.approve')}
-                </Button>
-              )}
-              {content.status === 'IN_REVIEW' && (
-                <Button variant="outline" icon={<XCircle />} onClick={() => setStatus('REJECTED')}>
-                  {t('contents.reject')}
-                </Button>
-              )}
-              {(content.status === 'APPROVED' || content.status === 'REJECTED') && (
-                <Button variant="outline" icon={<Undo2 />} onClick={() => setStatus('DRAFT')}>
-                  {t('contents.backToDraft')}
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                icon={<Layers />}
+                onClick={repurposeDialog.open}
+                disabled={generating}
+              >
+                {t('repurpose.action')}
+              </Button>
+              {!generating && <ReviewActionButtons content={content} />}
               <ConfirmationDialog
                 trigger={
                   <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
@@ -481,7 +527,7 @@ export function ContentView({ contentId }: { contentId: string }) {
                 actions={
                   <>
                     <CopyButton text={fullText(version)} label={t('contents.copyAll')} />
-                    {!isCurrent && editable && (
+                    {!isCurrent && editable && !frozen && (
                       <Button
                         size="sm"
                         icon={<RotateCcw />}
@@ -526,14 +572,29 @@ export function ContentView({ contentId }: { contentId: string }) {
                 </CardBody>
               </Card>
             )}
+            <CommentsCard
+              contentId={content.id}
+              currentVersionId={content.currentVersionId}
+              viewedVersionId={version.id}
+              canWrite={editable && !generating}
+            />
           </div>
 
           <div className="space-y-4">
+            <ReviewTimelineCard content={content} />
+            <Card>
+              <CardHeader title={t('calendar.publishing')} />
+              <CardBody>
+                <SchedulePanel content={content} editable={editable} />
+              </CardBody>
+            </Card>
+            <RepurposedCard content={content} />
+            <OrganizeCard content={content} editable={editable} />
             {version.id === content.currentVersionId && (
               <TermIssuesCard
                 contentId={content.id}
                 issues={content.termIssues ?? []}
-                canFix={editable && !generating}
+                canFix={editable && !generating && !frozen}
               />
             )}
             <SelfCheckCard version={version} />
@@ -586,6 +647,9 @@ export function ContentView({ contentId }: { contentId: string }) {
 
       {reviseDialog.isOpen && (
         <ReviseDialog contentId={content.id} open onOpenChange={reviseDialog.setIsOpen} />
+      )}
+      {repurposeDialog.isOpen && (
+        <RepurposeDialog content={content} onClose={repurposeDialog.close} />
       )}
       {editDrawer.isOpen && (
         <EditDrawer content={content} open onOpenChange={editDrawer.setIsOpen} />

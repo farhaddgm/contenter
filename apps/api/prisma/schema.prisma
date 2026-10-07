@@ -64,6 +64,12 @@ model User {
   topicGrants         TopicMember[]             @relation("TopicMemberGrantedBy")
   businessMemberships BusinessMember[]          @relation("BusinessMemberUser")
   businessGrants      BusinessMember[]          @relation("BusinessMemberGrantedBy")
+  submittedContents   Content[]                 @relation("ContentSubmitter")
+  contentReviews      ContentReview[]
+  contentComments     ContentComment[]          @relation("CommentAuthor")
+  resolvedComments    ContentComment[]          @relation("CommentResolver")
+  notifications       Notification[]
+  notificationPrefs   NotificationPreference[]
 }
 
 model RefreshToken {
@@ -572,9 +578,54 @@ model Topic {
   contents      Content[]
   brandDocs     BrandDocument[]
   members       TopicMember[]
+  tags          Tag[]
+  campaigns     Campaign[]
 
   @@index([status, createdAt])
   @@index([businessId])
+}
+
+/// Label an editor puts on ideas and contents of one topic (docs/20-tags-campaigns.md).
+model Tag {
+  id          String   @id @default(cuid())
+  topicId     String
+  name        String
+  /// One of the palette keys in `TagColor` (packages/shared); validated by Zod, not the DB
+  color       String   @default("slate")
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  topic    Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  contents Content[]
+  ideas    Idea[]
+
+  @@unique([topicId, name])
+}
+
+enum CampaignStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/// Groups the contents of one topic that serve one goal; the dates are optional, so a campaign
+/// without them works as a plain collection.
+model Campaign {
+  id          String         @id @default(cuid())
+  topicId     String
+  name        String
+  description String         @default("")
+  status      CampaignStatus @default(ACTIVE)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  topic    Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  contents Content[]
+
+  @@unique([topicId, name])
+  @@index([topicId, status])
 }
 
 /// Grants a non-admin user access to a project. The creator has EDIT without a row; a row
@@ -830,6 +881,7 @@ model Idea {
   topic    Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
   request  IdeationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
   contents Content[]
+  tags     Tag[]
 
   @@index([topicId, status, createdAt])
 }
@@ -850,15 +902,47 @@ enum VersionSource {
   ADMIN
 }
 
+/// Where an IN_REVIEW content waits: with an editor first, then (optionally) the final approver
+enum ReviewStage {
+  EDITORIAL
+  FINAL
+}
+
+enum ReviewDecision {
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+  WITHDRAWN
+  REOPENED
+  /// the text changed after review, so the content went back to DRAFT
+  RESET
+}
+
 model Content {
   id               String        @id @default(cuid())
   topicId          String
   ideaId           String?
   profileId        String?
+  campaignId       String?
+  /// Set on a content made for another platform from `sourceContentId` (docs/23-repurposing.md)
+  platform         Platform?
+  sourceContentId  String?
   title            String
   brief            String        @default("")
   format           ContentFormat @default(POST)
   status           ContentStatus @default(GENERATING)
+  /// Set while status is IN_REVIEW (docs/21-review-workflow.md)
+  reviewStage      ReviewStage?
+  submittedById    String?
+  submittedAt      DateTime?
+  /// Planned publish time; only an APPROVED content is scheduled (docs/22-calendar-publishing.md)
+  scheduledAt      DateTime?
+  /// Set by hand once the content is live elsewhere; a published content is frozen
+  publishedAt      DateTime?
+  publishedUrl     String?
+  /// The `scheduledAt` the "time to publish" reminder was already sent for (docs/25-notifications.md)
+  dueNotifiedFor   DateTime?
   currentVersionId String?       @unique
   lastJobId        String?
   createdById      String?
@@ -868,11 +952,65 @@ model Content {
   topic          Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
   idea           Idea?            @relation(fields: [ideaId], references: [id], onDelete: SetNull)
   profile        ContentProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  campaign       Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   currentVersion ContentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   versions       ContentVersion[] @relation("ContentVersions")
+  tags           Tag[]
+  submittedBy    User?            @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  source         Content?         @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  repurposed     Content[]        @relation("Repurposed")
+  reviews        ContentReview[]
+  comments       ContentComment[]
+  notifications  Notification[]
 
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
+  @@index([campaignId])
+  @@index([scheduledAt])
+  @@index([publishedAt])
+  @@index([sourceContentId])
+}
+
+/// One step of a content's review history (submit, approve, request changes …).
+model ContentReview {
+  id        String         @id @default(cuid())
+  contentId String
+  /// The version the decision was about
+  versionId String?
+  stage     ReviewStage?
+  decision  ReviewDecision
+  actorId   String?
+  note      String         @default("")
+  createdAt DateTime       @default(now())
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([contentId, createdAt])
+}
+
+/// A comment on a draft; replies are one level deep (`parentId` points at a top-level comment).
+model ContentComment {
+  id           String    @id @default(cuid())
+  contentId    String
+  /// The version the author was looking at
+  versionId    String?
+  parentId     String?
+  authorId     String?
+  body         String
+  resolvedAt   DateTime?
+  resolvedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  content    Content          @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  version    ContentVersion?  @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  parent     ContentComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    ContentComment[] @relation("CommentReplies")
+  author     User?            @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  resolvedBy User?            @relation("CommentResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([contentId, createdAt])
 }
 
 model ContentVersion {
@@ -890,10 +1028,81 @@ model ContentVersion {
   jobId     String?
   createdAt DateTime      @default(now())
 
-  content   Content  @relation("ContentVersions", fields: [contentId], references: [id], onDelete: Cascade)
-  currentOf Content? @relation("CurrentVersion")
+  content   Content          @relation("ContentVersions", fields: [contentId], references: [id], onDelete: Cascade)
+  currentOf Content?         @relation("CurrentVersion")
+  comments  ContentComment[]
 
   @@unique([contentId, version])
+}
+
+// ─────────────────────────────── Notifications ───────────────────────────────
+
+enum NotificationEvent {
+  REVIEW_SUBMITTED
+  REVIEW_FINAL_NEEDED
+  REVIEW_APPROVED
+  REVIEW_CHANGES_REQUESTED
+  REVIEW_REJECTED
+  COMMENT_ADDED
+  COMMENT_REPLIED
+  CONTENT_DUE
+}
+
+enum DeliveryChannel {
+  EMAIL
+  WEBHOOK
+}
+
+enum DeliveryStatus {
+  SENT
+  FAILED
+}
+
+/// One notification of one user. The text is not stored: `params` is rendered in the reader's
+/// language (packages/shared/src/notifications.ts).
+model Notification {
+  id        String            @id @default(cuid())
+  userId    String
+  event     NotificationEvent
+  contentId String?
+  params    Json
+  /// App path the notification leads to
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+/// A user's choice per event; a missing row means the defaults (NOTIFICATION_DEFAULTS)
+model NotificationPreference {
+  id     String            @id @default(cuid())
+  userId String
+  event  NotificationEvent
+  inApp  Boolean           @default(true)
+  email  Boolean           @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, event])
+}
+
+/// Outcome of one e-mail or webhook send, kept for a few weeks so a failing channel can be found
+model NotificationDelivery {
+  id             String            @id @default(cuid())
+  channel        DeliveryChannel
+  event          NotificationEvent
+  /// The address, or the host of the webhook
+  target         String
+  status         DeliveryStatus
+  error          String?
+  attempts       Int               @default(1)
+  createdAt      DateTime          @default(now())
+
+  @@index([createdAt])
 }
 
 // ─────────────────────────────── AI & Ops ───────────────────────────────
@@ -911,6 +1120,7 @@ enum AiJobType {
   BUSINESS_REVISE
   BUSINESS_ASSET_ANALYZE
   BUSINESS_AUDIT
+  REPURPOSE_CONTENT
 }
 
 enum AiJobStatus {

@@ -98,21 +98,36 @@
 ## ایده‌ها
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET | `/topics/:id/ideas?status&page&q` | فهرست |
+| GET | `/topics/:id/ideas?status&statuses&formats&tagId&sort&page&q` | فهرست ([24-search-filters.md](24-search-filters.md)) |
 | POST | `/topics/:id/ideas/generate` | **۲۰۲** — `{ count, direction?, format? }` ← کار `IDEATE` |
 | PATCH / DELETE | `/ideas/:id` | تغییر وضعیت، ویرایش یا حذف |
+| PUT | `/ideas/:id/tags` | `{ tagIds }` — [20-tags-campaigns.md](20-tags-campaigns.md) |
+
+## برچسب‌ها و کمپین‌ها
+مسیرهای `/topics/:id/tags`، `/tags/:id`، `/topics/:id/campaigns` و `/campaigns/:id` و `PUT /contents/:id/tags` در [20-tags-campaigns.md](20-tags-campaigns.md) آمده‌اند.
 
 ## محتوا
 | متد | مسیر | توضیح |
 |---|---|---|
-| GET | `/contents?topicId&status&q&page` | فهرست |
+| GET | `/contents?topicId&q&statuses&formats&platforms&tagIds&campaignId&createdById&schedule&createdFrom&createdTo&sort&order&page` | فهرست با فیلترهای پیشرفته ([24-search-filters.md](24-search-filters.md)) |
+| GET | `/search?q&topicId&limit` | جست‌وجوی سراسری در محتواها، ایده‌ها و موضوع‌ها |
+| POST | `/contents/:id/repurpose` | **۲۰۲** — `{ targets: [{ platform, format? }], notes? }` ← کار `REPURPOSE_CONTENT` برای هر هدف ([23-repurposing.md](23-repurposing.md)) |
 | POST | `/topics/:id/contents/generate` | **۲۰۲** — `{ ideaId? , brief?, format? }` ← `{ jobId, contentId }` |
 | GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه |
-| PATCH | `/contents/:id` | `{ status?: DRAFT, IN_REVIEW, APPROVED یا REJECTED, title? }` |
+| PATCH | `/contents/:id` | `{ title?, campaignId? }` — `status` دیگر پذیرفته نمی‌شود (۴۰۰)؛ برای تغییر وضعیت ↓ |
+| POST | `/contents/:id/review/:action` | گام گردش تأیید: `submit`، `approve`، `finalize`، `request_changes`، `reject`، `withdraw`، `reopen` — [21-review-workflow.md](21-review-workflow.md) |
+| GET / POST | `/contents/:id/comments` | کامنت‌ها (رشته‌ها با پاسخ) / نظر تازه |
+| PATCH / DELETE | `/comments/:id` | ویرایش، «حل شد» یا حذف نظر |
+| PUT | `/contents/:id/schedule` | `{ scheduledAt }` — برنامه‌ریزی انتشار ([22-calendar-publishing.md](22-calendar-publishing.md)) |
+| POST / DELETE | `/contents/:id/published` | ثبت انتشار `{ publishedAt?, url? }` / لغو آن |
+| GET | `/calendar?from&to&topicId&campaignId&tagId` | تقویم: `{ items, ready }` |
 | POST | `/contents/:id/revise` | **۲۰۲** — `{ feedback }` ← کار `REVISE_CONTENT` |
 | PUT | `/contents/:id/current` | ویرایش دستی که نسخهٔ جدیدی با منبع `ADMIN` می‌سازد |
 | POST | `/contents/:id/versions/:versionId/restore` | بازگرداندن یک نسخه |
 | DELETE | `/contents/:id` | حذف |
+
+## اعلان‌ها
+مسیرهای `/notifications` (اعلان‌ها و ترجیحات خودِ کاربر؛ همهٔ نقش‌ها) و `/admin/settings/notifications` و `/admin/notification-deliveries` (وب‌هوک و لاگ ارسال؛ فقط ADMIN) در [25-notifications.md](25-notifications.md) آمده‌اند.
 
 ## کارها و داشبورد
 | متد | مسیر | توضیح |

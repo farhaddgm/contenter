@@ -8,3 +8,8 @@ export * from './business';
 export * from './business-assets';
 export * from './business-profile';
 export * from './integration';
+export * from './workflow';
+export * from './calendar';
+export * from './search';
+export * from './repurpose';
+export * from './notifications';

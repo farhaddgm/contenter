@@ -67,6 +67,18 @@ describe('renderTemplate', () => {
         'format',
         'language',
       ],
+      repurpose_content: [
+        'topic',
+        'business',
+        'profile',
+        'principles',
+        'brand_docs',
+        'source',
+        'direction',
+        'target_platform',
+        'target_format',
+        'language',
+      ],
       revise_content: [
         'topic',
         'business',
@@ -117,7 +129,13 @@ describe('renderTemplate', () => {
     }
   });
   it('brand documents reach every generative prompt', () => {
-    for (const key of ['build_profile', 'ideate', 'generate_content', 'revise_content']) {
+    for (const key of [
+      'build_profile',
+      'ideate',
+      'generate_content',
+      'revise_content',
+      'repurpose_content',
+    ]) {
       const p = DEFAULT_PROMPTS.find((d) => d.key === key)!;
       expect(templateVariables(p.user)).toContain('brand_docs');
     }
@@ -294,6 +312,7 @@ describe('MockProvider', () => {
     ['IDEATE', IdeationResultSchema],
     ['GENERATE_CONTENT', ContentDraftResultSchema],
     ['REVISE_CONTENT', ContentDraftResultSchema],
+    ['REPURPOSE_CONTENT', ContentDraftResultSchema],
     ['SMART_CHAT', SmartReplySchema],
   ];
   it.each(cases)('returns schema-valid output for %s', async (task, schema) => {

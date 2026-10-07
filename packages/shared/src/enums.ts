@@ -83,6 +83,21 @@ export const ContentStatus = [
 ] as const;
 export type ContentStatus = (typeof ContentStatus)[number];
 
+/** Where an IN_REVIEW content waits (docs/21-review-workflow.md). */
+export const ReviewStage = ['EDITORIAL', 'FINAL'] as const;
+export type ReviewStage = (typeof ReviewStage)[number];
+
+export const ReviewDecision = [
+  'SUBMITTED',
+  'APPROVED',
+  'CHANGES_REQUESTED',
+  'REJECTED',
+  'WITHDRAWN',
+  'REOPENED',
+  'RESET',
+] as const;
+export type ReviewDecision = (typeof ReviewDecision)[number];
+
 export const ContentFormat = [
   'POST',
   'CAROUSEL',
@@ -94,6 +109,24 @@ export const ContentFormat = [
   'CAPTION',
 ] as const;
 export type ContentFormat = (typeof ContentFormat)[number];
+
+/** Palette of a tag; stored as a plain string in the DB and checked by Zod (docs/20). */
+export const TagColor = [
+  'slate',
+  'red',
+  'orange',
+  'amber',
+  'green',
+  'teal',
+  'blue',
+  'indigo',
+  'purple',
+  'pink',
+] as const;
+export type TagColor = (typeof TagColor)[number];
+
+export const CampaignStatus = ['ACTIVE', 'ARCHIVED'] as const;
+export type CampaignStatus = (typeof CampaignStatus)[number];
 
 export const AiJobType = [
   'ANALYZE_SAMPLE',
@@ -108,6 +141,7 @@ export const AiJobType = [
   'BUSINESS_REVISE',
   'BUSINESS_ASSET_ANALYZE',
   'BUSINESS_AUDIT',
+  'REPURPOSE_CONTENT',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 
