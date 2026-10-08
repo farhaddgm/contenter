@@ -22,7 +22,7 @@
     "seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@anthropic-ai/sdk": "^0.131.0",
     "@contenter/shared": "*",
     "@mozilla/readability": "^0.6.0",
     "@nestjs/common": "^11.1.6",
@@ -31,7 +31,7 @@
     "@nestjs/platform-express": "^11.1.6",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.19.0",
-    "argon2": "^0.44.0",
+    "argon2": "^0.45.1",
     "bullmq": "^5.61.0",
     "cookie-parser": "^1.4.7",
     "helmet": "^8.1.0",
