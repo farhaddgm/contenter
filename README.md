@@ -29,7 +29,7 @@
 
 | لایه | انتخاب |
 |---|---|
-| بک‌اند | NestJS 11، Prisma 6 + PostgreSQL، BullMQ + Redis، Zod |
+| بک‌اند | NestJS 12، Prisma 6 + PostgreSQL، BullMQ + Redis، Zod |
 | AI | Claude (Anthropic SDK) و GPT (OpenAI SDK) — مدل هر کار از پنل تنظیمات؛ Structured Outputs؛ ارائه‌دهندهٔ mock برای توسعه |
 | فرانت‌اند | React 19، Vite، TanStack Query، React Router 7، Tailwind 4، Radix — معماری [bulletproof-react](https://github.com/alan2207/bulletproof-react)، RTL فارسی + انگلیسی، پوستهٔ روشن/تیره |
 | مشترک | `packages/shared`: اسکیماهای Zod و انواع مشترک |

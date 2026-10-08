@@ -2,6 +2,18 @@
 
 قالب بر اساس [Keep a Changelog](https://keepachangelog.com/) و نسخه‌گذاری [SemVer](https://semver.org/).
 
+## [0.17.0] — 2026-10-08
+
+### تغییر کرد
+- **NestJS 12:** `@nestjs/common`، `@nestjs/core`، `@nestjs/platform-express` و `@nestjs/jwt` از ۱۱ به ۱۲ رفتند. تغییر کدی لازم نشد (برنامهٔ CommonJS با `require(esm)` کار می‌کند). `@nestjs/cli` روی ۱۱ ماند چون CLI ۱۲ TypeScript ‎≥ 6 می‌خواهد (docs/13-operations.md، بخش ۱۰).
+- با Nest 12 API واقعاً بالا آورده شد (PGlite + `AI_PROVIDER=mock`)؛ مسیرها، ورود، تگ و کمپین، گردش بازبینی، تقویم، بازنشر و اعلان‌ها با اسکریپت‌های smoke بررسی شد.
+
+### افزوده شد
+- تست `nest-install.spec.ts`: دو نسخهٔ `@nestjs/core` یا `@nestjs/common` در `package-lock.json` را رد می‌کند. چنین حالتی تست‌های واحد را نمی‌شکند ولی برنامه هنگام بالا آمدن با خطای تزریق `Reflector` در `ThrottlerGuard` می‌افتد.
+
+### نکتهٔ استقرار
+- بدون migration. Node سرور باید ‎≥ 22.12 باشد (الان 22.23). قالب خروجی لاگ‌های Nest ممکن است کمی فرق کند (`ConsoleLogger` در ۱۲ پارامترها را ساختاریافته چاپ می‌کند).
+
 ## [0.16.3] — 2026-10-08
 
 ### تغییر کرد
