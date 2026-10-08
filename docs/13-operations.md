@@ -218,7 +218,7 @@ bash scripts/setup-auto-deploy.sh
 
 ## ۱۰. به‌روزرسانی وابستگی‌ها
 
-- **خودکار:** `.github/dependabot.yml` هر دوشنبه یک PR برای به‌روزرسانی‌های patch/minor npm می‌سازد (همه در یک PR گروهی) و ماهی یک بار برای نسخهٔ اکشن‌های GitHub. مجورهای NestJS، Prisma، BullMQ، ioredis، OpenAI SDK و `@types/node` عمداً خارج‌اند؛ هر کدام مهاجرت برنامه‌ریزی‌شده می‌خواهد.
+- **خودکار:** `.github/dependabot.yml` هر دوشنبه یک PR برای به‌روزرسانی‌های patch/minor npm می‌سازد (همه در یک PR گروهی) و ماهی یک بار برای نسخهٔ اکشن‌های GitHub. مجورهای NestJS، Prisma، BullMQ، ioredis، OpenAI SDK، `@types/node` و TypeScript (`@nestjs/cli` آن را روی 5.9.3 قفل کرده؛ بدون این ignore هر اجرای Dependabot با خطای «dependency_file_not_resolvable» قرمز می‌شد) عمداً خارج‌اند؛ هر کدام مهاجرت برنامه‌ریزی‌شده می‌خواهد.
 - **بررسی دستی:** `npm outdated --workspaces --include-workspace-root` و `npm audit`. همیشه از ریشهٔ مخزن (با workspaceها) اجرا کنید؛ `npm audit` روی یک پوشهٔ ناقص نتیجهٔ غلط «۰ آسیب‌پذیری» می‌دهد.
 - **`overrides` در `package.json`:** هر کدام دلیل دارد؛ وقتی بستهٔ بالادستی خودش به‌روز شد بردارید و `npm audit` را دوباره بزنید.
   - `vite`: نسخهٔ یکسان برای همهٔ workspaceها.
