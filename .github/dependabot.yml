@@ -1,0 +1,36 @@
+# Weekly dependency PRs. Patch/minor updates are grouped into one PR per ecosystem so they are
+# cheap to review; majors of the runtime stack (NestJS, Prisma, BullMQ, ioredis, OpenAI SDK, Node
+# types) are left out on purpose — they need a planned migration, see docs/13-operations.md.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Tehran
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "@nestjs/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: prisma
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: bullmq
+        update-types: ["version-update:semver-major"]
+      - dependency-name: ioredis
+        update-types: ["version-update:semver-major"]
+      - dependency-name: openai
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2

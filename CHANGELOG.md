@@ -2,6 +2,18 @@
 
 قالب بر اساس [Keep a Changelog](https://keepachangelog.com/) و نسخه‌گذاری [SemVer](https://semver.org/).
 
+## [0.16.1] — 2026-10-08
+
+### تغییر کرد
+- وابستگی‌ها در محدودهٔ نسخه‌های مجاز به‌روز شدند (NestJS 11.2.7، vite 8.3.3، vitest 5.0.3، eslint 10.12، TanStack Query و …) و اکشن‌های `actions/checkout` و `actions/setup-node` به نسخهٔ ۷ رفتند (هشدار منسوخ‌شدن Node 20 در CI برطرف شد).
+- `esbuild` و `shell-quote` (ابزارهای توسعه) با `overrides` به نسخهٔ وصله‌شده رفتند؛ دو هشدار `npm audit` برای ابزارهای ساخت و توسعه بسته شد.
+
+### افزوده شد
+- `.github/dependabot.yml`: PR هفتگی گروهی برای patch/minor و ماهانه برای اکشن‌ها؛ مجورهای پشتهٔ اصلی (NestJS، Prisma، BullMQ، ioredis، OpenAI) عمداً خارج‌اند. توضیح و هشدارهای شناخته‌شدهٔ باقی‌مانده در docs/13-operations.md، بخش ۱۰.
+
+### نکتهٔ استقرار
+- بدون تغییر رفتار و بدون migration.
+
 ## [0.16.0] — 2026-10-07
 
 ### افزوده شد

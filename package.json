@@ -1,7 +1,7 @@
 {
   "name": "contenter",
   "private": true,
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "AI-assisted content production platform",
   "workspaces": [
     "packages/*",
@@ -28,6 +28,8 @@
     "vite": "^8.3.1"
   },
   "overrides": {
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "esbuild": "^0.28.2",
+    "shell-quote": "^1.12.0"
   }
 }
