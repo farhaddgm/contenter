@@ -2,6 +2,18 @@
 
 قالب بر اساس [Keep a Changelog](https://keepachangelog.com/) و نسخه‌گذاری [SemVer](https://semver.org/).
 
+## [0.16.2] — 2026-10-08
+
+### رفع شد
+- **`npm audit` به صفر رسید** (با devDependencies هم): `deepmerge-ts` در Prisma CLI با override به ^8.0.2 رفت و `sprintf-js` با override نسخهٔ ۲ `argparse` در `mammoth` از درخت حذف شد (فقط اسکریپت CLI خودِ `mammoth` به آن نیاز داشت). توضیح دلیل هر override در docs/13-operations.md، بخش ۱۰.
+- **`argon2` به `^0.44.0` برگشت.** نسخهٔ 0.45.x (وارد‌شده با #25) روی ویندوز با Node 22.13 هنگام بارگذاری segmentation fault می‌دهد؛ `npm install` محلی شکست می‌خورد و API محلی هنگام هش رمز می‌افتد. روی سرور (لینوکس) مشکلی نبود و هش‌ها سازگارند. Dependabot از این پس 0.45+ را پیشنهاد نمی‌دهد.
+
+### افزوده شد
+- فایل `LICENSE` («همهٔ حقوق محفوظ است»؛ مخزن عمومی است ولی مجوز استفاده نمی‌دهد) و فیلد `license: UNLICENSED` در `package.json`ها، و بخش «مجوز» در README.
+
+### نکتهٔ استقرار
+- بدون تغییر رفتار و بدون migration. فقط نسخهٔ `argon2` روی سرور از 0.45.1 به 0.44.0 برمی‌گردد.
+
 ## [0.16.1] — 2026-10-08
 
 ### تغییر کرد
