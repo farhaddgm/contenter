@@ -19,7 +19,7 @@ jobs:
   tag:
     runs-on: ubuntu-24.04 # pinned: ubuntu-latest moves to 26.04 on 2026-10-19; upgrade on purpose
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Tag the release commit of the current version
