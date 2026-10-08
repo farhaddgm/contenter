@@ -29,6 +29,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # 0.45.x crashes (segfault) on Windows + Node 22.13 at load time; see docs/13-operations.md §10.
+      - dependency-name: argon2
+        versions: [">=0.45.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

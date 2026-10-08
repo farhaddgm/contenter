@@ -77,3 +77,7 @@ apps/web        React SPA (پنل محتوا + بک‌آفیس)
 packages/shared Zod schemas & types
 docs/           مستندات
 ```
+
+## مجوز
+
+همهٔ حقوق محفوظ است ([LICENSE](LICENSE)). عمومی بودن مخزن به معنی اجازهٔ استفاده یا بازنشر نیست. اگر قرار است پروژه متن‌باز شود، فقط فایل `LICENSE` و فیلد `license` در `package.json`ها را عوض کنید.
