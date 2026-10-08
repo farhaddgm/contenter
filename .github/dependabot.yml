@@ -1,6 +1,6 @@
 # Weekly dependency PRs. Patch/minor updates are grouped into one PR per ecosystem so they are
 # cheap to review; majors of the runtime stack (NestJS, Prisma, BullMQ, ioredis, OpenAI SDK, Node
-# types) are left out on purpose — they need a planned migration, see docs/13-operations.md.
+# types, TypeScript) are left out on purpose — they need a planned migration, see docs/13-operations.md.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -28,6 +28,10 @@ updates:
       - dependency-name: openai
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # ~5.9.3 on purpose: @nestjs/cli pins TypeScript 5.9.3, so a 6/7 bump fails with
+      # dependency_file_not_resolvable and turns every Dependabot run red.
+      - dependency-name: typescript
         update-types: ["version-update:semver-major"]
       # 0.45.x crashes (segfault) on Windows + Node 22.13 at load time; see docs/13-operations.md §10.
       - dependency-name: argon2
