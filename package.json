@@ -2,7 +2,7 @@
   "name": "contenter",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.16.3",
+  "version": "0.17.0",
   "description": "AI-assisted content production platform",
   "workspaces": [
     "packages/*",
