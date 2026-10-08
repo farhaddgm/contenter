@@ -2,6 +2,15 @@
 
 قالب بر اساس [Keep a Changelog](https://keepachangelog.com/) و نسخه‌گذاری [SemVer](https://semver.org/).
 
+## [0.16.3] — 2026-10-08
+
+### تغییر کرد
+- **`undici` به نسخهٔ ۸ رفت** (PR #29 Dependabot که به‌تنهایی مرج نمی‌شد چون تست پروکسی را می‌شکست). نسخهٔ ۸ هدف‌های `http://` را بدون تونل CONNECT می‌فرستد؛ `MediaFetcherService` حالا `ProxyAgent` را با `proxyTunnel: true` می‌سازد تا رفتار `FETCH_PROXY_URL` عوض نشود.
+- فیلد `engines` در `package.json` ریشه از `>=22` به Node ‎^22.22.2 یا ‎^24.15.0 یا ‎≥26 سخت‌تر شد: `undici` 8 و `jsdom` 30 Node جدیدتر می‌خواهند. Docker و CI قبلاً این را دارند؛ روی سیستم‌های قدیمی‌تر فقط هشدار `EBADENGINE` می‌آید.
+
+### نکتهٔ استقرار
+- بدون migration. اگر `FETCH_PROXY_URL` را ندارید هیچ چیز عوض نمی‌شود. Node سرور باید ≥ 22.19 باشد (الان 22.23).
+
 ## [0.16.2] — 2026-10-08
 
 ### رفع شد

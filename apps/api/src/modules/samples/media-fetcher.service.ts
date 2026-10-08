@@ -79,7 +79,11 @@ export class MediaFetcherService {
     private readonly prisma: PrismaService,
     @Inject(ENV) private readonly env: Env,
   ) {
-    this.proxy = env.FETCH_PROXY_URL ? new ProxyAgent(env.FETCH_PROXY_URL) : null;
+    // proxyTunnel: undici 8 forwards plain-http targets without CONNECT unless told otherwise;
+    // keep tunnelling every target so the proxy sees the same CONNECT requests as before.
+    this.proxy = env.FETCH_PROXY_URL
+      ? new ProxyAgent({ uri: env.FETCH_PROXY_URL, proxyTunnel: true })
+      : null;
   }
 
   /** Fetches a stored sample and persists the outcome (never throws). */
