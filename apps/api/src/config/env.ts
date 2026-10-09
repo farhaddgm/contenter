@@ -117,6 +117,23 @@ const EnvSchema = z.object({
   /** Allow fetching private-network URLs (never enable in production). */
   FETCH_ALLOW_PRIVATE: bool('false'),
   /**
+   * Reading Instagram accounts (docs/28): the official Instagram API "Business Discovery". Needs
+   * an Instagram professional account of yours (its id = INSTAGRAM_GRAPH_USER_ID) and a user
+   * token of it with instagram_basic, instagram_manage_insights and pages_read_engagement.
+   * Either one empty = switched off; the admin then pastes the bio/captions by hand.
+   */
+  INSTAGRAM_GRAPH_TOKEN: z
+    .string()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  INSTAGRAM_GRAPH_USER_ID: z
+    .string()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  INSTAGRAM_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v25.0'),
+  /** Overridable for tests only. */
+  INSTAGRAM_GRAPH_BASE_URL: z.string().url().default('https://graph.facebook.com'),
+  /**
    * SMTP server for e-mail notifications (docs/25-notifications.md), e.g.
    * `smtps://user:password@smtp.example.com:465`. Empty = e-mail notifications are switched off;
    * the in-app list and the webhook still work.

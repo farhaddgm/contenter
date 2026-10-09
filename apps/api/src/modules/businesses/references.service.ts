@@ -4,12 +4,20 @@ import {
   AddReferenceSchema,
   BUSINESS_REFERENCE_LIMIT,
   BUSINESS_REFERENCE_MAX_CHARS,
+  InstagramManualSchema,
+  instagramProfileUrl,
   isGoogleDriveUrl,
+  isInstagramUrl,
+  isSharedHost,
   parseGoogleFileUrl,
   parseGoogleFolderUrl,
+  parseInstagramHandle,
   parsePodSpaceUrl,
   type AddReferenceInput,
   type GoogleFileType,
+  type InstagramPost,
+  type InstagramProfile,
+  type ReferenceAnalysis,
   type UpdateReferenceInput,
 } from '@contenter/shared';
 import { type AuthUser } from '../../common/auth.decorators';
@@ -20,6 +28,9 @@ import { FetchError, MediaFetcherService } from '../samples/media-fetcher.servic
 import { documentKind, extractText, isTextKind } from './document-text';
 import { AssetImportService, PREVIEW_MAX_BYTES } from './asset-import.service';
 import { PodSpaceService, type PodSpaceEntry } from './podspace.service';
+import { analyzeInstagram, formatInstagramSnapshot } from './social/instagram-analysis';
+import { InstagramService } from './social/instagram.service';
+import { WebsiteCrawlerService } from './social/website-crawler.service';
 
 const ACCOUNT_REF = { select: { id: true, email: true } } as const;
 const PUBLIC_EXPORT: Record<GoogleFileType, ((id: string) => string) | null> = {
@@ -33,6 +44,20 @@ export const MIN_PAGE_TEXT = 200;
 const READ_CONCURRENCY = 4;
 /** Largest shared file downloaded to be read as text (PDF, Word …). */
 const DOCUMENT_MAX_BYTES = 25_000_000;
+
+/** What reading one source produced. */
+interface ReadOutcome {
+  title: string;
+  text: string;
+  accountId: string | null;
+  /** INSTAGRAM / WEBSITE sources: what code computed on the way. */
+  analysis?: ReferenceAnalysis;
+}
+
+/** Instagram data the admin gave by hand cannot be read again from the account. */
+const isManualInstagram = (row: ReferenceRow) =>
+  row.kind === 'INSTAGRAM' &&
+  (row.analysis as { provider?: string } | null)?.provider === 'MANUAL';
 
 /** What adding or refreshing a link produced. */
 interface Expansion {
@@ -106,6 +131,8 @@ export class ReferencesService {
     private readonly drive: GoogleDriveService,
     private readonly podspace: PodSpaceService,
     private readonly assets: AssetImportService,
+    private readonly instagram: InstagramService,
+    private readonly crawler: WebsiteCrawlerService,
   ) {}
 
   async list(businessId: string) {
@@ -152,7 +179,9 @@ export class ReferencesService {
     let ids: string[];
     let skipped = 0;
     let assets = 0;
-    if (data.content) {
+    if (data.instagram) {
+      ids = [await this.addManualInstagram(businessId, data.instagram, user)];
+    } else if (data.content) {
       const row = await this.prisma.businessReference.create({
         data: {
           businessId,
@@ -166,7 +195,19 @@ export class ReferencesService {
       });
       ids = [row.id];
     } else {
-      const url = data.url!;
+      const handle = isInstagramUrl(data.url!) ? parseInstagramHandle(data.url!) : null;
+      if (isInstagramUrl(data.url!) && !handle) {
+        throw new BadRequestException(
+          'This Instagram link is a post, reel or story, not an account. Send the account link (instagram.com/name).',
+        );
+      }
+      const site = !handle && data.site;
+      if (site && isSharedHost(new URL(data.url!).hostname)) {
+        throw new BadRequestException(
+          'This is a shared platform (social network, Google Drive, blogging service), not the business website. Add it as a normal link, or use the Instagram option for an account.',
+        );
+      }
+      const url = handle ? instagramProfileUrl(handle) : data.url!;
       const google = isGoogleDriveUrl(url);
       const isFile = !!parseGoogleFileUrl(url);
       const isFolder = !!parseGoogleFolderUrl(url);
@@ -183,9 +224,9 @@ export class ReferencesService {
       const row = await this.prisma.businessReference.create({
         data: {
           businessId,
-          kind: google ? 'GOOGLE_DOC' : 'URL',
+          kind: handle ? 'INSTAGRAM' : site ? 'WEBSITE' : google ? 'GOOGLE_DOC' : 'URL',
           url,
-          title: data.title,
+          title: data.title || (handle ? `Instagram @${handle}` : ''),
           createdById: user.id,
         },
       });
@@ -202,7 +243,14 @@ export class ReferencesService {
       action: 'business.reference_add',
       entityType: 'Business',
       entityId: businessId,
-      meta: { references: ids.length, skipped, assets, url: data.url ?? null },
+      meta: {
+        references: ids.length,
+        skipped,
+        assets,
+        url: data.url ?? null,
+        ...(data.site ? { site: true } : {}),
+        ...(data.instagram ? { instagram: 'manual' } : {}),
+      },
     });
     return { references: await this.listByIds(ids), skipped, assets };
   }
@@ -211,6 +259,11 @@ export class ReferencesService {
   async refresh(id: string, user: AuthUser) {
     const row = await this.find(id);
     if (row.kind === 'TEXT') throw new BadRequestException('A pasted text has nothing to refresh');
+    if (isManualInstagram(row)) {
+      throw new BadRequestException(
+        'The Instagram data was given by hand, so there is nothing to read again. Delete it and add the new bio and captions.',
+      );
+    }
     let ids = [id];
     let skipped = 0;
     let assets = 0;
@@ -466,12 +519,16 @@ export class ReferencesService {
   private async read(row: ReferenceRow): Promise<void> {
     let data: Prisma.BusinessReferenceUpdateInput;
     try {
-      const out =
-        row.kind === 'GOOGLE_DOC'
-          ? await this.readGoogle(row)
-          : parsePodSpaceUrl(row.url ?? '')?.kind === 'file'
-            ? await this.readPodSpaceFile(row.url!)
-            : await this.readPage(row.url);
+      const out: ReadOutcome =
+        row.kind === 'INSTAGRAM'
+          ? await this.readInstagram(row)
+          : row.kind === 'WEBSITE'
+            ? await this.readWebsite(row)
+            : row.kind === 'GOOGLE_DOC'
+              ? await this.readGoogle(row)
+              : parsePodSpaceUrl(row.url ?? '')?.kind === 'file'
+                ? await this.readPodSpaceFile(row.url!)
+                : await this.readPage(row.url);
       const text = out.text.trim().slice(0, BUSINESS_REFERENCE_MAX_CHARS);
       if (!text) {
         throw new FetchError(
@@ -485,6 +542,7 @@ export class ReferencesService {
         error: null,
         fetchedAt: new Date(),
         googleAccount: out.accountId ? { connect: { id: out.accountId } } : { disconnect: true },
+        ...(out.analysis ? { analysis: out.analysis as unknown as Prisma.InputJsonValue } : {}),
       };
     } catch (err) {
       const expected = err instanceof FetchError || err instanceof DriveReadError;
@@ -496,7 +554,91 @@ export class ReferencesService {
     await this.prisma.businessReference.update({ where: { id: row.id }, data });
   }
 
-  private async readPage(url: string) {
+  /** The public data of a Business/Creator account through the Instagram API. */
+  private async readInstagram(row: ReferenceRow): Promise<ReadOutcome> {
+    const handle = parseInstagramHandle(row.url);
+    if (!handle) throw new FetchError('This reference does not point to an Instagram account');
+    const { profile, posts } = await this.instagram.fetchAccount(handle);
+    const analysis = analyzeInstagram('GRAPH', profile, posts);
+    return {
+      title: `Instagram @${profile.username}`,
+      text: formatInstagramSnapshot({
+        provider: 'GRAPH',
+        profile,
+        posts,
+        analysis,
+        readAt: new Date(),
+      }),
+      accountId: null,
+      analysis,
+    };
+  }
+
+  /** Bio, counts and captions the admin typed or took from the account's data export. */
+  private async addManualInstagram(
+    businessId: string,
+    input: NonNullable<AddReferenceInput['instagram']>,
+    user: AuthUser,
+  ): Promise<string> {
+    const manual = InstagramManualSchema.parse(input);
+    const handle = parseInstagramHandle(manual.handle) ?? '';
+    const url = handle ? instagramProfileUrl(handle) : '';
+    await this.assertRoom(businessId);
+    if (url && (await this.prisma.businessReference.findFirst({ where: { businessId, url } }))) {
+      throw new BadRequestException(
+        'This Instagram account is already a reference. Delete it first to replace it with new data.',
+      );
+    }
+    const profile: InstagramProfile = {
+      username: handle,
+      name: manual.name,
+      biography: manual.biography,
+      website: manual.website,
+      followers: manual.followers ?? null,
+      following: manual.following ?? null,
+      mediaCount: manual.mediaCount ?? null,
+    };
+    const posts: InstagramPost[] = manual.posts
+      .filter((p) => p.caption)
+      .map((p) => ({
+        caption: p.caption,
+        takenAt:
+          p.takenAt && !Number.isNaN(Date.parse(p.takenAt)) ? new Date(p.takenAt).toISOString() : null,
+        mediaType: p.mediaType ?? 'UNKNOWN',
+        likes: p.likes ?? null,
+        comments: p.comments ?? null,
+        permalink: p.permalink ?? '',
+      }));
+    const analysis = analyzeInstagram('MANUAL', profile, posts);
+    const row = await this.prisma.businessReference.create({
+      data: {
+        businessId,
+        kind: 'INSTAGRAM',
+        url,
+        title: handle ? `Instagram @${handle}` : 'Instagram (given by hand)',
+        content: formatInstagramSnapshot({
+          provider: 'MANUAL',
+          profile,
+          posts,
+          analysis,
+          readAt: new Date(),
+        }).slice(0, BUSINESS_REFERENCE_MAX_CHARS),
+        analysis: analysis as unknown as Prisma.InputJsonValue,
+        status: 'READY',
+        fetchedAt: new Date(),
+        createdById: user.id,
+      },
+    });
+    return row.id;
+  }
+
+  /** Several pages of a website (home, about, services …), see WebsiteCrawlerService. */
+  private async readWebsite(row: ReferenceRow): Promise<ReadOutcome> {
+    const out = await this.crawler.read(row.url);
+    return { title: out.title, text: out.text, accountId: null, analysis: out.analysis };
+  }
+
+  private async readPage(url: string): Promise<ReadOutcome> {
     const { media } = await this.fetcher.fetch(url);
     if (isLoginWall(url, media.finalUrl ?? url)) {
       throw new FetchError(

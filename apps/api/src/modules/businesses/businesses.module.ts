@@ -25,9 +25,13 @@ import {
   BusinessSectionKey,
   CreateBlockedSourceSchema,
   CreateBusinessSchema,
+  CreateFromPresenceSchema,
   CreateFromReferencesSchema,
   DiscoverBusinessesSchema,
+  instagramProfileUrl,
+  isSharedHost,
   isSourceBlocked,
+  parseInstagramHandle,
   RemoveSourceSchema,
   SelectCandidateSchema,
   sourceBlockValue,
@@ -43,8 +47,12 @@ import {
   type BusinessCandidate,
   type CreateBlockedSourceInput,
   type CreateBusinessInput,
+  type CreateFromPresenceInput,
   type CreateFromReferencesInput,
   type DiscoverBusinessesInput,
+  type InstagramAnalysis,
+  type InstagramStatus,
+  type ReferenceAnalysis,
   type RemoveSourceInput,
   type ResearchScope,
   type SelectCandidateInput,
@@ -54,6 +62,7 @@ import {
   type UpdateBusinessSectionInput,
   type UpdateReferenceInput,
   type WebSource,
+  type WebsiteAnalysis,
 } from '@contenter/shared';
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -78,6 +87,8 @@ import { ProfileKnowledgeController } from './profile-knowledge.controller';
 import { ProfileKnowledgeService } from './profile-knowledge.service';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
+import { InstagramService } from './social/instagram.service';
+import { WebsiteCrawlerService } from './social/website-crawler.service';
 
 const RECENT_DISCOVERIES = 20;
 const REVISIONS_LIMIT = 30;
@@ -559,6 +570,98 @@ export class BusinessesService {
     return { businessId: business.id, jobId, failed: 0 };
   }
 
+  // ---------- build from an Instagram account and a website ----------
+
+  /**
+   * "Profile from account and site" (docs/28): creates the business, reads the Instagram account
+   * and the website by code (several pages, statistics), and — only when every source was
+   * readable — queues the build limited to them. The name and the site link are taken from the
+   * sources when the admin left them out.
+   */
+  async createFromPresence(input: CreateFromPresenceInput, user: AuthUser) {
+    const data = CreateFromPresenceSchema.parse(input);
+    const handle = parseInstagramHandle(data.instagram || data.instagramManual?.handle || '');
+    const host = data.website ? new URL(data.website).hostname.replace(/^www\./, '') : '';
+    const business = await this.prisma.business.create({
+      data: {
+        name: data.name || handle || host || 'Untitled business',
+        language: data.language,
+        website: data.website,
+        location: data.location,
+        origin: 'SOURCES',
+        createdById: user.id,
+      },
+    });
+    this.audit.log({
+      userId: user.id,
+      action: 'business.create_from_presence',
+      entityType: 'Business',
+      entityId: business.id,
+      meta: {
+        instagram: handle ? (data.instagramManual ? 'manual' : 'api') : null,
+        website: !!data.website,
+        scope: data.scope,
+      },
+    });
+
+    const inputs: AddReferenceInput[] = [];
+    if (data.website) inputs.push({ url: data.website, site: true });
+    if (data.instagramManual) {
+      inputs.push({ instagram: { ...data.instagramManual, handle: handle ?? '' } });
+    } else if (handle) {
+      inputs.push({ url: instagramProfileUrl(handle) });
+    }
+    const results = await Promise.allSettled(
+      inputs.map((ref) => this.references.add(business.id, ref, user)),
+    );
+    const failed = results.filter(
+      (r) => r.status === 'rejected' || r.value.references.some((ref) => ref.status !== 'READY'),
+    ).length;
+    await this.fillFromSources(business, data.name, results, user);
+    if (failed) return { businessId: business.id, jobId: null, failed };
+
+    const { jobId } = await this.enqueueBuild(
+      business.id,
+      { instruction: data.instruction, scope: data.scope },
+      user,
+    );
+    return { businessId: business.id, jobId, failed: 0 };
+  }
+
+  /** Name and website of a business created from sources, taken from what was read. */
+  private async fillFromSources(
+    business: { id: string; website: string },
+    givenName: string,
+    results: PromiseSettledResult<{ references: { analysis: unknown }[] }>[],
+    user: AuthUser,
+  ) {
+    const analyses = results.flatMap((r) =>
+      r.status === 'fulfilled' ? r.value.references.map((x) => x.analysis as ReferenceAnalysis | null) : [],
+    );
+    const ig = analyses.find((a): a is InstagramAnalysis => a?.type === 'INSTAGRAM');
+    const web = analyses.find((a): a is WebsiteAnalysis => a?.type === 'WEBSITE');
+    const data: Prisma.BusinessUpdateInput = {};
+    const name = (web?.name || ig?.profile.name || '').trim();
+    if (!givenName && name) data.name = name.slice(0, 200);
+    const link = ig?.profile.website.trim() ?? '';
+    if (!business.website && /^https?:\/\//i.test(link)) {
+      try {
+        if (!isSharedHost(new URL(link).hostname)) data.website = link.slice(0, 500);
+      } catch {
+        // a malformed link in the bio is not worth failing the build for
+      }
+    }
+    if (!Object.keys(data).length) return;
+    await this.prisma.business.update({ where: { id: business.id }, data });
+    this.audit.log({
+      userId: user.id,
+      action: 'business.update',
+      entityType: 'Business',
+      entityId: business.id,
+      meta: { from: 'sources', fields: Object.keys(data) },
+    });
+  }
+
   // ---------- research sources & blocklist ----------
 
   /** Removes one research source from a business, optionally blacklisting it everywhere. */
@@ -724,6 +827,7 @@ export class BusinessesController {
   constructor(
     private readonly businesses: BusinessesService,
     private readonly refs: ReferencesService,
+    private readonly instagram: InstagramService,
   ) {}
 
   @Get()
@@ -756,6 +860,21 @@ export class BusinessesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.businesses.createFromReferences(body, user);
+  }
+
+  @Post('from-presence')
+  @Roles('ADMIN', 'EDITOR')
+  createFromPresence(
+    @Body(new ZodValidationPipe(CreateFromPresenceSchema)) body: CreateFromPresenceInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.businesses.createFromPresence(body, user);
+  }
+
+  /** Whether Instagram accounts can be read through the API (otherwise: paste them by hand). */
+  @Get('instagram-status')
+  instagramStatus(): InstagramStatus {
+    return { graphConfigured: this.instagram.configured };
   }
 
   @BusinessScoped('business')
@@ -994,6 +1113,8 @@ export class BusinessItemsController {
   providers: [
     BusinessesService,
     ReferencesService,
+    InstagramService,
+    WebsiteCrawlerService,
     PodSpaceService,
     AssetImportService,
     BusinessNotesService,

@@ -66,7 +66,10 @@ export function referenceSites(
   website: string,
   blocked: BlockRule[],
 ): string[] {
-  const urls = [...refs.filter((r) => r.kind === 'URL').map((r) => r.url), website];
+  const urls = [
+    ...refs.filter((r) => r.kind === 'URL' || r.kind === 'WEBSITE').map((r) => r.url),
+    website,
+  ];
   const hosts = urls
     .map((u) => (u ? sourceBlockValue(u, 'DOMAIN') : null))
     .filter(

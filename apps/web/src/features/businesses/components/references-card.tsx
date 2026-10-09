@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import {
+  AtSign,
   BookOpen,
   Eye,
   FileText,
@@ -12,7 +13,9 @@ import {
 } from 'lucide-react';
 import {
   BUSINESS_REFERENCE_MAX_CHARS,
+  instagramProfileUrl,
   parseGoogleFileUrl,
+  parseInstagramHandle,
   type BusinessReference,
   type ReferenceKind,
 } from '@contenter/shared';
@@ -33,18 +36,33 @@ import {
   useCanEditBusiness,
   useDeleteReference,
   useDriveStatus,
+  useInstagramStatus,
   useReference,
   useReferences,
   useRefreshReference,
   useUpdateReference,
 } from '../api/businesses';
 import { ConnectDriveButton } from './google-drive-card';
+import {
+  AnalysisReport,
+  analysisSummary,
+  EMPTY_MANUAL,
+  InstagramManualFields,
+  toManualInput,
+  type ManualInstagramState,
+} from './presence-parts';
 
 const KIND_ICON: Record<ReferenceKind, typeof Globe> = {
   URL: Globe,
   GOOGLE_DOC: FileText,
   TEXT: BookOpen,
+  INSTAGRAM: AtSign,
+  WEBSITE: Globe,
 };
+
+/** Instagram data the admin gave by hand: there is no account to read again. */
+const isManualInstagram = (r: BusinessReference) =>
+  r.analysis?.type === 'INSTAGRAM' && r.analysis.provider === 'MANUAL';
 
 /** Lines of a textarea that look like http(s) links, and the ones that do not. */
 export function splitLinks(raw: string): { links: string[]; invalid: string[] } {
@@ -138,13 +156,30 @@ function AddReferenceDialog({
 }) {
   const t = useT();
   const add = useAddReference(businessId);
-  const [tab, setTab] = useState<'link' | 'text'>('link');
+  const { data: igStatus } = useInstagramStatus();
+  const [tab, setTab] = useState<'link' | 'site' | 'instagram' | 'text'>('link');
   const [urls, setUrls] = useState('');
+  const [siteUrl, setSiteUrl] = useState('');
+  const [handleText, setHandleText] = useState('');
+  const [byHand, setByHand] = useState(false);
+  const [manual, setManual] = useState<ManualInstagramState>(EMPTY_MANUAL);
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const { links, invalid } = splitLinks(urls);
-  const valid = tab === 'link' ? links.length > 0 && !invalid.length : text.trim().length > 0;
+  const siteLinks = splitLinks(siteUrl);
+  const handle = parseInstagramHandle(handleText);
+  const graph = igStatus?.graphConfigured ?? false;
+  const showManual = !graph || byHand;
+  const manualInput = showManual ? toManualInput(handle ?? '', manual) : undefined;
+  const valid =
+    tab === 'link'
+      ? links.length > 0 && !invalid.length
+      : tab === 'site'
+        ? siteLinks.links.length === 1 && !siteLinks.invalid.length
+        : tab === 'instagram'
+          ? (!!handle && graph && !manualInput) || !!manualInput
+          : text.trim().length > 0;
 
   const submit = async () => {
     setBusy(true);
@@ -152,7 +187,11 @@ function AddReferenceDialog({
       const inputs =
         tab === 'link'
           ? links.map((url) => ({ url }))
-          : [{ content: text.trim(), title: title.trim() }];
+          : tab === 'site'
+            ? [{ url: siteLinks.links[0]!, site: true }]
+            : tab === 'instagram'
+              ? [manualInput ? { instagram: manualInput } : { url: instagramProfileUrl(handle!) }]
+              : [{ content: text.trim(), title: title.trim() }];
       const results = await Promise.allSettled(inputs.map((i) => add.mutateAsync(i)));
       const rejected = results.filter((r) => r.status === 'rejected');
       const added = results.flatMap((r) => (r.status === 'fulfilled' ? r.value.references : []));
@@ -201,6 +240,8 @@ function AddReferenceDialog({
           onChange={setTab}
           options={[
             { value: 'link', label: t('businesses.references.tabLink') },
+            { value: 'site', label: t('businesses.references.tabSite') },
+            { value: 'instagram', label: t('businesses.references.tabInstagram') },
             { value: 'text', label: t('businesses.references.tabText') },
           ]}
         />
@@ -229,6 +270,60 @@ function AddReferenceDialog({
               )}
             </Field>
             <GoogleLinkHint links={links} />
+          </>
+        ) : tab === 'site' ? (
+          <Field
+            label={t('businesses.references.siteUrl')}
+            hint={t('businesses.references.siteHint')}
+            error={
+              siteLinks.invalid.length
+                ? t('businesses.fromSources.invalidLinks', {
+                    lines: siteLinks.invalid.slice(0, 3).join(' , '),
+                  })
+                : undefined
+            }
+          >
+            {(id) => (
+              <Input
+                id={id}
+                autoFocus
+                dir="ltr"
+                placeholder="https://brand.ir"
+                value={siteUrl}
+                onChange={(e) => setSiteUrl(e.target.value)}
+              />
+            )}
+          </Field>
+        ) : tab === 'instagram' ? (
+          <>
+            <Field
+              label={t('businesses.references.instagramUrl')}
+              hint={t('businesses.references.instagramHint')}
+              error={
+                handleText.trim() && !handle ? t('businesses.presence.invalidInstagram') : undefined
+              }
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  autoFocus
+                  dir="ltr"
+                  placeholder="@brand"
+                  value={handleText}
+                  onChange={(e) => setHandleText(e.target.value)}
+                />
+              )}
+            </Field>
+            <p className="text-xs leading-6 text-muted-foreground">
+              {graph ? t('businesses.presence.graphOn') : t('businesses.presence.graphOff')}
+            </p>
+            {graph && (
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={byHand} onCheckedChange={setByHand} />
+                {t('businesses.references.instagramManualToggle')}
+              </label>
+            )}
+            {showManual && <InstagramManualFields value={manual} onChange={setManual} />}
           </>
         ) : (
           <>
@@ -301,6 +396,7 @@ function ReferenceViewDialog({
             {data.googleAccount &&
               ` · ${t('businesses.references.readWith', { email: data.googleAccount.email })}`}
           </p>
+          {data.analysis && <AnalysisReport analysis={data.analysis} />}
           <pre
             dir="auto"
             className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-4 text-xs leading-6"
@@ -321,8 +417,25 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
   const update = useUpdateReference(businessId);
   const refresh = useRefreshReference(businessId);
   const remove = useDeleteReference(businessId);
+  const addReference = useAddReference(businessId);
   const [addOpen, setAddOpen] = useState(false);
   const [viewing, setViewing] = useState<BusinessReference | null>(null);
+
+  // Instagram accounts the website links to that are not a source yet.
+  const known = new Set(
+    (data ?? []).filter((r) => r.kind === 'INSTAGRAM').map((r) => parseInstagramHandle(r.url)),
+  );
+  const discovered = [
+    ...new Set(
+      (data ?? []).flatMap((r) =>
+        r.analysis?.type === 'WEBSITE'
+          ? r.analysis.socialLinks.flatMap((s) => (s.handle ? [s.handle] : []))
+          : [],
+      ),
+    ),
+  ]
+    .filter((h) => !known.has(h))
+    .slice(0, 2);
 
   return (
     <Card>
@@ -373,6 +486,11 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                       {r.url}
                     </a>
                   )}
+                  {r.analysis && r.status === 'READY' && (
+                    <p className="text-xs" dir="auto">
+                      {analysisSummary(r.analysis, t)}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {t(`enums.referenceKind.${r.kind}`)}
                     {r.chars > 0 &&
@@ -410,7 +528,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                       <Eye />
                     </Button>
                   )}
-                  {editable && r.kind !== 'TEXT' && (
+                  {editable && r.kind !== 'TEXT' && !isManualInstagram(r) && (
                     <Button
                       size="icon-sm"
                       variant="ghost"
@@ -454,6 +572,30 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
               </li>
             );
           })}
+        </ul>
+      )}
+      {editable && discovered.length > 0 && (
+        <ul className="divide-y border-t">
+          {discovered.map((handle) => (
+            <li key={handle} className="flex flex-wrap items-center gap-3 px-5 py-3 text-xs">
+              <AtSign className="size-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1">{t('businesses.analysis.foundInstagram', { handle })}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                icon={<Plus />}
+                isLoading={addReference.isPending && addReference.variables?.url?.includes(handle)}
+                onClick={() =>
+                  addReference.mutate(
+                    { url: instagramProfileUrl(handle) },
+                    { onError: (e) => notify.error(t('common.error'), e.message) },
+                  )
+                }
+              >
+                {t('businesses.analysis.addIt')}
+              </Button>
+            </li>
+          ))}
         </ul>
       )}
       {addOpen && <AddReferenceDialog businessId={businessId} onOpenChange={setAddOpen} />}

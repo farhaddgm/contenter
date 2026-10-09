@@ -287,6 +287,8 @@ enum ReferenceKind {
   URL
   GOOGLE_DOC
   TEXT
+  INSTAGRAM
+  WEBSITE
 }
 
 enum ReferenceStatus {
@@ -304,6 +306,9 @@ model BusinessReference {
   url             String          @default("")
   title           String          @default("")
   content         String          @default("")
+  /// What code computed while reading an INSTAGRAM / WEBSITE source (`ReferenceAnalysis` in
+  /// packages/shared/src/social.ts); null for the other kinds.
+  analysis        Json?
   status          ReferenceStatus @default(PENDING)
   error           String?
   isActive        Boolean         @default(true)

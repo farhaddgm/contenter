@@ -8,8 +8,10 @@ import type {
   BusinessReference,
   CreateBusinessNoteInput,
   UpdateBusinessAssetInput,
+  CreateFromPresenceInput,
   CreateFromReferencesInput,
   GoogleDriveStatus,
+  InstagramStatus,
   UpdateReferenceInput,
   CreateBlockedSourceInput,
   RemoveSourceInput,
@@ -43,6 +45,7 @@ export const businessKeys = {
   references: (id: string) => ['businesses', id, 'references'] as const,
   reference: (id: string) => ['business-references', id] as const,
   drive: ['google-drive'] as const,
+  instagram: ['businesses', 'instagram-status'] as const,
   notes: (id: string) => ['businesses', id, 'notes'] as const,
   assets: (id: string) => ['businesses', id, 'assets'] as const,
   asset: (id: string) => ['business-assets', id] as const,
@@ -359,6 +362,29 @@ export function useCreateFromReferences() {
     mutationFn: (data: CreateFromReferencesInput) =>
       api.post<{ businessId: string; jobId: string | null; failed: number }>(
         '/businesses/from-references',
+        data,
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+// ---------- Instagram account + website (docs/28) ----------
+
+/** Whether the server can read Instagram accounts through the API (else: paste by hand). */
+export function useInstagramStatus() {
+  return useQuery({
+    queryKey: businessKeys.instagram,
+    queryFn: () => api.get<InstagramStatus>('/businesses/instagram-status'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateFromPresence() {
+  const invalidate = useInvalidateBusinesses();
+  return useMutation({
+    mutationFn: (data: CreateFromPresenceInput) =>
+      api.post<{ businessId: string; jobId: string | null; failed: number }>(
+        '/businesses/from-presence',
         data,
       ),
     onSuccess: invalidate,
