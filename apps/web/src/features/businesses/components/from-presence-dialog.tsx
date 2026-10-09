@@ -198,7 +198,9 @@ export function FromPresenceDialog({ onOpenChange }: { onOpenChange: (v: boolean
             />
           )}
         </Field>
-        <p className="text-xs leading-6 text-muted-foreground">{t('businesses.presence.privacy')}</p>
+        <p className="text-xs leading-6 text-muted-foreground">
+          {t('businesses.presence.privacy')}
+        </p>
       </div>
     </Dialog>
   );

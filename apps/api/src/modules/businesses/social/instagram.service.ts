@@ -41,7 +41,8 @@ interface GraphError {
   error?: { message?: string; code?: number; error_subcode?: number; type?: string };
 }
 
-const MEDIA_FIELDS = 'caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count';
+const MEDIA_FIELDS =
+  'caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count';
 const PROFILE_FIELDS = 'username,name,biography,website,followers_count,follows_count,media_count';
 /** Used when the API refuses the profile fields above (they are not all documented for every version). */
 const PROFILE_FIELDS_MINIMAL = 'username,name,followers_count,media_count';
@@ -63,7 +64,10 @@ export function mediaTypeOf(m: GraphMedia): InstagramMediaType {
 export function toPost(m: GraphMedia): InstagramPost {
   return {
     caption: (m.caption ?? '').slice(0, INSTAGRAM_CAPTION_MAX),
-    takenAt: m.timestamp && !Number.isNaN(Date.parse(m.timestamp)) ? new Date(m.timestamp).toISOString() : null,
+    takenAt:
+      m.timestamp && !Number.isNaN(Date.parse(m.timestamp))
+        ? new Date(m.timestamp).toISOString()
+        : null,
     mediaType: mediaTypeOf(m),
     // Hidden like counts are omitted by the API: keep them as unknown, never as zero.
     likes: typeof m.like_count === 'number' ? m.like_count : null,
@@ -79,7 +83,14 @@ export function explainGraphError(status: number, err: GraphError['error']): str
   if (code === 190 || status === 401) {
     return `The Instagram access token was rejected or has expired — create a new one and update INSTAGRAM_GRAPH_TOKEN.${detail}`;
   }
-  if (code === 4 || code === 17 || code === 32 || code === 613 || code === 80002 || status === 429) {
+  if (
+    code === 4 ||
+    code === 17 ||
+    code === 32 ||
+    code === 613 ||
+    code === 80002 ||
+    status === 429
+  ) {
     return `Instagram asked us to slow down (rate limit). Try again in a while.${detail}`;
   }
   if (code === 10 || code === 200 || code === 299) {
@@ -110,13 +121,16 @@ export class InstagramService {
     return !!this.env.INSTAGRAM_GRAPH_TOKEN && !!this.env.INSTAGRAM_GRAPH_USER_ID;
   }
 
-  async fetchAccount(handle: string): Promise<{ profile: InstagramProfile; posts: InstagramPost[] }> {
+  async fetchAccount(
+    handle: string,
+  ): Promise<{ profile: InstagramProfile; posts: InstagramPost[] }> {
     if (!this.configured) {
       throw new InstagramError(
         'Reading Instagram accounts is not set up on this server (INSTAGRAM_GRAPH_TOKEN and INSTAGRAM_GRAPH_USER_ID). Paste the bio and captions instead.',
       );
     }
-    if (!/^[a-z0-9._]{1,30}$/.test(handle)) throw new InstagramError('Not a valid Instagram username');
+    if (!/^[a-z0-9._]{1,30}$/.test(handle))
+      throw new InstagramError('Not a valid Instagram username');
 
     let first = await this.query(handle, PROFILE_FIELDS, null);
     if (first.fieldRefused) first = await this.query(handle, PROFILE_FIELDS_MINIMAL, null);
@@ -163,10 +177,18 @@ export class InstagramService {
     // include the URL, and it is not logged here.
     const { status, body } = await this.fetcher.getJsonLoose<GraphDiscovery & GraphError>(url);
     if (status >= 200 && status < 300 && body?.business_discovery) {
-      return { fields: profileFields, account: body.business_discovery, error: null, fieldRefused: false };
+      return {
+        fields: profileFields,
+        account: body.business_discovery,
+        error: null,
+        fieldRefused: false,
+      };
     }
     const err = body?.error;
-    const fieldRefused = err?.code === 100 && /nonexisting field/i.test(err.message ?? '') && profileFields === PROFILE_FIELDS;
+    const fieldRefused =
+      err?.code === 100 &&
+      /nonexisting field/i.test(err.message ?? '') &&
+      profileFields === PROFILE_FIELDS;
     return {
       fields: profileFields,
       account: null,

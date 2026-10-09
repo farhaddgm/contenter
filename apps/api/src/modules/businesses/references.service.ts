@@ -56,8 +56,7 @@ interface ReadOutcome {
 
 /** Instagram data the admin gave by hand cannot be read again from the account. */
 const isManualInstagram = (row: ReferenceRow) =>
-  row.kind === 'INSTAGRAM' &&
-  (row.analysis as { provider?: string } | null)?.provider === 'MANUAL';
+  row.kind === 'INSTAGRAM' && (row.analysis as { provider?: string } | null)?.provider === 'MANUAL';
 
 /** What adding or refreshing a link produced. */
 interface Expansion {
@@ -603,7 +602,9 @@ export class ReferencesService {
       .map((p) => ({
         caption: p.caption,
         takenAt:
-          p.takenAt && !Number.isNaN(Date.parse(p.takenAt)) ? new Date(p.takenAt).toISOString() : null,
+          p.takenAt && !Number.isNaN(Date.parse(p.takenAt))
+            ? new Date(p.takenAt).toISOString()
+            : null,
         mediaType: p.mediaType ?? 'UNKNOWN',
         likes: p.likes ?? null,
         comments: p.comments ?? null,

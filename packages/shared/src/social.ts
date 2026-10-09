@@ -191,7 +191,7 @@ export function parseInstagramExport(raw: string): InstagramManualPost[] {
   const list: unknown[] = Array.isArray(data)
     ? data
     : data && typeof data === 'object'
-      ? (Object.values(data).find(Array.isArray) as unknown[] | undefined) ?? []
+      ? ((Object.values(data).find(Array.isArray) as unknown[] | undefined) ?? [])
       : [];
   const posts: InstagramManualPost[] = [];
   for (const item of list) {

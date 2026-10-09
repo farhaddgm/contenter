@@ -69,7 +69,8 @@ describe('sitemap', () => {
   });
 
   it('tells an index from a sitemap', () => {
-    const xml = '<sitemapindex><sitemap><loc>https://brand.ir/s1.xml</loc></sitemap></sitemapindex>';
+    const xml =
+      '<sitemapindex><sitemap><loc>https://brand.ir/s1.xml</loc></sitemap></sitemapindex>';
     expect(parseSitemap(xml)).toEqual({ urls: [], sitemaps: ['https://brand.ir/s1.xml'] });
   });
 });
@@ -81,7 +82,10 @@ describe('social links', () => {
       url: 'https://www.instagram.com/cafe_noor/',
       handle: 'cafe_noor',
     });
-    expect(socialLink('https://t.me/cafenoor')).toEqual({ network: 'telegram', url: 'https://t.me/cafenoor' });
+    expect(socialLink('https://t.me/cafenoor')).toEqual({
+      network: 'telegram',
+      url: 'https://t.me/cafenoor',
+    });
     expect(socialLink('https://www.aparat.com/cafenoor/')?.network).toBe('aparat');
   });
 
@@ -226,7 +230,8 @@ describe('brandFromTitles', () => {
 
 describe('links back to the site itself', () => {
   it('are not social links of the business', () => {
-    const html = '<a href="https://virgool.io/@someone">a</a><a href="https://virgool.io/">b</a><a href="https://t.me/virgool">c</a>';
+    const html =
+      '<a href="https://virgool.io/@someone">a</a><a href="https://virgool.io/">b</a><a href="https://t.me/virgool">c</a>';
     const sig = extractPageSignals(html, 'https://virgool.io/');
     expect(sig.social.map((s) => s.network)).toEqual(['telegram']);
   });

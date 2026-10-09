@@ -43,22 +43,27 @@ const open = () =>
 const submit = () => screen.getByRole('button', { name: t('businesses.presence.submit') });
 const instagramField = () => screen.getByPlaceholderText('@brand');
 const websiteField = () => screen.getByPlaceholderText('https://brand.ir');
+/** Long strings are pasted: typing them key by key can hit the 5 s timeout when the machine is busy. */
+const enter = async (el: HTMLElement, text: string) => {
+  await userEvent.click(el);
+  await userEvent.paste(text);
+};
 
 describe('FromPresenceDialog', () => {
   it('needs an account or a website before it can be sent', async () => {
     open();
     expect(submit()).toBeDisabled();
-    await userEvent.type(websiteField(), 'https://brand.ir');
+    await enter(websiteField(), 'https://brand.ir');
     expect(submit()).toBeEnabled();
   });
 
   it('rejects a post link and a website without http', async () => {
     open();
-    await userEvent.type(instagramField(), 'https://www.instagram.com/p/Cabc123/');
+    await enter(instagramField(), 'https://www.instagram.com/p/Cabc123/');
     expect(screen.getByText(t('businesses.presence.invalidInstagram'))).toBeVisible();
     expect(submit()).toBeDisabled();
     await userEvent.clear(instagramField());
-    await userEvent.type(websiteField(), 'brand.ir');
+    await enter(websiteField(), 'brand.ir');
     expect(screen.getByText(t('businesses.presence.invalidWebsite'))).toBeVisible();
     expect(submit()).toBeDisabled();
   });
@@ -68,7 +73,10 @@ describe('FromPresenceDialog', () => {
     expect(screen.getByText(t('businesses.presence.graphOff'))).toBeVisible();
     await userEvent.type(instagramField(), '@cafe_noor');
     expect(submit()).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(t('businesses.presence.bio'), { exact: false }), 'قهوهٔ تخصصی');
+    await userEvent.type(
+      screen.getByLabelText(t('businesses.presence.bio'), { exact: false }),
+      'قهوهٔ تخصصی',
+    );
     expect(submit()).toBeEnabled();
     await userEvent.click(submit());
     expect(state.create).toHaveBeenCalledTimes(1);
@@ -81,8 +89,8 @@ describe('FromPresenceDialog', () => {
     state.graph = true;
     open();
     expect(screen.getByText(t('businesses.presence.graphOn'))).toBeVisible();
-    await userEvent.type(instagramField(), 'https://instagram.com/Cafe_Noor/');
-    await userEvent.type(websiteField(), 'https://cafenoor.ir');
+    await enter(instagramField(), 'https://instagram.com/Cafe_Noor/');
+    await enter(websiteField(), 'https://cafenoor.ir');
     await userEvent.click(submit());
     expect(state.create.mock.calls[0]![0]).toMatchObject({
       instagram: 'cafe_noor',
@@ -103,7 +111,11 @@ describe('typed Instagram data', () => {
 
   it('builds nothing from empty fields and reads followers as a number', () => {
     expect(toManualInput('x', EMPTY_MANUAL)).toBeUndefined();
-    const input = toManualInput('x', { ...EMPTY_MANUAL, biography: 'bio', followers: '۱٬۲۰۰'.replace(/\D/g, '') || '1200' });
+    const input = toManualInput('x', {
+      ...EMPTY_MANUAL,
+      biography: 'bio',
+      followers: '۱٬۲۰۰'.replace(/\D/g, '') || '1200',
+    });
     expect(input).toMatchObject({ handle: 'x', biography: 'bio', followers: 1200 });
     expect(toManualInput('', { ...EMPTY_MANUAL, biography: 'bio' })?.followers).toBeNull();
   });
@@ -166,7 +178,11 @@ describe('analysis report', () => {
   });
 
   it('says so when a source has no like or comment counts', () => {
-    render(<AnalysisReport analysis={{ ...instagram, stats: { ...instagram.stats, engagement: null } }} />);
+    render(
+      <AnalysisReport
+        analysis={{ ...instagram, stats: { ...instagram.stats, engagement: null } }}
+      />,
+    );
     expect(screen.getByText(t('businesses.analysis.noCounts'))).toBeVisible();
   });
 

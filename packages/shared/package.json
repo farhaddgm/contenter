@@ -1,6 +1,6 @@
 {
   "name": "@contenter/shared",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "license": "UNLICENSED",
   "description": "Shared Zod schemas, enums and types for Contenter",

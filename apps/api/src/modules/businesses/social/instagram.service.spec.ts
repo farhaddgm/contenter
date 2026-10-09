@@ -109,7 +109,9 @@ describe('InstagramService', () => {
     const { svc, urls } = service([
       {
         status: 400,
-        body: { error: { code: 100, message: '(#100) Tried accessing nonexisting field (biography)' } },
+        body: {
+          error: { code: 100, message: '(#100) Tried accessing nonexisting field (biography)' },
+        },
       },
       discovery(),
     ]);
@@ -149,7 +151,9 @@ describe('Graph helpers', () => {
   });
 
   it('turns API errors into advice', () => {
-    expect(explainGraphError(400, { code: 190, message: 'expired' })).toMatch(/INSTAGRAM_GRAPH_TOKEN/);
+    expect(explainGraphError(400, { code: 190, message: 'expired' })).toMatch(
+      /INSTAGRAM_GRAPH_TOKEN/,
+    );
     expect(explainGraphError(400, { code: 4, message: 'limit' })).toMatch(/slow down/);
     expect(explainGraphError(403, { code: 10, message: 'perm' })).toMatch(/permission/);
     expect(explainGraphError(400, { code: 110 })).toMatch(/paste/);

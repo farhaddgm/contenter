@@ -100,8 +100,7 @@ describe('instagramStats', () => {
 
   it('recognizes Persian calls to action with and without a half-space', () => {
     const zwnj = String.fromCharCode(0x200c);
-    const share = (caption: string) =>
-      instagramStats(profile, [post({ caption })]).ctaShare;
+    const share = (caption: string) => instagramStats(profile, [post({ caption })]).ctaShare;
     expect(share(`همین امروز ثبت${zwnj}نام کنید`)).toBe(1);
     expect(share('همین امروز ثبت نام کنید')).toBe(1);
     expect(share('برای خرید به لینک بیو بروید')).toBe(1);
@@ -153,7 +152,10 @@ describe('formatInstagramSnapshot', () => {
 
   it('cuts very long captions and caps the list', () => {
     const long = Array.from({ length: 80 }, (_, i) =>
-      post({ caption: 'x'.repeat(2000), takenAt: `2026-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00Z` }),
+      post({
+        caption: 'x'.repeat(2000),
+        takenAt: `2026-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00Z`,
+      }),
     );
     const out = formatInstagramSnapshot({
       provider: 'GRAPH',

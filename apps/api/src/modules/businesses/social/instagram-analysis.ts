@@ -105,7 +105,8 @@ export function instagramStats(profile: InstagramProfile, posts: InstagramPost[]
     firstPostAt: dates.length ? new Date(dates[0]!).toISOString() : null,
     lastPostAt: dates.length ? new Date(dates[dates.length - 1]!).toISOString() : null,
     // N posts span N-1 gaps; a single post or one day carries no rhythm.
-    postsPerWeek: spanDays >= 1 && dates.length > 1 ? round(((dates.length - 1) / spanDays) * 7) : null,
+    postsPerWeek:
+      spanDays >= 1 && dates.length > 1 ? round(((dates.length - 1) / spanDays) * 7) : null,
     formatMix,
     avgCaptionChars: n ? Math.round(captions.reduce((s, c) => s + c.length, 0) / n) : 0,
     emptyCaptions: n - withText.length,
@@ -120,7 +121,9 @@ export function instagramStats(profile: InstagramProfile, posts: InstagramPost[]
       persian: letters ? round(persian / letters, 2) : 0,
       latin: letters ? round(latin / letters, 2) : 0,
     },
-    ctaShare: withText.length ? round(withText.filter((c) => CTA.test(c)).length / withText.length, 2) : 0,
+    ctaShare: withText.length
+      ? round(withText.filter((c) => CTA.test(c)).length / withText.length, 2)
+      : 0,
     questionShare: withText.length
       ? round(withText.filter((c) => QUESTION.test(c)).length / withText.length, 2)
       : 0,
@@ -187,7 +190,8 @@ export function formatInstagramSnapshot(args: {
     '',
     `## Statistics (computed by code from ${s.postsAnalyzed} posts, ${day(s.firstPostAt)} → ${day(s.lastPostAt)})`,
   ];
-  if (s.postsPerWeek !== null) lines.push(`- Posting rhythm: about ${s.postsPerWeek} posts per week`);
+  if (s.postsPerWeek !== null)
+    lines.push(`- Posting rhythm: about ${s.postsPerWeek} posts per week`);
   const mix = Object.entries(s.formatMix)
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `${FORMAT_LABEL[k as InstagramMediaType]} ${v}`)
@@ -199,10 +203,14 @@ export function formatInstagramSnapshot(args: {
     `- ${pct(s.ctaShare)} of captions contain a call to action; ${pct(s.questionShare)} ask a question`,
   );
   if (s.topHashtags.length) {
-    lines.push(`- Most used hashtags: ${s.topHashtags.map((h) => `${h.tag} (${h.count})`).join(' ')}`);
+    lines.push(
+      `- Most used hashtags: ${s.topHashtags.map((h) => `${h.tag} (${h.count})`).join(' ')}`,
+    );
   }
   if (s.topMentions.length) {
-    lines.push(`- Most mentioned accounts: ${s.topMentions.map((m) => `${m.handle} (${m.count})`).join(' ')}`);
+    lines.push(
+      `- Most mentioned accounts: ${s.topMentions.map((m) => `${m.handle} (${m.count})`).join(' ')}`,
+    );
   }
   if (s.engagement) {
     const e = s.engagement;
