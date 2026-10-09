@@ -54,7 +54,9 @@
 | POST | `/businesses/:id/sources/remove`، `/business-discoveries/:id/sources/remove` | `{ url, block }` — حذف منبع تحقیق و در صورت نیاز افزودن به فهرست سیاه (مسدودسازی فقط ADMIN) |
 | GET / POST / DELETE | `/source-blocklist`، `/source-blocklist/:id` | فهرست سیاه منابع تحقیق (تغییر فقط ADMIN) |
 | POST | `/businesses/from-references` | ساخت کسب‌وکار از لینک‌ها/متن ادمین و شروع `BUSINESS_BUILD` ([14-business-references.md](14-business-references.md)) |
-| GET / POST | `/businesses/:id/references` | منابع مرجع AI: فهرست / افزودن لینک یا متن |
+| POST | `/businesses/from-presence` | ساخت کسب‌وکار از حساب اینستاگرام و/یا سایت (خواندن و تحلیل با کد، سپس `BUSINESS_BUILD`) ([28-instagram-website-profile.md](28-instagram-website-profile.md)) |
+| GET | `/businesses/instagram-status` | `{ graphConfigured }` — آیا حساب‌ها از راه API خوانده می‌شوند |
+| GET / POST | `/businesses/:id/references` | منابع مرجع AI: فهرست / افزودن لینک، متن، سایت چندصفحه‌ای (`site: true`)، حساب اینستاگرام یا داده‌های دستی اینستاگرام |
 | GET / PATCH / DELETE | `/business-references/:id`، POST `…/refresh` | متن ذخیره‌شده، فعال/غیرفعال، خواندن دوباره، حذف |
 | GET | `/google-drive`، POST `/google-drive/connect`، DELETE `/google-drive/accounts/:id` | حساب‌های گوگل متصل برای اسناد خصوصی (اتصال/قطع فقط ADMIN) |
 | GET / POST | `/businesses/:id/notes`، PATCH / DELETE `/business-notes/:id` | توضیح ادمین؛ ثبت آن `BUSINESS_REVISE` را در صف می‌گذارد ([15-business-notes-and-assets.md](15-business-notes-and-assets.md)) |

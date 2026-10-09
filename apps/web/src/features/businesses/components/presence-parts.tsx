@@ -42,7 +42,10 @@ export function manualPosts(m: ManualInstagramState): InstagramManualPost[] {
 }
 
 /** The request body for the typed data, or undefined when there is nothing to send. */
-export function toManualInput(handle: string, m: ManualInstagramState): InstagramManualInput | undefined {
+export function toManualInput(
+  handle: string,
+  m: ManualInstagramState,
+): InstagramManualInput | undefined {
   const posts = manualPosts(m);
   if (!m.biography.trim() && !posts.length) return undefined;
   const followers = Number(m.followers.replace(/[^\d]/g, ''));
@@ -66,7 +69,9 @@ export function InstagramManualFields({
   const file = useRef<HTMLInputElement>(null);
   return (
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-      <p className="text-xs leading-6 text-muted-foreground">{t('businesses.presence.manualHint')}</p>
+      <p className="text-xs leading-6 text-muted-foreground">
+        {t('businesses.presence.manualHint')}
+      </p>
       <Field label={t('businesses.presence.bio')} optional={t('common.optional')}>
         {(id) => (
           <Textarea
@@ -149,10 +154,7 @@ export function InstagramManualFields({
 }
 
 /** One-line summary of what code computed (shown in the reference list). */
-export function analysisSummary(
-  a: ReferenceAnalysis,
-  t: TFn,
-): string {
+export function analysisSummary(a: ReferenceAnalysis, t: TFn): string {
   if (a.type === 'WEBSITE') {
     return t('businesses.analysis.summaryWebsite', { pages: formatNumber(a.pages.length) });
   }
@@ -181,7 +183,10 @@ function InstagramReport({ a }: { a: InstagramAnalysis }) {
   const s = a.stats;
   const mix = Object.entries(s.formatMix)
     .sort((x, y) => y[1] - x[1])
-    .map(([k, v]) => `${t(`businesses.analysis.format.${k as InstagramMediaType}`)} ${formatNumber(v)}`)
+    .map(
+      ([k, v]) =>
+        `${t(`businesses.analysis.format.${k as InstagramMediaType}`)} ${formatNumber(v)}`,
+    )
     .join(' · ');
   const known = (n: number | null) => (n === null ? '؟' : formatNumber(n));
   return (
@@ -189,16 +194,24 @@ function InstagramReport({ a }: { a: InstagramAnalysis }) {
       <p className="text-xs text-muted-foreground">
         {t('businesses.analysis.source')}: {t(`businesses.analysis.${a.provider}`)}
         {a.profile.username && ` · @${a.profile.username}`}
-        {s.firstPostAt && s.lastPostAt && ` · ${formatDate(s.firstPostAt)} → ${formatDate(s.lastPostAt)}`}
+        {s.firstPostAt &&
+          s.lastPostAt &&
+          ` · ${formatDate(s.firstPostAt)} → ${formatDate(s.lastPostAt)}`}
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label={t('businesses.analysis.followers')} value={known(a.profile.followers)} />
         <Stat label={t('businesses.analysis.mediaCount')} value={known(a.profile.mediaCount)} />
-        <Stat label={t('businesses.analysis.postsAnalyzed')} value={formatNumber(s.postsAnalyzed)} />
+        <Stat
+          label={t('businesses.analysis.postsAnalyzed')}
+          value={formatNumber(s.postsAnalyzed)}
+        />
         <Stat label={t('businesses.analysis.perWeek')} value={known(s.postsPerWeek)} />
         {s.engagement ? (
           <>
-            <Stat label={t('businesses.analysis.avgLikes')} value={formatNumber(s.engagement.avgLikes, 1)} />
+            <Stat
+              label={t('businesses.analysis.avgLikes')}
+              value={formatNumber(s.engagement.avgLikes, 1)}
+            />
             <Stat
               label={t('businesses.analysis.avgComments')}
               value={formatNumber(s.engagement.avgComments, 1)}
@@ -206,7 +219,9 @@ function InstagramReport({ a }: { a: InstagramAnalysis }) {
             <Stat
               label={t('businesses.analysis.rate')}
               hint={t('businesses.analysis.rateHint')}
-              value={s.engagement.ratePct === null ? '؟' : `${formatNumber(s.engagement.ratePct, 2)}٪`}
+              value={
+                s.engagement.ratePct === null ? '؟' : `${formatNumber(s.engagement.ratePct, 2)}٪`
+              }
             />
           </>
         ) : null}
@@ -215,7 +230,10 @@ function InstagramReport({ a }: { a: InstagramAnalysis }) {
           value={formatNumber(s.avgCaptionChars)}
         />
         <Stat label={t('businesses.analysis.emojis')} value={formatNumber(s.avgEmojisPerPost, 1)} />
-        <Stat label={t('businesses.analysis.hashtagsPer')} value={formatNumber(s.avgHashtagsPerPost, 1)} />
+        <Stat
+          label={t('businesses.analysis.hashtagsPer')}
+          value={formatNumber(s.avgHashtagsPerPost, 1)}
+        />
         <Stat label={t('businesses.analysis.cta')} value={pct(s.ctaShare)} />
         <Stat label={t('businesses.analysis.questions')} value={pct(s.questionShare)} />
         <Stat label={t('businesses.analysis.persianShare')} value={pct(s.scriptShare.persian)} />
@@ -281,7 +299,9 @@ function WebsiteReport({ a }: { a: WebsiteAnalysis }) {
           {t('businesses.analysis.skipped', { count: formatNumber(a.skipped) })}
         </p>
       )}
-      {a.robotsLimited && <p className="text-muted-foreground">{t('businesses.analysis.robots')}</p>}
+      {a.robotsLimited && (
+        <p className="text-muted-foreground">{t('businesses.analysis.robots')}</p>
+      )}
       {(a.emails.length > 0 || a.phones.length > 0) && (
         <p dir="auto">
           <span className="font-medium">{t('businesses.analysis.contacts')}: </span>

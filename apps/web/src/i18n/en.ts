@@ -1638,7 +1638,8 @@ export const en: DeepStrings<Dictionary> = {
       sitemap: 'A sitemap was found',
       social: 'Social links found on the site',
       contacts: 'Contacts',
-      summaryInstagram: '{{followers}} followers · {{posts}} posts analyzed · {{perWeek}} posts a week',
+      summaryInstagram:
+        '{{followers}} followers · {{posts}} posts analyzed · {{perWeek}} posts a week',
       summaryWebsite: '{{pages}} pages read',
       foundInstagram: 'This site links to an Instagram account: @{{handle}}',
       addIt: 'Add to sources',

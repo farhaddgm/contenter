@@ -43,7 +43,9 @@ function fakePrisma() {
       return row;
     },
     findMany: async ({ where }: { where: { id?: { in: string[] } } }) =>
-      rows.filter((r) => !where.id || where.id.in.includes(r.id)).map((r) => ({ ...r, googleAccount: null })),
+      rows
+        .filter((r) => !where.id || where.id.in.includes(r.id))
+        .map((r) => ({ ...r, googleAccount: null })),
     findUnique: async ({ where }: { where: { id: string } }) => {
       const r = rows.find((x) => x.id === where.id);
       return r ? { ...r, googleAccount: null } : null;
@@ -62,7 +64,14 @@ const profile: InstagramProfile = {
   mediaCount: 2,
 };
 const posts: InstagramPost[] = [
-  { caption: 'سلام #قهوه', takenAt: '2026-09-01T00:00:00Z', mediaType: 'IMAGE', likes: 10, comments: 1, permalink: '' },
+  {
+    caption: 'سلام #قهوه',
+    takenAt: '2026-09-01T00:00:00Z',
+    mediaType: 'IMAGE',
+    likes: 10,
+    comments: 1,
+    permalink: '',
+  },
 ];
 
 const siteAnalysis: WebsiteAnalysis = {
@@ -81,7 +90,9 @@ const siteAnalysis: WebsiteAnalysis = {
   socialLinks: [],
 };
 
-function setup(over: { instagram?: Partial<InstagramService>; crawler?: Partial<WebsiteCrawlerService> } = {}) {
+function setup(
+  over: { instagram?: Partial<InstagramService>; crawler?: Partial<WebsiteCrawlerService> } = {},
+) {
   const { rows, prisma } = fakePrisma();
   const instagram = {
     configured: true,
@@ -202,12 +213,19 @@ describe('adding a website', () => {
   it('stores the crawler error and keeps the earlier snapshot on a failed refresh', async () => {
     const crawl = vi
       .fn()
-      .mockResolvedValueOnce({ title: 'برند', text: 'first snapshot '.repeat(30), analysis: siteAnalysis })
+      .mockResolvedValueOnce({
+        title: 'برند',
+        text: 'first snapshot '.repeat(30),
+        analysis: siteAnalysis,
+      })
       .mockRejectedValueOnce(new Error('brand.ir did not answer within 15 seconds.'));
     const { service, rows } = setup({ crawler: { read: crawl } });
     await service.add('b1', { url: 'https://brand.ir/', site: true }, user);
     await service.refresh('r1', user);
-    expect(rows[0]).toMatchObject({ status: 'FAILED', error: expect.stringMatching(/did not answer/) });
+    expect(rows[0]).toMatchObject({
+      status: 'FAILED',
+      error: expect.stringMatching(/did not answer/),
+    });
     expect(String(rows[0]!.content)).toContain('first snapshot');
   });
 });
@@ -215,7 +233,12 @@ describe('adding a website', () => {
 describe('what AI jobs receive', () => {
   it('tells the model how to read analyzed sources', () => {
     const out = formatReferences([
-      { kind: 'INSTAGRAM', title: 'Instagram @x', url: 'https://www.instagram.com/x/', content: 'stats' },
+      {
+        kind: 'INSTAGRAM',
+        title: 'Instagram @x',
+        url: 'https://www.instagram.com/x/',
+        content: 'stats',
+      },
       { kind: 'WEBSITE', title: 'Brand', url: 'https://brand.ir', content: 'pages' },
       { kind: 'URL', title: 'Plain', url: 'https://a.ir', content: 'text' },
     ]);

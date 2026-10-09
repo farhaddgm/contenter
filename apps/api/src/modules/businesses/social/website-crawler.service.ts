@@ -95,7 +95,10 @@ export class WebsiteCrawlerService {
           : 'This address did not return a web page.',
       );
     }
-    if (pages[0]!.text.length < MIN_SITE_PAGE_TEXT && pages.every((p) => p.text.length < MIN_SITE_PAGE_TEXT)) {
+    if (
+      pages[0]!.text.length < MIN_SITE_PAGE_TEXT &&
+      pages.every((p) => p.text.length < MIN_SITE_PAGE_TEXT)
+    ) {
       throw new FetchError(
         `Only ${pages[0]!.text.length} characters of readable text were found — the site probably builds its pages with JavaScript or needs a login. Paste the text of its main pages instead.`,
       );
@@ -175,7 +178,11 @@ export class WebsiteCrawlerService {
   }
 
   /** URLs listed in the sitemap (one level of sitemap index followed). */
-  private async sitemap(origin: string, robots: string | null, deadline: number): Promise<string[]> {
+  private async sitemap(
+    origin: string,
+    robots: string | null,
+    deadline: number,
+  ): Promise<string[]> {
     const roots = [...(robots ? robotsSitemaps(robots) : []), `${origin}/sitemap.xml`];
     const urls: string[] = [];
     const todo = [...new Set(roots)].slice(0, 3);

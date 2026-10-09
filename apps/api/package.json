@@ -1,6 +1,6 @@
 {
   "name": "@contenter/api",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "license": "UNLICENSED",
   "description": "Contenter HTTP API and AI worker (NestJS)",

@@ -46,7 +46,11 @@ export function parseRobots(text: string, agent = 'contenterbot'): (path: string
     } else if ((field === 'allow' || field === 'disallow') && current) {
       inAgents = false;
       if (value) {
-        current.rules.push({ allow: field === 'allow', pattern: ruleRegex(value), length: value.length });
+        current.rules.push({
+          allow: field === 'allow',
+          pattern: ruleRegex(value),
+          length: value.length,
+        });
       }
     } else {
       inAgents = false;
@@ -81,9 +85,9 @@ const decodeXml = (s: string) =>
 
 /** `<loc>` entries of a sitemap or sitemap index. */
 export function parseSitemap(xml: string): { urls: string[]; sitemaps: string[] } {
-  const locs = [...xml.matchAll(/<loc>\s*(?:<!\[CDATA\[)?\s*([^<\]]+?)\s*(?:\]\]>)?\s*<\/loc>/gi)].map(
-    (m) => decodeXml(m[1]!),
-  );
+  const locs = [
+    ...xml.matchAll(/<loc>\s*(?:<!\[CDATA\[)?\s*([^<\]]+?)\s*(?:\]\]>)?\s*<\/loc>/gi),
+  ].map((m) => decodeXml(m[1]!));
   return /<sitemapindex/i.test(xml) ? { urls: [], sitemaps: locs } : { urls: locs, sitemaps: [] };
 }
 
@@ -148,8 +152,19 @@ export interface PageSignals {
   schema: SchemaInfo;
 }
 
-const ORG_TYPES = /^(Organization|Corporation|LocalBusiness|Store|ProfessionalService|Restaurant|Hotel|MedicalBusiness|EducationalOrganization|OnlineStore|NewsMediaOrganization|[A-Za-z]*Business|[A-Za-z]*Store|[A-Za-z]*Service)$/;
-const ORG_FIELDS = ['name', 'alternateName', 'description', 'slogan', 'telephone', 'email', 'foundingDate', 'priceRange', 'url'] as const;
+const ORG_TYPES =
+  /^(Organization|Corporation|LocalBusiness|Store|ProfessionalService|Restaurant|Hotel|MedicalBusiness|EducationalOrganization|OnlineStore|NewsMediaOrganization|[A-Za-z]*Business|[A-Za-z]*Store|[A-Za-z]*Service)$/;
+const ORG_FIELDS = [
+  'name',
+  'alternateName',
+  'description',
+  'slogan',
+  'telephone',
+  'email',
+  'foundingDate',
+  'priceRange',
+  'url',
+] as const;
 
 function plain(v: unknown): string {
   if (typeof v === 'string') return v.trim();
@@ -189,7 +204,9 @@ export function parseStructuredData(blocks: string[]): SchemaInfo {
       continue;
     }
     for (const node of flattenLd(data)) {
-      const types = ([] as unknown[]).concat(node['@type'] ?? []).filter((t): t is string => typeof t === 'string');
+      const types = ([] as unknown[])
+        .concat(node['@type'] ?? [])
+        .filter((t): t is string => typeof t === 'string');
       for (const t of types) if (!info.types.includes(t)) info.types.push(t);
       if (!types.some((t) => ORG_TYPES.test(t))) continue;
       for (const f of ORG_FIELDS) {
@@ -251,11 +268,16 @@ export function extractPageSignals(html: string, pageUrl: string): PageSignals {
     // Posts, share buttons and the like on a social network are not pages of the site.
     if (NETWORKS.some(([re]) => re.test(url.hostname.toLowerCase()))) continue;
     url.hash = '';
-    links.push({ url: url.toString(), text: (a.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) });
+    links.push({
+      url: url.toString(),
+      text: (a.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80),
+    });
   }
 
   const schema = parseStructuredData(
-    [...document.querySelectorAll('script[type="application/ld+json"]')].map((s) => s.textContent ?? ''),
+    [...document.querySelectorAll('script[type="application/ld+json"]')].map(
+      (s) => s.textContent ?? '',
+    ),
   );
   for (const s of schema.sameAs) {
     const link = socialLink(s);
@@ -315,7 +337,10 @@ export function scorePage(url: string, anchorText = ''): number {
   const path = decodePath(u.pathname);
   if (JUNK.test(path)) return -1;
   const haystack = `${path} ${anchorText.toLowerCase()}`;
-  const keyword = KEYWORDS.reduce((best, [w, re]) => (re.test(haystack) ? Math.max(best, w) : best), 0);
+  const keyword = KEYWORDS.reduce(
+    (best, [w, re]) => (re.test(haystack) ? Math.max(best, w) : best),
+    0,
+  );
   const depth = path.split('/').filter(Boolean).length;
   return keyword > 0 ? keyword - Math.min(depth, 4) * 0.25 : 0;
 }
@@ -323,7 +348,9 @@ export function scorePage(url: string, anchorText = ''): number {
 export const isArticleUrl = (url: string) => {
   try {
     const segments = decodePath(new URL(url).pathname).split('/').filter(Boolean);
-    return segments.length >= 2 && ARTICLE.test(segments.join('/')) && !JUNK.test(segments.join('/'));
+    return (
+      segments.length >= 2 && ARTICLE.test(segments.join('/')) && !JUNK.test(segments.join('/'))
+    );
   } catch {
     return false;
   }
@@ -402,7 +429,12 @@ const TITLE_SEPARATOR = /\s+[|–—·•:]\s+|\s+-\s+|\s*\|\s*/;
 export function brandFromTitles(titles: string[]): string {
   const counts = new Map<string, number>();
   for (const title of titles) {
-    const segments = new Set(title.split(TITLE_SEPARATOR).map((p) => p.trim()).filter(Boolean));
+    const segments = new Set(
+      title
+        .split(TITLE_SEPARATOR)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    );
     for (const seg of segments) counts.set(seg, (counts.get(seg) ?? 0) + 1);
   }
   let best = '';

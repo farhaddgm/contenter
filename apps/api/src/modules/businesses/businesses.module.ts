@@ -636,7 +636,9 @@ export class BusinessesService {
     user: AuthUser,
   ) {
     const analyses = results.flatMap((r) =>
-      r.status === 'fulfilled' ? r.value.references.map((x) => x.analysis as ReferenceAnalysis | null) : [],
+      r.status === 'fulfilled'
+        ? r.value.references.map((x) => x.analysis as ReferenceAnalysis | null)
+        : [],
     );
     const ig = analyses.find((a): a is InstagramAnalysis => a?.type === 'INSTAGRAM');
     const web = analyses.find((a): a is WebsiteAnalysis => a?.type === 'WEBSITE');

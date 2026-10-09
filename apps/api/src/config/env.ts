@@ -69,10 +69,21 @@ const EnvSchema = z.object({
     .or(z.literal('').transform(() => undefined)),
   /** Explicit business IDs; empty means deny all. Wildcards are not supported. */
   RESEARCHER_BUSINESS_ACCESS: z.enum(['selected', 'all']).default('selected'),
-  RESEARCHER_BUSINESS_IDS: z.string().default('').transform((value) =>
-    [...new Set(value.split(',').map((id) => id.trim()).filter(Boolean))],
-  ).refine((ids) => ids.every((id) => /^[A-Za-z0-9_-]{1,128}$/u.test(id)),
-    'Business IDs must be explicit identifiers, not wildcards'),
+  RESEARCHER_BUSINESS_IDS: z
+    .string()
+    .default('')
+    .transform((value) => [
+      ...new Set(
+        value
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    ])
+    .refine(
+      (ids) => ids.every((id) => /^[A-Za-z0-9_-]{1,128}$/u.test(id)),
+      'Business IDs must be explicit identifiers, not wildcards',
+    ),
   /** Encrypts stored OAuth refresh tokens. Default: derived from JWT_REFRESH_SECRET. */
   DATA_ENCRYPTION_KEY: z
     .string()
@@ -130,7 +141,10 @@ const EnvSchema = z.object({
     .string()
     .optional()
     .or(z.literal('').transform(() => undefined)),
-  INSTAGRAM_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v25.0'),
+  INSTAGRAM_GRAPH_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/)
+    .default('v25.0'),
   /** Overridable for tests only. */
   INSTAGRAM_GRAPH_BASE_URL: z.string().url().default('https://graph.facebook.com'),
   /**

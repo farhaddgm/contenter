@@ -33,7 +33,11 @@ function site(over: Record<string, string | Error> = {}) {
     const hit = files[path];
     if (hit === undefined) throw new FetchError('Remote server responded 404');
     if (hit instanceof Error) throw hit;
-    const type = path.endsWith('.txt') ? 'text/plain' : path.endsWith('.xml') ? 'application/xml' : 'text/html; charset=utf-8';
+    const type = path.endsWith('.txt')
+      ? 'text/plain'
+      : path.endsWith('.xml')
+        ? 'application/xml'
+        : 'text/html; charset=utf-8';
     return { text: hit, finalUrl: url, contentType: type };
   });
   const crawler = new WebsiteCrawlerService({ getText } as unknown as MediaFetcherService);
@@ -67,7 +71,10 @@ describe('WebsiteCrawlerService', () => {
     expect(out.text).toContain('## Page 2:');
     expect(out.analysis.language).toBe('fa');
     expect(out.analysis.schemaTypes).toContain('LocalBusiness');
-    expect(out.analysis.socialLinks[0]).toMatchObject({ network: 'instagram', handle: 'cafe_noor' });
+    expect(out.analysis.socialLinks[0]).toMatchObject({
+      network: 'instagram',
+      handle: 'cafe_noor',
+    });
   });
 
   it('starts from the home page too when the link is deeper', async () => {
@@ -89,7 +96,9 @@ describe('WebsiteCrawlerService', () => {
   });
 
   it('fails clearly on a JavaScript shell', async () => {
-    const { crawler } = site({ '/': '<html><body><div id="app"></div><script src="/a.js"></script></body></html>' });
+    const { crawler } = site({
+      '/': '<html><body><div id="app"></div><script src="/a.js"></script></body></html>',
+    });
     await expect(crawler.read('https://brand.ir/')).rejects.toThrow(/JavaScript or needs a login/);
   });
 

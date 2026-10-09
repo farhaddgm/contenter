@@ -74,7 +74,9 @@ describe('Instagram data export', () => {
           { uri: 'media/posts/202402/c.jpg', creation_timestamp: 1_710_000_000 },
         ],
       },
-      { media: [{ uri: 'media/reels/202403/d.mp4', creation_timestamp: 1_712_000_000, title: 'r' }] },
+      {
+        media: [{ uri: 'media/reels/202403/d.mp4', creation_timestamp: 1_712_000_000, title: 'r' }],
+      },
     ]);
     const posts = parseInstagramExport(file);
     expect(posts.map((p) => p.caption)).toEqual(['r', 'New caption #tag', 'پست قدیمی']);
@@ -122,12 +124,14 @@ describe('request schemas', () => {
   });
 
   it('add-reference takes exactly one of link, text or Instagram data', () => {
-    expect(AddReferenceSchema.safeParse({ url: 'https://brand.ir', site: true }).success).toBe(true);
+    expect(AddReferenceSchema.safeParse({ url: 'https://brand.ir', site: true }).success).toBe(
+      true,
+    );
     expect(AddReferenceSchema.safeParse({ site: true }).success).toBe(false);
     expect(AddReferenceSchema.safeParse({ instagram: { biography: 'x' } }).success).toBe(true);
-    expect(
-      AddReferenceSchema.safeParse({ url: 'https://brand.ir', content: 'text' }).success,
-    ).toBe(false);
+    expect(AddReferenceSchema.safeParse({ url: 'https://brand.ir', content: 'text' }).success).toBe(
+      false,
+    );
     expect(
       AddReferenceSchema.safeParse({ url: 'https://brand.ir', instagram: { biography: 'x' } })
         .success,
