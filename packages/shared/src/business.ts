@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import type { AccessLevel } from './enums';
 import { PaginationQuerySchema, patchOf } from './schemas';
+import { InstagramManualSchema, type ReferenceAnalysis } from './social';
 
 // ---------- enums ----------
 
@@ -140,8 +141,11 @@ export type DiscoveryStatus = (typeof DiscoveryStatus)[number];
 export const SourceBlockKind = ['URL', 'DOMAIN'] as const;
 export type SourceBlockKind = (typeof SourceBlockKind)[number];
 
-/** Admin-supplied reference: a public web page, a Google Docs/Drive file, or a pasted text. */
-export const ReferenceKind = ['URL', 'GOOGLE_DOC', 'TEXT'] as const;
+/**
+ * Admin-supplied reference: a public web page, a Google Docs/Drive file, a pasted text, an
+ * Instagram account or a whole website read page by page (docs/28).
+ */
+export const ReferenceKind = ['URL', 'GOOGLE_DOC', 'TEXT', 'INSTAGRAM', 'WEBSITE'] as const;
 export type ReferenceKind = (typeof ReferenceKind)[number];
 
 export const ReferenceStatus = ['PENDING', 'READY', 'FAILED'] as const;
@@ -313,14 +317,23 @@ const httpUrl = z
   .url()
   .refine((u) => /^https?:\/\//i.test(u), 'Only http(s) links');
 
-/** Adds a reference: a link (web page or Google Docs/Drive file) or a pasted text. */
+/**
+ * Adds a reference: a link (web page, Google Docs/Drive file or an Instagram account), a whole
+ * website (`site`: several pages are read), a pasted text, or Instagram data given by hand.
+ */
 export const AddReferenceSchema = z
   .object({
     url: httpUrl.optional(),
     title: z.string().trim().max(300).optional().default(''),
     content: z.string().trim().max(BUSINESS_REFERENCE_MAX_CHARS).optional(),
+    /** With `url`: read the whole website (home, about, services … up to ten pages). */
+    site: z.boolean().optional().default(false),
+    instagram: InstagramManualSchema.optional(),
   })
-  .refine((v) => !!v.url !== !!v.content, 'Give either a link or a text');
+  .refine((v) => [!!v.url, !!v.content, !!v.instagram].filter(Boolean).length === 1, {
+    message: 'Give either a link, a text or Instagram data',
+  })
+  .refine((v) => !v.site || !!v.url, 'A website needs its link');
 export type AddReferenceInput = z.input<typeof AddReferenceSchema>;
 
 export const UpdateReferenceSchema = z.object({
@@ -412,6 +425,8 @@ export interface BusinessReference {
   chars: number;
   /** Google account the file was read with (GOOGLE_DOC). */
   googleAccount: { id: string; email: string } | null;
+  /** What code computed while reading an INSTAGRAM / WEBSITE source (docs/28). */
+  analysis: ReferenceAnalysis | null;
   /** Only on the single-reference endpoint. */
   content?: string;
 }

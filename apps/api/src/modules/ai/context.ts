@@ -425,7 +425,18 @@ export const clamp = (n: number, min: number, max: number) =>
 /** Total reference text sent to one AI job. */
 export const REFERENCES_PROMPT_CHARS = 150_000;
 
-export type ReferenceForPrompt = { title: string; url: string; content: string };
+export type ReferenceForPrompt = { title: string; url: string; content: string; kind?: string };
+
+/**
+ * How to read the sources that code has already analyzed (docs/28). Kept next to the data, not in
+ * the prompt text, so edited prompt versions get it too.
+ */
+const KIND_HINT: Record<string, string> = {
+  INSTAGRAM:
+    'Instagram account of the business. The statistics (rhythm, formats, hashtags, engagement) were computed by code from the listed posts — quote them as they are, do not recount. Use the captions as evidence of the real voice, recurring topics, calls to action and hashtags. Counts are a snapshot of the date shown; engagement describes only these posts. Do not infer audience demographics from it.',
+  WEBSITE:
+    'Several pages read from the business website, one section per page. The site is the authoritative source for what the business offers, its contacts and its own wording; blog posts show how it writes.',
+};
 
 /**
  * Admin-supplied references as one block for the `research` variable. Every reference gets an
@@ -439,7 +450,8 @@ export function formatReferences(
   const share = Math.max(2_000, Math.floor(budget / refs.length));
   const blocks = refs.map((r, i) => {
     const text = r.content.trim();
-    const head = `[R${i + 1}] ${r.title || r.url || 'Untitled'}${r.url ? ` — ${r.url}` : ''}`;
+    const hint = r.kind ? KIND_HINT[r.kind] : undefined;
+    const head = `[R${i + 1}] ${r.title || r.url || 'Untitled'}${r.url ? ` — ${r.url}` : ''}${hint ? `\n(${hint})` : ''}`;
     return `${head}\n${text.length > share ? `${text.slice(0, share)}\n[truncated]` : text}`;
   });
   return [

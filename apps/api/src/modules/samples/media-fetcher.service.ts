@@ -213,6 +213,36 @@ export class MediaFetcherService {
     }
   }
 
+  /**
+   * Like getJson, but an error status is returned instead of thrown: some APIs (Instagram Graph)
+   * explain what went wrong in the body of a 4xx answer. `body` is null when it is not JSON.
+   */
+  async getJsonLoose<T = unknown>(
+    url: string,
+    headers: Record<string, string> = {},
+  ): Promise<{ status: number; body: T | null }> {
+    const res = await this.safeFetch(url, {
+      headers: { accept: 'application/json', ...headers },
+      acceptErrors: true,
+    });
+    const text = await this.readLimited(res);
+    try {
+      return { status: res.status, body: JSON.parse(text) as T };
+    } catch {
+      return { status: res.status, body: null };
+    }
+  }
+
+  /** A page, robots.txt or sitemap as text (same safety rules as every read). Non-2xx throws. */
+  async getText(
+    url: string,
+    accept = 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
+  ): Promise<{ text: string; finalUrl: string; contentType: string }> {
+    const res = await this.safeFetch(url, { headers: { accept } });
+    const contentType = res.headers.get('content-type') ?? '';
+    return { text: await this.readLimited(res), finalUrl: res.url, contentType };
+  }
+
   /** Downloads a file (up to `maxBytes`; a larger one is refused, not truncated). */
   async download(
     url: string,
@@ -280,7 +310,7 @@ export class MediaFetcherService {
 
   private async safeFetch(
     rawUrl: string,
-    opts: { headers?: Record<string, string>; timeoutMs?: number } = {},
+    opts: { headers?: Record<string, string>; timeoutMs?: number; acceptErrors?: boolean } = {},
   ): Promise<Response> {
     const timeoutMs = opts.timeoutMs ?? this.env.FETCH_TIMEOUT_MS;
     let current = new URL(rawUrl);
@@ -306,7 +336,7 @@ export class MediaFetcherService {
         current = new URL(res.headers.get('location')!, current);
         continue;
       }
-      if (!res.ok) {
+      if (!res.ok && !opts.acceptErrors) {
         await res.body?.cancel();
         throw new FetchError(`Remote server responded ${res.status}`);
       }
