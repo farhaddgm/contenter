@@ -1,0 +1,54 @@
+# Manual run of the Persian eval against live models (docs/43-persian-eval.md).
+# It needs the repository secrets OPENAI_API_KEY and ANTHROPIC_API_KEY, costs real money
+# (a full run is about 90 model calls plus judge calls) and never runs on its own.
+# Without secrets, run it on your machine: npm run eval -w @contenter/api -- --model ... --judge ...
+name: Persian eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Model to evaluate, as provider:model (e.g. openai:gpt-5.4)'
+        required: true
+        default: 'openai:gpt-5.4'
+      judge:
+        description: 'Judge model from another vendor (e.g. anthropic:claude-sonnet-5)'
+        required: true
+        default: 'anthropic:claude-sonnet-5'
+      task:
+        description: 'One task (generate_content, repurpose_content, ideate) or empty for all'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-24.04 # pinned: ubuntu-latest moves to 26.04 on 2026-10-19; upgrade on purpose
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @contenter/shared
+      - name: Run the eval
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVAL_MODEL: ${{ inputs.model }}
+          EVAL_JUDGE: ${{ inputs.judge }}
+          EVAL_TASK: ${{ inputs.task }}
+        run: |
+          args=(--model "$EVAL_MODEL" --judge "$EVAL_JUDGE" --out eval-results)
+          if [ -n "$EVAL_TASK" ]; then args+=(--task "$EVAL_TASK"); fi
+          npm run eval -w @contenter/api -- "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: apps/api/eval-results/
+          if-no-files-found: ignore

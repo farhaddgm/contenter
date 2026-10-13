@@ -250,7 +250,7 @@ function Readings({ contentId, items }: { contentId: string; items: ContentMetri
 }
 
 /**
- * Performance numbers typed or pasted by hand for a published content (docs/32). The server
+ * Performance numbers typed or pasted by hand for a published content (docs/42). The server
  * only accepts readings for published content, so the card explains how to unlock it otherwise.
  */
 export function MetricsCard({ content, canEdit }: { content: Content; canEdit: boolean }) {

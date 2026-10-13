@@ -14,3 +14,4 @@ apps/api/uploads/
 # server-local deploy files (production overrides, backups of them)
 docker-compose.override.yml*
 docker-compose.yml.local-change-*.diff
+apps/api/eval-results/

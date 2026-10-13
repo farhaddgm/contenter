@@ -1,5 +1,5 @@
 /**
- * Pre-publish quality gate (docs/31-quality-gate.md). Everything here is deterministic code: the
+ * Pre-publish quality gate (docs/41-quality-gate.md). Everything here is deterministic code: the
  * model never decides whether a text is acceptable. The gate only warns; it never blocks a
  * review step or a publish.
  *
@@ -42,7 +42,7 @@ export interface PlatformRules {
 /**
  * Limits by platform. Only numbers I could source are filled; a missing number means "no check",
  * never "no limit". Eitaa, Rubika and Aparat publish no text limits in the documentation I found
- * (docs/30), so they are left empty.
+ * (docs/40), so they are left empty.
  */
 export const PLATFORM_RULES: Record<Platform, PlatformRules> = {
   INSTAGRAM: {

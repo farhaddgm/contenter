@@ -70,7 +70,7 @@ export function toMetricDto(row: Row): ContentMetric {
 }
 
 /**
- * Manual performance readings of a published content (docs/32-performance-metrics.md). The admin
+ * Manual performance readings of a published content (docs/42-performance-metrics.md). The admin
  * types or pastes what a platform shows; nothing here calls a platform. A published content is
  * frozen for edits, but its readings are not: they describe the post, they do not change it.
  */

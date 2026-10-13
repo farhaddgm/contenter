@@ -8,7 +8,7 @@ import { formatNumber } from '@/utils/format';
 const OWN_CARD = new Set(['TERM_AVOID', 'TERM_USE']);
 
 /**
- * Pre-publish quality gate (docs/31). The report is computed by code on the server; the card only
+ * Pre-publish quality gate (docs/41). The report is computed by code on the server; the card only
  * words it. It warns and never blocks a review step.
  */
 export function QualityCard({ quality }: { quality: QualityReport | null | undefined }) {

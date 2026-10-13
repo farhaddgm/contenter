@@ -23,7 +23,7 @@ export const Platform = [
   'TIKTOK',
   'BLOG',
   'OTHER',
-  // Iranian messengers and media (docs/30); appended so stored values keep their order
+  // Iranian messengers and media (docs/40); appended so stored values keep their order
   'EITAA',
   'BALE',
   'RUBIKA',

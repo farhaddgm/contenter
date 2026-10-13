@@ -1,5 +1,5 @@
 /**
- * Manual performance numbers of a published content (docs/32-performance-metrics.md).
+ * Manual performance numbers of a published content (docs/42-performance-metrics.md).
  *
  * The admin reads the numbers from the platform and types or pastes them; nothing here calls a
  * platform. One reading per content and day (re-entering the day replaces it). The counters are

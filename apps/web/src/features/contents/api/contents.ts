@@ -188,7 +188,7 @@ export function useRepurpose(id: string) {
   });
 }
 
-// ---------- performance readings (docs/32) ----------
+// ---------- performance readings (docs/42) ----------
 
 export const metricKeys = {
   content: (contentId: string) => ['content-metrics', contentId] as const,

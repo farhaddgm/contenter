@@ -115,11 +115,14 @@
 | GET | `/search?q&topicId&limit` | جست‌وجوی سراسری در محتواها، ایده‌ها و موضوع‌ها |
 | POST | `/contents/:id/repurpose` | **۲۰۲** — `{ targets: [{ platform, format? }], notes? }` ← کار `REPURPOSE_CONTENT` برای هر هدف ([23-repurposing.md](23-repurposing.md)) |
 | POST | `/topics/:id/contents/generate` | **۲۰۲** — `{ ideaId? , brief?, format? }` ← `{ jobId, contentId }` |
-| GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه |
+| GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه، `termIssues` و `quality` ([41-quality-gate.md](41-quality-gate.md)) |
 | PATCH | `/contents/:id` | `{ title?, campaignId? }` — `status` دیگر پذیرفته نمی‌شود (۴۰۰)؛ برای تغییر وضعیت ↓ |
 | POST | `/contents/:id/review/:action` | گام گردش تأیید: `submit`، `approve`، `finalize`، `request_changes`، `reject`، `withdraw`، `reopen` — [21-review-workflow.md](21-review-workflow.md) |
 | GET / POST | `/contents/:id/comments` | کامنت‌ها (رشته‌ها با پاسخ) / نظر تازه |
 | PATCH / DELETE | `/comments/:id` | ویرایش، «حل شد» یا حذف نظر |
+| GET / POST | `/contents/:id/metrics` | خوانش‌های آمار عملکرد (`{ items, summary }`) / ثبت یا جایگزینی خوانش یک روز؛ فقط محتوای منتشرشده ([42-performance-metrics.md](42-performance-metrics.md)) |
+| POST | `/contents/:id/metrics/bulk` | `{ rows }` تا ۳۶۶ روز؛ همه یا هیچ |
+| PATCH / DELETE | `/content-metrics/:id` | تغییر بخشی از عددها / حذف یک خوانش |
 | PUT | `/contents/:id/schedule` | `{ scheduledAt }` — برنامه‌ریزی انتشار ([22-calendar-publishing.md](22-calendar-publishing.md)) |
 | POST / DELETE | `/contents/:id/published` | ثبت انتشار `{ publishedAt?, url? }` / لغو آن |
 | GET | `/calendar?from&to&topicId&campaignId&tagId` | تقویم: `{ items, ready }` |

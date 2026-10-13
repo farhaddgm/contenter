@@ -106,7 +106,7 @@ export class ContentsService {
   /**
    * Content with its versions plus the checks done by code, never by the model: the brand
    * terminology check of the current version (`checkTerms`), the pre-publish quality gate
-   * (`checkContentQuality`: platform limits, key-fact numbers, Persian typography, docs/31), and
+   * (`checkContentQuality`: platform limits, key-fact numbers, Persian typography, docs/41), and
    * the review workflow: what the caller may do now and the history.
    */
   async detail(id: string, user: AuthUser) {
