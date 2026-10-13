@@ -50,6 +50,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Topic & business access (docs/17-project-access.md)
 - EDITOR/VIEWER only reach topics/businesses they created or the owner granted (`TopicMember` / `BusinessMember`, `AccessLevel` VIEW/EDIT); admins reach all; only the owner manages grants (`/owner/users/:id/...`). Every topic- or business-scoped route needs `@TopicScoped` / `@BusinessScoped` (from `common/access.ts`); every list of them or their data must apply `AccessService.visibleTopics()` / `visibleBusinesses()`. Web gates edit UI with `useCanEditTopic` / `useCanEditBusiness`, not `can('content:write')`.
 
+## Learning from edits (docs/30-learn-from-edits.md)
+- `LEARN_FROM_EDITS` follows the core rule: code finds the (last AI version, approved admin version) pairs (`collectEditPairs`) and computes every diff (`edit-diff.ts`, folded word diff); the model only names patterns and points at pair ids (`P1`…); `resolveSuggestions` drops a suggestion with < 2 real pairs, a repeat, or made-up ids, and builds the evidence from the real pairs — never store what the model wrote as evidence. A `LearningSuggestion` becomes a `Principle` only through `POST /learning-suggestions/:id/accept` (admin). `category` is a plain string checked by `EditCategory` in `packages/shared`.
+
 ## Smart (docs/10-smart.md)
 - Walker steps: `WalkerStepKey` in `packages/shared/src/smart.ts`; server progress in `WalkerProgressService`, client routing in `apps/web/src/features/smart/walker-steps.ts`.
 - Errors: 5xx are recorded by `AllExceptionsFilter` → `ErrorTrackerService`; browser errors go through `lib/smart-bus.ts` → `lib/error-reporter.ts`. Don't record 4xx.

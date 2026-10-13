@@ -278,6 +278,7 @@ export const en: DeepStrings<Dictionary> = {
       BUSINESS_ASSET_ANALYZE: 'Analyze business asset',
       BUSINESS_AUDIT: 'Audit business profile',
       REPURPOSE_CONTENT: 'Repurpose for another platform',
+      LEARN_FROM_EDITS: 'Learn from edits',
     },
     jobStatus: {
       QUEUED: 'Queued',
@@ -351,6 +352,41 @@ export const en: DeepStrings<Dictionary> = {
     activeProfile: 'Active profile',
     noActiveProfile: 'No approved profile',
     noBusiness: 'No business',
+  },
+  editLearning: {
+    title: 'Learning from edits',
+    subtitle:
+      'When an editor changes an AI draft and it is approved, the difference is a quality signal. Repeated patterns in those changes are found here and proposed as principles; each one becomes a principle only when you accept it.',
+    analyze: 'Analyze edits',
+    approved: 'Approved contents',
+    edited: 'Changed by an editor',
+    unedited: 'Approved as written',
+    notEnough:
+      'At least {{min}} approved contents changed by an editor are needed; you have {{edited}} so far.',
+    working: 'Analyzing the edits…',
+    workingHint:
+      'The differences are computed by code; the AI only names the patterns that repeat.',
+    nothingFound: 'No clear repeated pattern was found in the recent edits.',
+    seenIn: 'Seen in {{count}} contents',
+    evidence: 'Evidence',
+    changed: '{{percent}} of the text changed',
+    accept: 'Add to principles',
+    dismiss: 'Dismiss',
+    accepted: 'Added to the principles of the topic.',
+    decided: 'Earlier decisions ({{count}})',
+    status: { PENDING: 'Pending', ACCEPTED: 'Accepted', DISMISSED: 'Dismissed' },
+    categories: {
+      LENGTH: 'Length',
+      OPENING: 'Opening',
+      TONE: 'Tone',
+      TERMINOLOGY: 'Wording',
+      FACTS: 'Facts',
+      STRUCTURE: 'Structure',
+      CTA: 'Call to action',
+      FORMATTING: 'Formatting',
+      CLARITY: 'Clarity',
+      OTHER: 'Other',
+    },
   },
   principles: {
     title: 'Principles',
@@ -590,6 +626,7 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_ADDED: 'A new comment on a content',
       COMMENT_REPLIED: 'A new reply in a conversation',
       CONTENT_DUE: 'It is time to publish a content',
+      BACKUP_VERIFY_FAILED: 'The backup restore check failed',
     },
     eventHints: {
       REVIEW_SUBMITTED: 'For the editors and admins who can review.',
@@ -600,6 +637,7 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_ADDED: 'For those around the content: creator, sender and commenters.',
       COMMENT_REPLIED: 'For those who commented in the same thread.',
       CONTENT_DUE: 'For the creator, the sender and the approver of a scheduled approved content.',
+      BACKUP_VERIFY_FAILED: 'For admins: the weekly backup restore check (docs/13) failed.',
     },
     preferences: {
       title: 'My notifications',

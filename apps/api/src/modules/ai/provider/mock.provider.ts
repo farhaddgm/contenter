@@ -7,6 +7,7 @@ import {
   type BusinessReviseResult,
   type BusinessSuggestResult,
   type ContentDraftResult,
+  type EditLearningResult,
   type IdeationResult,
   type ProfileBuildResult,
   type SampleAnalysisResult,
@@ -309,6 +310,29 @@ export class MockProvider implements AiProvider {
             score: 7 + (i % 3),
           })),
         } satisfies IdeationResult;
+      }
+      case 'LEARN_FROM_EDITS': {
+        // point at the first pairs of the prompt, so evidence always exists and is checked by code
+        const ids = [...req.user.matchAll(/<pair id="(P\d+)"/g)].map((m) => m[1]!);
+        if (ids.length < 2) return { suggestions: [] } satisfies EditLearningResult;
+        return {
+          suggestions: [
+            {
+              kind: 'AVOID',
+              category: 'OPENING',
+              text: 'مقدمه را با احوال‌پرسی یا معرفی خودت شروع نکن؛ از همان جملهٔ اول سراغ فایدهٔ اصلی برو.',
+              rationale: 'ویراستارها در چند محتوا جملهٔ آغازین را حذف و فایده را جلو آورده‌اند.',
+              evidence: ids.slice(0, 3),
+            },
+            {
+              kind: 'PREFER',
+              category: 'LENGTH',
+              text: 'جمله‌ها را کوتاه و زیر ۲۰ کلمه نگه دار.',
+              rationale: 'در چند محتوا جمله‌های بلند شکسته شده‌اند.',
+              evidence: ids.slice(0, 2),
+            },
+          ],
+        } satisfies EditLearningResult;
       }
       case 'REPURPOSE_CONTENT': {
         // the prompt names the target, so a repurposed mock draft differs per platform

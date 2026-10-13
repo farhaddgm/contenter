@@ -142,6 +142,7 @@ export const AiJobType = [
   'BUSINESS_ASSET_ANALYZE',
   'BUSINESS_AUDIT',
   'REPURPOSE_CONTENT',
+  'LEARN_FROM_EDITS',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 

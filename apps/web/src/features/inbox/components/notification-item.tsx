@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   CornerDownLeft,
+  DatabaseBackup,
   MessageSquare,
   MessageSquareWarning,
   Send,
@@ -24,6 +25,7 @@ const ICON: Record<NotificationEvent, { icon: LucideIcon; tone: string }> = {
   COMMENT_ADDED: { icon: MessageSquare, tone: 'text-primary' },
   COMMENT_REPLIED: { icon: CornerDownLeft, tone: 'text-primary' },
   CONTENT_DUE: { icon: BellRing, tone: 'text-destructive' },
+  BACKUP_VERIFY_FAILED: { icon: DatabaseBackup, tone: 'text-destructive' },
 };
 
 /** The text of a notification in the reader's language. */

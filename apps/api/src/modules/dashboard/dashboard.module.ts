@@ -5,6 +5,7 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Public, type AuthUser } from '../../common/auth.decorators';
 import { AccessService } from '../../common/access';
 import { QueueService } from '../../infra/queue/queue.service';
+import { BackupStatusService } from '../ops/backup-status.service';
 
 const DAYS = 14;
 
@@ -132,6 +133,7 @@ export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
+    private readonly backups: BackupStatusService,
   ) {}
 
   @Public()
@@ -139,7 +141,20 @@ export class HealthController {
   async health() {
     const db = await this.prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false);
     const redis = await this.queue.ping();
-    return { status: db && redis ? 'ok' : 'degraded', db, redis, time: new Date().toISOString() };
+    // The weekly restore check (docs/13-operations.md). Informational: it never makes `status`
+    // degraded, and it is only a verdict and a date, no details.
+    const restore = db
+      ? await this.backups
+          .summary()
+          .catch(() => ({ restoreCheck: 'never' as const, lastRestoreVerifiedAt: null }))
+      : { restoreCheck: 'never' as const, lastRestoreVerifiedAt: null };
+    return {
+      status: db && redis ? 'ok' : 'degraded',
+      db,
+      redis,
+      ...restore,
+      time: new Date().toISOString(),
+    };
   }
 }
 

@@ -21,6 +21,7 @@ import { formatNumber } from '@/utils/format';
 import { useDeleteTopic, useTopic, useUpdateTopic } from '@/features/topics/api/topics';
 import { TopicFormDrawer } from '@/features/topics/components/topic-form';
 import { TopicOverview } from '@/features/topics/components/topic-overview';
+import { EditLearningPanel } from '@/features/edit-learning/components/edit-learning-panel';
 import { PrinciplesList } from '@/features/principles/components/principles-list';
 import { SamplesPanel } from '@/features/samples/components/samples-panel';
 import { ProfilePanel } from '@/features/profiles/components/profile-panel';
@@ -185,6 +186,7 @@ export default function TopicRoute() {
               </Link>
             </Authorization>
           </p>
+          <EditLearningPanel topicId={topic.id} />
           <BrandDocsPanel topicId={topic.id} />
         </div>
       )}

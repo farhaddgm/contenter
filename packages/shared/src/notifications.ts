@@ -15,6 +15,8 @@ export const NotificationEvent = [
   'COMMENT_ADDED',
   'COMMENT_REPLIED',
   'CONTENT_DUE',
+  /** A system event, not about a content: the weekly restore check of the backups failed (docs/13). */
+  'BACKUP_VERIFY_FAILED',
 ] as const;
 export type NotificationEvent = (typeof NotificationEvent)[number];
 
@@ -32,6 +34,7 @@ export const NOTIFICATION_DEFAULTS: Record<NotificationEvent, { inApp: boolean; 
     COMMENT_ADDED: { inApp: true, email: false },
     COMMENT_REPLIED: { inApp: true, email: false },
     CONTENT_DUE: { inApp: true, email: true },
+    BACKUP_VERIFY_FAILED: { inApp: true, email: true },
   };
 
 /** The values a message is written from; stored with the notification. */
@@ -79,6 +82,8 @@ const TEXT = {
     COMMENT_ADDED: (a: string, c: string) => `${a} روی «${c}» نظر گذاشت`,
     COMMENT_REPLIED: (a: string, c: string) => `${a} در «${c}» پاسخ داد`,
     CONTENT_DUE: (_a: string, c: string) => `زمان انتشار «${c}» رسید`,
+    BACKUP_VERIFY_FAILED: () =>
+      'بررسی بازیابی پشتیبان شکست خورد؛ پشتیبان‌ها ممکن است قابل‌اتکا نباشند',
     someone: 'کسی',
     untitled: 'بدون عنوان',
     plannedFor: (when: string) => `برنامه‌ریزی‌شده برای ${when}؛ هنوز منتشرشده ثبت نشده است.`,
@@ -93,6 +98,7 @@ const TEXT = {
     COMMENT_ADDED: (a: string, c: string) => `${a} commented on “${c}”`,
     COMMENT_REPLIED: (a: string, c: string) => `${a} replied in “${c}”`,
     CONTENT_DUE: (_a: string, c: string) => `It is time to publish “${c}”`,
+    BACKUP_VERIFY_FAILED: () => 'The backup restore check failed; the backups may not be reliable',
     someone: 'Someone',
     untitled: 'Untitled',
     plannedFor: (when: string) => `Planned for ${when}; it is not marked published yet.`,

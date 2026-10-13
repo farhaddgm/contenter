@@ -572,12 +572,12 @@ model Topic {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  business      Business?         @relation(fields: [businessId], references: [id], onDelete: SetNull)
-  activeProfile ContentProfile?   @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
+  createdBy     User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  business      Business?            @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  activeProfile ContentProfile?      @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
   principles    Principle[]
   samples       SampleContent[]
-  profiles      ContentProfile[]  @relation("TopicProfiles")
+  profiles      ContentProfile[]     @relation("TopicProfiles")
   ideationRuns  IdeationRequest[]
   ideas         Idea[]
   contents      Content[]
@@ -585,6 +585,8 @@ model Topic {
   members       TopicMember[]
   tags          Tag[]
   campaigns     Campaign[]
+  editRuns      EditLearningRun[]
+  learnings     LearningSuggestion[]
 
   @@index([status, createdAt])
   @@index([businessId])
@@ -1040,6 +1042,51 @@ model ContentVersion {
   @@unique([contentId, version])
 }
 
+// ───────────────────────── Learning from edits ─────────────────────────
+// See docs/30-learn-from-edits.md. Mirrors packages/shared/src/edit-learning.ts.
+
+/// One analysis of the edited approved contents of a topic (one LEARN_FROM_EDITS job).
+model EditLearningRun {
+  id             String   @id @default(cuid())
+  topicId        String
+  jobId          String?
+  /// How many (AI draft, approved text) pairs the model saw
+  pairCount      Int
+  /// Mean share of words changed over those pairs, 0–1 (counted by code)
+  avgChangeRatio Float
+  createdAt      DateTime @default(now())
+
+  topic       Topic                @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  suggestions LearningSuggestion[]
+
+  @@index([topicId, createdAt])
+}
+
+/// A principle the model proposes from edits that repeat; becomes a Principle only when accepted.
+model LearningSuggestion {
+  id          String           @id @default(cuid())
+  topicId     String
+  runId       String
+  kind        PrincipleKind
+  /// One of EditCategory (checked by Zod, not an enum, so the list can grow without a migration)
+  category    String
+  text        String
+  rationale   String           @default("")
+  /// EditEvidence[] — built by code from real pairs, never copied from the model
+  evidence    Json
+  status      SuggestionStatus @default(PENDING)
+  principleId String?
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime         @default(now())
+
+  topic Topic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  run   EditLearningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, status])
+  @@index([runId])
+}
+
 // ─────────────────────────────── Notifications ───────────────────────────────
 
 enum NotificationEvent {
@@ -1051,6 +1098,7 @@ enum NotificationEvent {
   COMMENT_ADDED
   COMMENT_REPLIED
   CONTENT_DUE
+  BACKUP_VERIFY_FAILED
 }
 
 enum DeliveryChannel {
@@ -1097,15 +1145,15 @@ model NotificationPreference {
 
 /// Outcome of one e-mail or webhook send, kept for a few weeks so a failing channel can be found
 model NotificationDelivery {
-  id             String            @id @default(cuid())
-  channel        DeliveryChannel
-  event          NotificationEvent
+  id        String            @id @default(cuid())
+  channel   DeliveryChannel
+  event     NotificationEvent
   /// The address, or the host of the webhook
-  target         String
-  status         DeliveryStatus
-  error          String?
-  attempts       Int               @default(1)
-  createdAt      DateTime          @default(now())
+  target    String
+  status    DeliveryStatus
+  error     String?
+  attempts  Int               @default(1)
+  createdAt DateTime          @default(now())
 
   @@index([createdAt])
 }
@@ -1126,6 +1174,7 @@ enum AiJobType {
   BUSINESS_ASSET_ANALYZE
   BUSINESS_AUDIT
   REPURPOSE_CONTENT
+  LEARN_FROM_EDITS
 }
 
 enum AiJobStatus {

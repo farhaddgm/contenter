@@ -135,6 +135,9 @@ test_offsite() {
 #   VERIFY_MAX_AGE_HOURS  newest backup must be younger than this (default 48)
 #   VERIFY_PG_IMAGE       image for the throwaway database (default postgres:17-alpine)
 #   VERIFY_DB_URL         use this EMPTY database instead of a container (tests); refused when it has tables
+#   VERIFY_REPORT         1 = always hand the result to the app, 0 = never (default: yes, except with VERIFY_DB_URL)
+# The result is also handed to the api container (apps/api/src/cli/record-backup-verify.ts): the app
+# stores it, shows it in /api/health and warns the admins when it failed (in-app, e-mail, webhook).
 VERIFY_TABLES=(User Business Topic Content AiJob AuditLog)
 
 verify() {
@@ -227,6 +230,7 @@ verify_finish() {
   now="$(date '+%Y-%m-%d %H:%M:%S')"
   write_verify_status "$passed" "$now"
   VERIFY_DONE=1
+  report_to_app
   for w in ${VERIFY_WARNINGS[@]+"${VERIFY_WARNINGS[@]}"}; do warn "$w"; done
   if [ "$passed" = true ]; then
     echo "$now" > "$BACKUP_DIR/verify-last-ok"
@@ -263,7 +267,27 @@ verify_exit() {
   if [ "${VERIFY_DONE:-1}" = 0 ]; then
     VERIFY_PROBLEMS+=("The check stopped before it finished (exit $code); see the log")
     write_verify_status false "$(date '+%Y-%m-%d %H:%M:%S')" || true
+    report_to_app
   fi
+}
+
+# Hands verify-status.json to the api container so the app can store it and warn the admins.
+# Never changes the verdict: when the app cannot be reached (not running, an older image without
+# the command) it only warns, and the file in $BACKUP_DIR is still the record.
+report_to_app() {
+  case "${VERIFY_REPORT:-}" in 0) return 0 ;; 1) ;; *) [ -z "${VERIFY_DB_URL:-}" ] || return 0 ;; esac
+  [ -s "$BACKUP_DIR/verify-status.json" ] || return 0
+  command -v docker >/dev/null || return 0
+  if ! docker compose ps --status running --services 2>/dev/null | grep -qx api; then
+    warn "The api container is not running: the result was not reported to the app."
+    return 0
+  fi
+  if docker compose exec -T -e APP_ROLE=api api node apps/api/dist/cli/record-backup-verify.js < "$BACKUP_DIR/verify-status.json"; then
+    echo "The app has the result (admins are warned when it failed)."
+  else
+    warn "Could not report the result to the app (an older version without the command?). It is in $BACKUP_DIR/verify-status.json."
+  fi
+  return 0
 }
 
 # throwaway database: a container with no network, or $VERIFY_DB_URL (must be empty, checked by the caller)

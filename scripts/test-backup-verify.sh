@@ -116,5 +116,56 @@ run_case "non-empty scratch database is refused" 1 preloaded
 
 run_case "fresh enough backup passes at the age limit" 0 good "40 hours ago"
 
+# ── handing the result to the app (a fake `docker` that records what it receives) ──
+FAKEBIN="$WORK/fakebin"
+mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/docker" <<'FAKE'
+#!/usr/bin/env bash
+# docker compose ps ...  -> pretend the api container runs; docker compose exec ... -> keep stdin and args
+if [ "$1" = compose ] && [ "$2" = ps ]; then
+  [ "${FAKE_API_UP:-1}" = 1 ] && echo api
+  exit 0
+fi
+if [ "$1" = compose ] && [ "$2" = exec ]; then
+  echo "$*" > "$FAKE_CAPTURE.args"
+  cat > "$FAKE_CAPTURE"
+  [ "${FAKE_EXEC_FAIL:-0}" = 1 ] && exit 1
+  exit 0
+fi
+exit 0
+FAKE
+chmod +x "$FAKEBIN/docker"
+
+report_case() {
+  local name="$1" expect="$2" variant="$3" up="$4" execfail="$5" want_sent="$6" bdir code db
+  CASE_N=$((CASE_N + 1))
+  bdir="$WORK/case$CASE_N"
+  mkdir -p "$bdir"
+  db="contenter_verify_test_$CASE_N"
+  PGOPTIONS='-c client_min_messages=warning' psql "$ADMIN" -Atqc "DROP DATABASE IF EXISTS $db" -c "CREATE DATABASE $db" >/dev/null || exit 2
+  make_dump "$bdir/db-$(stamp '1 hour ago').sql.gz" "$variant"
+  PATH="$FAKEBIN:$PATH" FAKE_CAPTURE="$bdir/captured" FAKE_API_UP="$up" FAKE_EXEC_FAIL="$execfail" \
+    VERIFY_REPORT=1 BACKUP_DIR="$bdir" BACKUP_CONFIG=/nonexistent BACKUP_REMOTE= VERIFY_DB_URL="$BASE/$db" \
+    bash scripts/backup.sh verify local > "$bdir/out.log" 2>&1
+  code=$?
+  local verdict=ok
+  [ "$code" = "$expect" ] || verdict="exit $code, expected $expect"
+  if [ "$want_sent" = yes ]; then
+    cmp -s "$bdir/captured" "$bdir/verify-status.json" || verdict="the app did not receive verify-status.json"
+    grep -q 'APP_ROLE=api' "$bdir/captured.args" 2>/dev/null || verdict="exec without -e APP_ROLE=api"
+    grep -q 'dist/cli/record-backup-verify.js' "$bdir/captured.args" 2>/dev/null || verdict="exec does not run the CLI"
+  else
+    [ ! -e "$bdir/captured" ] || verdict="the result was sent although it should not"
+  fi
+  if [ "$verdict" = ok ]; then echo "ok    $name"; else
+    echo "FAIL  $name — $verdict"; sed 's/^/        /' "$bdir/out.log" | tail -8; FAILED=$((FAILED + 1))
+  fi
+}
+
+report_case "a passing check is reported to the app" 0 good 1 0 yes
+report_case "a failing check is reported to the app too" 1 nousers 1 0 yes
+report_case "api container down: warns, verdict unchanged, nothing sent" 0 good 0 0 no
+report_case "reporting fails: warns, verdict unchanged" 0 good 1 1 yes
+
 echo
 if [ "$FAILED" -eq 0 ]; then echo "All backup verify tests passed ($CASE_N cases)"; else echo "$FAILED check(s) failed"; exit 1; fi
