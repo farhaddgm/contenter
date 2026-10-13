@@ -23,7 +23,7 @@
     "seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
+    "@anthropic-ai/sdk": "^0.132.1",
     "@contenter/shared": "*",
     "@mozilla/readability": "^0.6.0",
     "@nestjs/common": "^12.1.2",
