@@ -17,9 +17,11 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  checkContentQuality,
   checkTerms,
   ContentListQuerySchema,
   defaultFormatFor,
+  effectivePlatform,
   RepurposeContentSchema,
   EditContentVersionSchema,
   GenerateContentSchema,
@@ -101,9 +103,10 @@ export class ContentsService {
   }
 
   /**
-   * Content with its versions plus the brand terminology check of the current version (the
-   * linked business's USE/AVOID terms matched by code, `checkTerms`, never by the model) and the
-   * review workflow: what the caller may do now and the history.
+   * Content with its versions plus the checks done by code, never by the model: the brand
+   * terminology check of the current version (`checkTerms`), the pre-publish quality gate
+   * (`checkContentQuality`: platform limits, key-fact numbers, Persian typography, docs/31), and
+   * the review workflow: what the caller may do now and the history.
    */
   async detail(id: string, user: AuthUser) {
     const base = await this.get(id);
@@ -113,14 +116,31 @@ export class ContentsService {
     ]);
     const c = { ...base, review, reviews };
     const v = c.currentVersion;
-    if (!v) return { ...c, termIssues: [] };
+    if (!v) return { ...c, termIssues: [], quality: null };
     const topic = await this.prisma.topic.findUnique({
       where: { id: c.topicId },
-      select: { business: { select: { terms: { where: { isActive: true } } } } },
+      select: {
+        business: {
+          select: {
+            terms: { where: { isActive: true } },
+            facts: { where: { isActive: true } },
+          },
+        },
+      },
     });
     const terms = topic?.business?.terms ?? [];
     const text = [v.title, v.body, v.hashtags.join(' '), v.cta].join('\n');
-    return { ...c, termIssues: terms.length ? checkTerms(text, terms) : [] };
+    const quality = checkContentQuality({
+      title: v.title,
+      body: v.body,
+      hashtags: v.hashtags,
+      cta: v.cta,
+      platform: effectivePlatform(c, c.topic),
+      format: c.format,
+      terms,
+      facts: topic?.business?.facts ?? [],
+    });
+    return { ...c, termIssues: terms.length ? checkTerms(text, terms) : [], quality };
   }
 
   /** Creates the content shell (status GENERATING) and queues the AI draft. */

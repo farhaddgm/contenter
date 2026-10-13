@@ -17,6 +17,11 @@ describe('detectPlatform', () => {
     ['https://twitter.com/user', 'X'],
     ['https://www.linkedin.com/posts/a', 'LINKEDIN'],
     ['https://virgool.io/@a/post', 'BLOG'],
+    ['https://eitaa.com/channel', 'EITAA'],
+    ['https://ble.ir/channel', 'BALE'],
+    ['https://rubika.ir/channel', 'RUBIKA'],
+    ['https://www.aparat.com/v/abc', 'APARAT'],
+    ['https://notaparat.com', 'OTHER'],
     ['https://example.com', 'OTHER'],
     ['https://notinstagram.com.evil.io', 'OTHER'],
   ])('%s → %s', (url, expected) => {

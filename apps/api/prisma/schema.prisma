@@ -542,6 +542,11 @@ enum Platform {
   TIKTOK
   BLOG
   OTHER
+  EITAA
+  BALE
+  RUBIKA
+  APARAT
+  NEWSLETTER
 }
 
 enum TopicStatus {
