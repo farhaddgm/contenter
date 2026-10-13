@@ -58,3 +58,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 - Errors: 5xx are recorded by `AllExceptionsFilter` → `ErrorTrackerService`; browser errors go through `lib/smart-bus.ts` → `lib/error-reporter.ts`. Don't record 4xx.
 - Detailed interaction logging is opt-in (`SystemSetting` key `smart`); always pass logged payloads through `sanitize()`.
 - Walker issues ("دفتر خطاهای واکر") are the admin's bug reports — read them via `GET /api/smart/issues` or the DB table `WalkerIssue` when asked to fix reported problems.
+
+## Quality gate, performance numbers, Persian eval (docs/40–43)
+- Iranian platforms (`EITAA`, `BALE`, `RUBIKA`, `APARAT`, `NEWSLETTER`) are in `Platform` (Prisma + shared). Official messenger API facts and their confidence are in docs/40; publishing to them is not built.
+- Pre-publish checks are code only (`packages/shared/src/quality.ts`, `checkContentQuality`), returned as `quality` by `GET /contents/:id`; they warn and never block a review step or a publish. Platform limits live once in `PLATFORM_RULES` — an empty number means "not checked", never "no limit". Never let a model decide whether a text passes.
+- Performance numbers are typed or pasted by hand (`ContentMetric`, one reading per content and day, only for published content, docs/42). The paste parser accepts Gregorian dates only; do not hand-write a Jalali converter.
+- Eval (`apps/api/src/evals`, docs/43): editing `prompts/defaults.ts` for `generate_content`, `repurpose_content` or `ideate` fails the `prompt change guard` test until `npm run eval -w @contenter/api -- --model … --judge … --update-baseline` records a full run. The judge must be from another vendor than the writer and must pass calibration. Tests must never write the real `eval-baseline.json` / `evaluated-prompts.json` (pass temp paths to `recordBaseline`).

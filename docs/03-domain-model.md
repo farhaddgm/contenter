@@ -25,6 +25,7 @@ Topic ──< Tag >──< Idea / Content   (چندبه‌چند؛ [20-tags-camp
 Topic ──< Campaign ──< Content      (هر محتوا حداکثر در یک کمپین)
 Topic ──< EditLearningRun ──< LearningSuggestion   (پیشنهاد اصل از ویرایش‌های ویراستار؛ [30-learn-from-edits.md](30-learn-from-edits.md))
 Content ──< ContentReview           (تاریخچهٔ بازبینی)  ·  Content ──< ContentComment  ([21-review-workflow.md](21-review-workflow.md))
+Content ──< ContentMetric           (آمار عملکرد دستی، یک ردیف برای هر روز؛ [42-performance-metrics.md](42-performance-metrics.md))
 
 AiJob         (هر فراخوانی AI؛ targetType/targetId به موجودیت مرتبط اشاره می‌کند)
 PromptTemplate (key + version؛ فقط یک نسخهٔ فعال برای هر key)
@@ -49,7 +50,7 @@ SystemSetting  (key/value JSON)
 |---|---|
 | `title`، `description` | عنوان و شرح کامل موضوع |
 | `audience` | مخاطب هدف |
-| `platform` | پلتفرم هدف: `INSTAGRAM`، `YOUTUBE`، `TELEGRAM`، `LINKEDIN`، `X`، `BLOG`، `OTHER` |
+| `platform` | پلتفرم هدف: `INSTAGRAM`، `YOUTUBE`، `TELEGRAM`، `LINKEDIN`، `X`، `TIKTOK`، `BLOG`، `OTHER` و پلتفرم‌های ایرانی `EITAA`، `BALE`، `RUBIKA`، `APARAT`، `NEWSLETTER` ([40-iranian-messengers.md](40-iranian-messengers.md)) |
 | `language` | زبان تولید (پیش‌فرض `fa`) |
 | `status` | `ACTIVE` یا `ARCHIVED` |
 | `activeProfileId` | پروفایل تأییدشدهٔ فعلی که برای ایده‌پردازی و تولید استفاده می‌شود |

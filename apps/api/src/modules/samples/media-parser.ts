@@ -17,6 +17,10 @@ const PLATFORM_HOSTS: [RegExp, Platform][] = [
   [/(^|\.)linkedin\.com$/, 'LINKEDIN'],
   [/(^|\.)(x\.com|twitter\.com)$/, 'X'],
   [/(^|\.)tiktok\.com$/, 'TIKTOK'],
+  [/(^|\.)(eitaa\.com|eitaayar\.ir)$/, 'EITAA'],
+  [/(^|\.)(ble\.ir|bale\.ai)$/, 'BALE'],
+  [/(^|\.)rubika\.ir$/, 'RUBIKA'],
+  [/(^|\.)aparat\.com$/, 'APARAT'],
   [/(^|\.)(medium\.com|substack\.com|wordpress\.com|blogspot\.com|virgool\.io)$/, 'BLOG'],
 ];
 
@@ -34,13 +38,18 @@ export function platformMediaType(platform: Platform): MediaType {
   switch (platform) {
     case 'YOUTUBE':
     case 'TIKTOK':
+    case 'APARAT':
       return 'VIDEO';
     case 'INSTAGRAM':
     case 'X':
     case 'LINKEDIN':
     case 'TELEGRAM':
+    case 'EITAA':
+    case 'BALE':
+    case 'RUBIKA':
       return 'POST';
     case 'BLOG':
+    case 'NEWSLETTER':
       return 'ARTICLE';
     default:
       return 'UNKNOWN';

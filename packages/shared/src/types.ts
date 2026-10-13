@@ -2,6 +2,7 @@
  * API response shapes (what the web app receives).
  */
 import type { TermIssue } from './business-profile';
+import type { QualityReport } from './quality';
 import type {
   AiJobStatus,
   AiJobType,
@@ -332,6 +333,8 @@ export interface Content {
   reviews?: ContentReview[];
   /** Detail only: brand terminology violations of the current version (linked business). */
   termIssues?: TermIssue[];
+  /** Detail only: the pre-publish quality gate of the current version (docs/41); null without a draft. */
+  quality?: QualityReport | null;
 }
 
 export type PersonRef = Pick<User, 'id' | 'name'>;

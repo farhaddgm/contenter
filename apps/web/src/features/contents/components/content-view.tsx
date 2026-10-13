@@ -40,6 +40,8 @@ import { useCampaigns } from '@/features/campaigns/api/campaigns';
 import { SchedulePanel } from '@/features/calendar/components/schedule-panel';
 import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
+import { MetricsCard } from './metrics-card';
+import { QualityCard } from './quality-card';
 import { RepurposeDialog, RepurposedCard } from './repurpose';
 import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
 import { TagPicker } from '@/features/tags/components/tag-picker';
@@ -589,6 +591,7 @@ export function ContentView({ contentId }: { contentId: string }) {
               </CardBody>
             </Card>
             <RepurposedCard content={content} />
+            <MetricsCard content={content} canEdit={editable} />
             <OrganizeCard content={content} editable={editable} />
             {version.id === content.currentVersionId && (
               <TermIssuesCard
@@ -597,6 +600,7 @@ export function ContentView({ contentId }: { contentId: string }) {
                 canFix={editable && !generating && !frozen}
               />
             )}
+            {version.id === content.currentVersionId && <QualityCard quality={content.quality} />}
             <SelfCheckCard version={version} />
             <Card>
               <CardHeader

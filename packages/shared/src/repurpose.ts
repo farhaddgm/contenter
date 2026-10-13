@@ -11,6 +11,11 @@ export const PLATFORM_DEFAULT_FORMAT: Record<Platform, ContentFormat> = {
   TIKTOK: 'SHORT_VIDEO_SCRIPT',
   BLOG: 'ARTICLE',
   OTHER: 'POST',
+  EITAA: 'POST',
+  BALE: 'POST',
+  RUBIKA: 'POST',
+  APARAT: 'LONG_VIDEO_SCRIPT',
+  NEWSLETTER: 'NEWSLETTER',
 };
 
 export const defaultFormatFor = (platform: Platform): ContentFormat =>

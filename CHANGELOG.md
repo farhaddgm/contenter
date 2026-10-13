@@ -4,11 +4,18 @@
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-10-13
+
 ### افزوده شد
 - **یادگیری از ویرایش‌های ویراستار** (گام ۳ از docs/29؛ مستند: docs/30): در تب «اصول» هر پروژه، کارت «یادگیری از ویرایش‌ها» می‌گوید چند محتوا تأیید شده، چندتا را ویراستار عوض کرده و چندتا همان‌طور که AI نوشت تأیید شده (شمارش با کد). با دست‌کم ۶ محتوای ویرایش‌شده، «تحلیل ویرایش‌ها» کار تازهٔ `LEARN_FROM_EDITS` را در صف می‌گذارد. کد جفت‌های (آخرین نسخهٔ AI، نسخهٔ تأییدشده) را پیدا و تفاوت کلمه‌ای را حساب می‌کند؛ مدل فقط الگوهای تکراری را نام می‌برد؛ کد هر پیشنهاد را با جفت‌های واقعی می‌سنجد (دست‌کم دو شاهد، بدون تکراری، شاهد ساخت کد) و ادمین می‌پذیرد (→ اصل پروژه، با امکان بازنویسی) یا رد می‌کند.
   - جدول‌های `EditLearningRun` و `LearningSuggestion`؛ `AiJobType.LEARN_FROM_EDITS`؛ پرامپت `learn_from_edits`؛ مسیرهای `GET /topics/:id/edit-learning`، `POST /topics/:id/edit-learning/analyze`، `POST /learning-suggestions/:id/accept|dismiss`.
   - آزمون: تفاوت و جفت‌ها، سرویس و رانر، کارت وب؛ و یک اجرای سرتاسری با Postgres واقعی و API با `AI_PROVIDER=mock` (هفت محتوا ← ویرایش ← تأیید ← تحلیل ← پذیرفتن/رد/تحلیل دوم).
 - **هشدار شکست بررسی بازیابی و نمایش در `/api/health`** (ادامهٔ گام ۳۸ از docs/29): `backup.sh verify` نتیجه را به کانتینر `api` می‌دهد (`apps/api/src/cli/record-backup-verify.ts`، بدون HTTP و بدون توکن تازه). برنامه آن را نگه می‌دارد (`SystemSetting` کلید `backupVerify`، لاگ ممیزی `backup.verify_ok` / `backup.verify_failed`) و اگر شکست خورده باشد به همهٔ مدیران فعال رویداد تازهٔ `BACKUP_VERIFY_FAILED` می‌فرستد (در برنامه، ایمیل، و وب‌هوک در صورت انتخاب). `GET /api/health` دو فیلد اطلاعاتی `restoreCheck` و `lastRestoreVerifiedAt` گرفت؛ `status` را عوض نمی‌کنند.
+- **پلتفرم‌های ایرانی** (docs/40): `EITAA`، `BALE`، `RUBIKA`، `APARAT`، `NEWSLETTER` به `Platform` اضافه شدند (قالب پیش‌فرض بازنشر، تشخیص لینک نمونه، برچسب فارسی/انگلیسی). خلاصهٔ **مستندات رسمی** API بله (`tapi.bale.ai`)، روبیکا (`botapi.rubika.ir/v3`) و ایتایار (`eitaayar.ir/api`) با درجهٔ اعتماد هر ادعا نوشته شد. انتشار خودکار هنوز ساخته نشده.
+- **دروازهٔ کیفیت پیش از انتشار** (docs/41): `checkContentQuality` در `packages/shared` (فقط با کد): سقف طول و هشتگ هر پلتفرم، پست‌های رشته، واژه‌نامه، **عدد در برابر واقعیت‌های کلیدی** و واقعیت منقضی، جانگهدار جامانده و تایپوگرافی فارسی (نیم‌فاصله، «ي/ك» عربی، ارقام مخلوط، نشانهٔ نگارشی لاتین). `GET /contents/:id` فیلد `quality` می‌دهد و صفحهٔ محتوا کارت «بررسی کیفیت» دارد. فقط هشدار می‌دهد.
+- **ثبت دستی عملکرد** (docs/42): جدول `ContentMetric` (migration `20261013140000_content_metrics`)، مسیرهای `GET/POST /contents/:id/metrics`، `POST …/metrics/bulk`، `PATCH/DELETE /content-metrics/:id`، خلاصه با نرخ تعامل و کلیک، کارت عملکرد در صفحهٔ محتوا و «چسباندن جدول» (عنوان ستون فارسی یا انگلیسی، فقط تاریخ میلادی).
+- **Eval فارسی** (docs/43): ۹۰ مورد روی شش برند ساختگی، بررسی‌های قطعی، داور مدلی با تنظیم‌سنجی و قاعدهٔ «خانوادهٔ دیگر»، `npm run eval -w @contenter/api`، baseline و نگهبان تغییر پرامپت در CI، workflow دستی `eval.yml`. **با مدل واقعی اجرا نشده.**
+- `package.json`: `overrides.vite` اکنون `"$vite"` است تا Dependabot دیگر با «Override for vite conflicts with direct dependency» قرمز نشود.
 - **بررسی خودکار بازیابی پشتیبان** (گام ۳۸ از docs/29): `bash scripts/backup.sh verify [local]` جدیدترین پشتیبان را در یک پایگاه داده موقت (کانتینر Postgres بدون شبکه) واقعاً بازیابی می‌کند و جدول‌های کلیدی، کاربر، migrationها، بایگانی بارگذاری‌ها و سن پشتیبان را می‌سنجد. نتیجه در `~/contenter-backups/verify-status.json` و `verify-last-ok`؛ شکست با کد خروج ۱. `install-cron` (و `deploy.sh`) علاوه بر پشتیبان شبانه، این بررسی را هر یکشنبه ۴:۰۷ زمان‌بندی می‌کنند. مستند: docs/13-operations.md بخش ۸.
 - `NotificationEvent` مقدار تازهٔ `BACKUP_VERIFY_FAILED` (Prisma + shared + متن فارسی/انگلیسی + آیکون)، schema مشترک `BackupVerifyStatus` در `packages/shared/src/ops.ts`، و ماژول `OpsModule` / `BackupStatusService`.
 - ۹ آزمون واحد برای `BackupStatusService` (ذخیره، هشدار به مدیران، حفظ آخرین موفقیت، نتیجهٔ نامعتبر، و خلاصهٔ health).
@@ -18,6 +25,9 @@
 ### نکتهٔ استقرار
 - migration `20261013090000_backup_verify_notification` (یک مقدار enum؛ بدون بازنویسی داده). با شروع کانتینر `api` خودکار اعمال می‌شود.
 - بدون متغیر محیطی تازه. ایمیل هشدار فقط با `SMTP_URL` کار می‌کند (docs/25)؛ بدون آن هشدار درون‌برنامه‌ای است.
+- migrationهای `20261013130000_iranian_platforms` (پنج مقدار enum) و `20261013140000_content_metrics` (یک جدول تازه) افزایشی‌اند و با شروع کانتینر `api` خودکار اعمال می‌شوند؛ هیچ داده‌ای بازنویسی نمی‌شود.
+- مستندات تازه: `docs/40` تا `docs/43` (شماره‌ها عمداً از ۴۰ شروع می‌شوند تا با `docs/30-learn-from-edits.md` و اسناد گام‌های `docs/29` برخورد نکنند).
+- **راستی‌آزمایی‌نشده:** Eval با مدل واقعی اجرا نشد (`eval-baseline.json` خالی است)؛ آستانه‌ها برآوردند. API بله، روبیکا و ایتایار فقط از روی مستندات خوانده شد و با کانال آزمایشی امتحان نشد؛ انتشار خودکار هنوز نیست.
 - **راستی‌آزمایی‌نشده:** `docker compose exec` واقعی روی سرور (فقط با `docker` جعلی آزموده شد). CLI و health با Postgres و API واقعی (بدون Docker) آزموده شدند. پس از انتشار یک بار `bash scripts/backup.sh verify local` بزنید و در پایان باید `The app has the result` ببینید.
 
 ## [0.19.0] — 2026-10-13
