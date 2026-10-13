@@ -23,6 +23,7 @@ Idea  ──< Content
 ContentProfile ──< Content    (هر محتوا می‌داند از کدام نسخهٔ پروفایل ساخته شده)
 Topic ──< Tag >──< Idea / Content   (چندبه‌چند؛ [20-tags-campaigns.md](20-tags-campaigns.md))
 Topic ──< Campaign ──< Content      (هر محتوا حداکثر در یک کمپین)
+Topic ──< EditLearningRun ──< LearningSuggestion   (پیشنهاد اصل از ویرایش‌های ویراستار؛ [30-learn-from-edits.md](30-learn-from-edits.md))
 Content ──< ContentReview           (تاریخچهٔ بازبینی)  ·  Content ──< ContentComment  ([21-review-workflow.md](21-review-workflow.md))
 
 AiJob         (هر فراخوانی AI؛ targetType/targetId به موجودیت مرتبط اشاره می‌کند)
@@ -130,7 +131,7 @@ SystemSetting  (key/value JSON)
 ### AiJob
 | فیلد | توضیح |
 |---|---|
-| `type` | `ANALYZE_SAMPLE`، `BUILD_PROFILE`، `IDEATE`، `GENERATE_CONTENT`، `REVISE_CONTENT`، `REPURPOSE_CONTENT` یا کارهای اسمارت و کسب‌وکار |
+| `type` | `ANALYZE_SAMPLE`، `BUILD_PROFILE`، `IDEATE`، `GENERATE_CONTENT`، `REVISE_CONTENT`، `REPURPOSE_CONTENT`، `LEARN_FROM_EDITS` یا کارهای اسمارت و کسب‌وکار |
 | `status` | `QUEUED`، `RUNNING`، `SUCCEEDED`، `FAILED` یا `CANCELED` |
 | `targetType`، `targetId` | موجودیت هدف |
 | `input`، `output` | JSON |

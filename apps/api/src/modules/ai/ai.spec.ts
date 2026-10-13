@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ContentDraftResultSchema,
+  EditCategory,
+  EditLearningResultSchema,
   IdeationResultSchema,
   ProfileBuildResultSchema,
   SampleAnalysisResultSchema,
@@ -121,6 +123,16 @@ describe('renderTemplate', () => {
         'text',
       ],
       business_audit: ['language', 'sections_spec', 'business', 'gaps', 'standing_notes'],
+      learn_from_edits: [
+        'language',
+        'pair_count',
+        'average_change',
+        'topic',
+        'business',
+        'principles',
+        'known_suggestions',
+        'pairs',
+      ],
     };
     expect(Object.keys(allowed).sort()).toEqual(DEFAULT_PROMPTS.map((p) => p.key).sort());
     for (const p of DEFAULT_PROMPTS) {
@@ -313,6 +325,7 @@ describe('MockProvider', () => {
     ['GENERATE_CONTENT', ContentDraftResultSchema],
     ['REVISE_CONTENT', ContentDraftResultSchema],
     ['REPURPOSE_CONTENT', ContentDraftResultSchema],
+    ['LEARN_FROM_EDITS', EditLearningResultSchema],
     ['SMART_CHAT', SmartReplySchema],
   ];
   it.each(cases)('returns schema-valid output for %s', async (task, schema) => {
@@ -326,6 +339,43 @@ describe('MockProvider', () => {
     });
     expect(schema.safeParse(res.data).success).toBe(true);
     if (task === 'IDEATE') expect((res.data as { ideas: unknown[] }).ideas).toHaveLength(4);
+  });
+});
+
+describe('learn_from_edits prompt', () => {
+  const prompt = DEFAULT_PROMPTS.find((p) => p.key === 'learn_from_edits')!;
+
+  it('names every category the server accepts, and the three kinds', () => {
+    for (const category of EditCategory) expect(prompt.system).toContain(category);
+    for (const kind of ['MUST', 'AVOID', 'PREFER']) expect(prompt.system).toContain(kind);
+  });
+
+  it('tells the model that two pairs are the least a pattern needs', () => {
+    expect(prompt.system).toMatch(/at least two different pairs/);
+  });
+});
+
+describe('MockProvider LEARN_FROM_EDITS', () => {
+  const ask = (user: string) =>
+    new MockProvider().generateStructured({
+      task: 'LEARN_FROM_EDITS',
+      model: 'm',
+      effort: 'low',
+      system: 's',
+      user,
+      schema: EditLearningResultSchema,
+    });
+
+  it('points only at pair ids that are in the prompt', async () => {
+    const { data } = await ask('<pair id="P1" x>\n</pair>\n<pair id="P2" x>\n</pair>');
+    expect(data.suggestions.length).toBeGreaterThan(0);
+    for (const s of data.suggestions)
+      for (const id of s.evidence) expect(['P1', 'P2']).toContain(id);
+  });
+
+  it('proposes nothing when there are fewer than two pairs', async () => {
+    expect((await ask('<pair id="P1" x></pair>')).data.suggestions).toEqual([]);
+    expect((await ask('(none)')).data.suggestions).toEqual([]);
   });
 });
 

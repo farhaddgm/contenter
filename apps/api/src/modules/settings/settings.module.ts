@@ -28,6 +28,7 @@ const DEFAULT_EFFORT: Record<AiJobType, AiEffort> = {
   GENERATE_CONTENT: 'high',
   REVISE_CONTENT: 'medium',
   REPURPOSE_CONTENT: 'medium',
+  LEARN_FROM_EDITS: 'high',
   SMART_CHAT: 'medium',
   BUSINESS_DISCOVER: 'medium',
   BUSINESS_BUILD: 'high',

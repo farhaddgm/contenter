@@ -23,6 +23,7 @@ import {
   ReviseContentRunner,
 } from './runners/content.runners';
 import { IdeateRunner } from './runners/ideate.runner';
+import { LearnFromEditsRunner } from './runners/learn-from-edits.runner';
 import { AI_RUNNERS } from './runners/runner';
 import { SmartChatRunner } from './runners/smart-chat.runner';
 
@@ -33,6 +34,7 @@ const RUNNERS = [
   GenerateContentRunner,
   ReviseContentRunner,
   RepurposeContentRunner,
+  LearnFromEditsRunner,
   SmartChatRunner,
   BusinessDiscoverRunner,
   BusinessBuildRunner,

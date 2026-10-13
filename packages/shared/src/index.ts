@@ -15,3 +15,4 @@ export * from './search';
 export * from './repurpose';
 export * from './notifications';
 export * from './ops';
+export * from './edit-learning';

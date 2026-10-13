@@ -17,6 +17,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ContentsModule } from './modules/contents/contents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { EditLearningModule } from './modules/edit-learning/edit-learning.module';
 import { IdeasModule } from './modules/ideas/ideas.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { JobsModule } from './modules/jobs/jobs.module';
@@ -62,6 +63,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     CalendarModule,
     SearchModule,
     ReviewsModule,
+    EditLearningModule,
     NotificationsModule,
     OpsModule,
     TagsModule,
