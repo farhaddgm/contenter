@@ -17,3 +17,4 @@ export * from './notifications';
 export * from './ops';
 export * from './edit-learning';
 export * from './quality';
+export * from './metrics';

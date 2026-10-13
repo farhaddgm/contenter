@@ -45,6 +45,7 @@ import { ReviewsModule } from '../reviews/reviews.module';
 import { ReviewsService } from '../reviews/reviews.service';
 import { TAG_SELECT } from '../tags/tag-select';
 import { buildContentOrderBy, buildContentWhere } from './content-filters';
+import { MetricsController, MetricsService } from './metrics.service';
 
 const PUBLISHED_FROZEN = 'The content is published; unpublish it before changing it';
 
@@ -447,7 +448,7 @@ export class ContentsController {
 
 @Module({
   imports: [ReviewsModule],
-  controllers: [ContentsController],
-  providers: [ContentsService],
+  controllers: [ContentsController, MetricsController],
+  providers: [ContentsService, MetricsService],
 })
 export class ContentsModule {}

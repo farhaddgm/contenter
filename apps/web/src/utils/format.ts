@@ -29,6 +29,14 @@ export function formatNumber(n: number | null | undefined, maxFraction = 0) {
   return new Intl.NumberFormat(locale(), { maximumFractionDigits: maxFraction }).format(n ?? 0);
 }
 
+/** A ratio (0.1) as a percentage in the UI language (۱۰٪ / 10%). */
+export function formatPercent(ratio: number | null | undefined, maxFraction = 1) {
+  return new Intl.NumberFormat(locale(), {
+    style: 'percent',
+    maximumFractionDigits: maxFraction,
+  }).format(ratio ?? 0);
+}
+
 export function formatUsd(n: number | null | undefined) {
   const v = n ?? 0;
   return new Intl.NumberFormat(locale(), {

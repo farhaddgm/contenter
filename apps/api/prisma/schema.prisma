@@ -67,6 +67,7 @@ model User {
   submittedContents   Content[]                 @relation("ContentSubmitter")
   contentReviews      ContentReview[]
   contentComments     ContentComment[]          @relation("CommentAuthor")
+  contentMetrics      ContentMetric[]           @relation("MetricAuthor")
   resolvedComments    ContentComment[]          @relation("CommentResolver")
   notifications       Notification[]
   notificationPrefs   NotificationPreference[]
@@ -973,6 +974,7 @@ model Content {
   repurposed     Content[]        @relation("Repurposed")
   reviews        ContentReview[]
   comments       ContentComment[]
+  metrics        ContentMetric[]
   notifications  Notification[]
 
   @@index([topicId, status, createdAt])
@@ -1090,6 +1092,33 @@ model LearningSuggestion {
 
   @@index([topicId, status])
   @@index([runId])
+}
+
+/// Numbers read by hand from a platform for a published content, one reading per day
+/// (docs/32-performance-metrics.md). Counters are cumulative; the newest reading is the current state.
+model ContentMetric {
+  id          String   @id @default(cuid())
+  contentId   String
+  /// The calendar day (UTC midnight) the numbers were read.
+  measuredAt  DateTime @db.Date
+  views       Int?
+  likes       Int?
+  comments    Int?
+  shares      Int?
+  saves       Int?
+  clicks      Int?
+  conversions Int?
+  revenue     Float?
+  note        String   @default("")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("MetricAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([contentId, measuredAt])
+  @@index([measuredAt])
 }
 
 // ─────────────────────────────── Notifications ───────────────────────────────
