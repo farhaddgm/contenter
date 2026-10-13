@@ -173,7 +173,33 @@ bash scripts/backup.sh
 bash scripts/backup.sh test
 ```
 
-پیام سبز `It can be restored` یعنی همه‌چیز درست است. پشتیبان شبانه (ساعت ۳:۱۷) را `deploy.sh` در اولین انتشار خودش فعال می‌کند (`bash scripts/backup.sh install-cron`)؛ حتی بدون مقصد بیرونی هم هر شب یک پشتیبان محلی گرفته می‌شود و گزارشش در `~/contenter-backups/backup.log` است. هر چند وقت یک بار `bash scripts/backup.sh test` را اجرا کنید.
+پیام سبز `It can be restored` یعنی همه‌چیز درست است. پشتیبان شبانه (ساعت ۳:۱۷) را `deploy.sh` در اولین انتشار خودش فعال می‌کند (`bash scripts/backup.sh install-cron`)؛ حتی بدون مقصد بیرونی هم هر شب یک پشتیبان محلی گرفته می‌شود و گزارشش در `~/contenter-backups/backup.log` است. دستور `test` فقط نشان می‌دهد فایل پشتیبان باز و بسته می‌شود؛ برای اطمینان واقعی از [بررسی بازیابی](#بررسی-بازیابی-هفتگی) پایین استفاده کنید.
+
+### بررسی بازیابی (هفتگی)
+
+پشتیبانی که هیچ‌وقت بازیابی نشده، اثبات‌نشده است. دستور زیر جدیدترین پشتیبان را (اگر `BACKUP_REMOTE` تنظیم باشد از مقصد بیرونی، وگرنه از پوشهٔ محلی) **واقعاً** در یک پایگاه داده موقت بازیابی می‌کند و نتیجه را بررسی می‌کند:
+
+```bash
+bash scripts/backup.sh verify          # بیرونی (اگر تنظیم شده) وگرنه محلی
+bash scripts/backup.sh verify local    # فقط پشتیبان محلی
+```
+
+- پایگاه موقت یک کانتینر `postgres:17-alpine` **بدون شبکه** است (`--network none`، حداکثر ۱ گیگابایت حافظه) که پایان کار پاک می‌شود. به پایگاه داده زندهٔ برنامه هیچ دسترسی ندارد.
+- بررسی‌ها: فایل `db-*.sql.gz` سالم باشد و بدون خطا بازیابی شود؛ جدول‌های `User`، `Business`، `Topic`، `Content`، `AiJob`، `AuditLog` و `_prisma_migrations` وجود داشته باشند؛ دست‌کم یک کاربر داشته باشد؛ هیچ migration نیمه‌کاره نباشد؛ بایگانی فایل‌های بارگذاری‌شده خوانده شود؛ و سن پشتیبان از **۴۸ ساعت** بیشتر نباشد (اگر بیشتر بود یعنی پشتیبان شبانه از کار افتاده است).
+- نتیجه در `~/contenter-backups/verify-status.json` است (`ok`، سن پشتیبان، شمار جدول‌ها و ردیف‌ها، فهرست `problems` و `warnings`). در صورت موفقیت تاریخ در `~/contenter-backups/verify-last-ok` ثبت می‌شود. در صورت شکست، دستور با کد خروج ۱ تمام می‌شود و دلیل در `verify.log` است.
+- `deploy.sh` (یا `bash scripts/backup.sh install-cron`) علاوه بر پشتیبان شبانه، این بررسی را **هر یکشنبه ساعت ۴:۰۷** زمان‌بندی می‌کند. لاگ: `~/contenter-backups/verify.log`.
+
+تنظیمات اختیاری (در `~/.contenter-backup.env` یا هنگام اجرا): `VERIFY_MAX_AGE_HOURS` (پیش‌فرض ۴۸)، `VERIFY_PG_IMAGE` (پیش‌فرض `postgres:17-alpine`؛ همان نسخهٔ پایگاه داده اصلی).
+
+```bash
+cat ~/contenter-backups/verify-status.json
+cat ~/contenter-backups/verify-last-ok      # آخرین بررسی موفق
+tail -20 ~/contenter-backups/verify.log
+```
+
+**چه چیزی را نمی‌سنجد:** درستی محتوای ردیف‌ها (فقط وجود و شمارش)، بازیابی فایل `.env`، و سالم بودن خود فایل‌های داخل بایگانی بارگذاری‌ها (فقط فهرست می‌شود). هنوز اعلان خودکار شکست (ایمیل/وب‌هوک) و نمایش در `/api/health` ندارد؛ فعلاً باید `verify.log` یا `verify-status.json` را ببینید.
+
+**آزمون خودکار:** `scripts/test-backup-verify.sh` منطق این بررسی را روی یک Postgres واقعی می‌آزماید (ده سناریو: پشتیبان سالم، بدون کاربر، بدون جدول، migration نیمه‌کاره، قدیمی، dump خراب، gzip خراب، نبود پشتیبان، پایگاه موقت غیرخالی، و مرز سن). در CI اجرا می‌شود: `TEST_PG_ADMIN_URL=postgresql://user:pass@localhost:5432/postgres bash scripts/test-backup-verify.sh`.
 
 ### اگر ارسال شکست خورد
 در انتشار (`deploy.sh`) فقط هشدار زرد `Off-site upload FAILED` نشان داده می‌شود و انتشار ادامه می‌یابد. تاریخ آخرین ارسال موفق در `~/contenter-backups/offsite-last-ok` است. آخر `backup.log` را برای Claude بفرستید:
