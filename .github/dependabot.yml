@@ -1,5 +1,5 @@
 # Weekly dependency PRs. Patch/minor updates are grouped into one PR per ecosystem so they are
-# cheap to review; majors of the runtime stack (NestJS, Prisma, BullMQ, ioredis, OpenAI SDK, Node
+# cheap to review; majors of the runtime stack (NestJS, Prisma, BullMQ, ioredis, Node
 # types, TypeScript) are left out on purpose — they need a planned migration, see docs/13-operations.md.
 version: 2
 updates:
@@ -24,8 +24,6 @@ updates:
       - dependency-name: bullmq
         update-types: ["version-update:semver-major"]
       - dependency-name: ioredis
-        update-types: ["version-update:semver-major"]
-      - dependency-name: openai
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
