@@ -29,6 +29,9 @@ jobs:
       - run: npm ci
       - run: npm run build -w @contenter/shared
       - run: npx -w @contenter/api prisma migrate deploy
+      - run: bash scripts/test-backup-verify.sh
+        env:
+          TEST_PG_ADMIN_URL: postgresql://contenter:contenter@localhost:5432/postgres
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
