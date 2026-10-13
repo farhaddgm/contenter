@@ -136,7 +136,7 @@
 |---|---|---|
 | GET | `/jobs/:id` | وضعیت یک کار (برای poll) |
 | GET | `/dashboard` | آمار |
-| GET | `/health` | سلامت DB و Redis (عمومی) |
+| GET | `/health` | سلامت DB و Redis (عمومی)؛ به‌علاوه `restoreCheck` (`ok` / `failed` / `never`) و `lastRestoreVerifiedAt` از بررسی هفتگی بازیابی پشتیبان ([13-operations.md](13-operations.md)) |
 
 ## اسمارت
 مرجع کامل endpointهای `/smart/*` در [10-smart.md](10-smart.md#api) آمده است. پاسخ‌های 5xx یک فیلد `errorId` دارند که به رکورد خطایاب اشاره می‌کند.

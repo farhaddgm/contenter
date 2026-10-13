@@ -1051,6 +1051,7 @@ enum NotificationEvent {
   COMMENT_ADDED
   COMMENT_REPLIED
   CONTENT_DUE
+  BACKUP_VERIFY_FAILED
 }
 
 enum DeliveryChannel {

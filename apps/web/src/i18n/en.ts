@@ -590,6 +590,7 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_ADDED: 'A new comment on a content',
       COMMENT_REPLIED: 'A new reply in a conversation',
       CONTENT_DUE: 'It is time to publish a content',
+      BACKUP_VERIFY_FAILED: 'The backup restore check failed',
     },
     eventHints: {
       REVIEW_SUBMITTED: 'For the editors and admins who can review.',
@@ -600,6 +601,7 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_ADDED: 'For those around the content: creator, sender and commenters.',
       COMMENT_REPLIED: 'For those who commented in the same thread.',
       CONTENT_DUE: 'For the creator, the sender and the approver of a scheduled approved content.',
+      BACKUP_VERIFY_FAILED: 'For admins: the weekly backup restore check (docs/13) failed.',
     },
     preferences: {
       title: 'My notifications',
