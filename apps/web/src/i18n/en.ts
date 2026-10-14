@@ -1030,6 +1030,9 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_REPLIED: 'A new reply in a conversation',
       CONTENT_DUE: 'It is time to publish a content',
       BACKUP_VERIFY_FAILED: 'The backup restore check failed',
+      AI_FALLBACK_USED: 'The fallback AI model was used',
+      AI_BUDGET_WARNING: 'The monthly AI budget is nearly used up',
+      AI_BUDGET_EXCEEDED: 'The monthly AI budget is used up',
     },
     eventHints: {
       REVIEW_SUBMITTED: 'For the editors and admins who can review.',
@@ -1041,6 +1044,9 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_REPLIED: 'For those who commented in the same thread.',
       CONTENT_DUE: 'For the creator, the sender and the approver of a scheduled approved content.',
       BACKUP_VERIFY_FAILED: 'For admins: the weekly backup restore check (docs/13) failed.',
+      AI_FALLBACK_USED: 'For admins: the main model was unavailable (credit, key or outage) and the fallback took over.',
+      AI_BUDGET_WARNING: 'For admins: AI spending this month reached the warning level.',
+      AI_BUDGET_EXCEEDED: 'For admins: the monthly AI cap is used up.',
     },
     preferences: {
       title: 'My notifications',
@@ -1386,6 +1392,25 @@ export const en: DeepStrings<Dictionary> = {
     unavailable: 'no key',
     missingKeyWarning:
       'Some selected models belong to a provider without an API key; those jobs will fail.',
+    reliability: {
+      title: 'Fallback model and cost routing',
+      subtitle:
+        "If the main model's credit or key runs out, jobs continue on the fallback model. Routing gives heavy tasks a strong model and light tasks a cheap one.",
+      fallback: 'Fallback model',
+      fallbackHint:
+        "Used only when the main model's vendor is unavailable (credit used up, key refused, outage). A failure of the model itself (such as invalid output) is not repeated on another model.",
+      noFallback: 'No fallback model',
+      fallbackNoKey:
+        'The fallback vendor has no API key on the server; it will not work until one is set.',
+      sameVendor:
+        "The fallback is from the same vendor as the default model. It will not help when that vendor's credit runs out; prefer another vendor.",
+      routing: 'Routing suggestion',
+      routingHint:
+        'Heavy tasks (drafting, building profiles and businesses, revising and auditing, learning from edits) get the strong model; platform rewrites, ideas, sample analysis and chat get the cheap one. This only fills the form; press Save to apply.',
+      strong: 'Strong model',
+      light: 'Cheap model',
+      apply: 'Fill the model table',
+    },
   },
   audit: {
     title: 'Audit log',

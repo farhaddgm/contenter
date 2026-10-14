@@ -4,6 +4,8 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import {
   researchSources,
   NonRetryableAiError,
+  ProviderOverloadedError,
+  ProviderUnavailableError,
   sumUsage,
   type AiProvider,
   type AiUsage,
@@ -74,8 +76,9 @@ export class AnthropicProvider implements AiProvider {
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     if (!this.hasCredentials) {
-      throw new NonRetryableAiError(
+      throw new ProviderUnavailableError(
         'ANTHROPIC_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
+        'auth',
       );
     }
     try {
@@ -86,13 +89,7 @@ export class AnthropicProvider implements AiProvider {
         this.logger.warn(`Retrying ${req.task} without images: ${err.message}`);
         return this.call(req, []);
       }
-      if (
-        err instanceof Anthropic.BadRequestError ||
-        err instanceof Anthropic.AuthenticationError
-      ) {
-        throw new NonRetryableAiError(err.message);
-      }
-      throw err;
+      throw permanentOrRaw(err);
     }
   }
 
@@ -168,8 +165,9 @@ export class AnthropicProvider implements AiProvider {
    */
   async research(req: ResearchRequest): Promise<ResearchResult> {
     if (!this.hasCredentials) {
-      throw new NonRetryableAiError(
+      throw new ProviderUnavailableError(
         'ANTHROPIC_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
+        'auth',
       );
     }
     const messages: Anthropic.Beta.BetaMessageParam[] = [
@@ -225,19 +223,42 @@ export class AnthropicProvider implements AiProvider {
         messages.push({ role: 'assistant', content: message.content });
       }
     } catch (err) {
-      if (
-        err instanceof Anthropic.BadRequestError ||
-        err instanceof Anthropic.AuthenticationError
-      ) {
-        throw new NonRetryableAiError(err.message);
-      }
-      throw err;
+      throw permanentOrRaw(err);
     }
 
     const { text, sources } = collectResearch(blocks);
     if (!text.trim()) throw new NonRetryableAiError('Web research returned no findings');
     return { text, sources, model, usage: sumUsage(...usages) };
   }
+}
+
+/**
+ * Failures that retrying will not fix become NonRetryableAiError or ProviderUnavailableError
+ * (credit, key, permission); overload and network trouble become ProviderOverloadedError. Other
+ * errors are rethrown unchanged.
+ */
+export function permanentOrRaw(err: unknown): unknown {
+  if (err instanceof Anthropic.BadRequestError) {
+    // an empty balance is reported as a 400 "credit balance is too low"
+    return /credit balance|billing|purchase credits/i.test(err.message)
+      ? new ProviderUnavailableError(err.message, 'quota')
+      : new NonRetryableAiError(err.message);
+  }
+  if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+    return new ProviderUnavailableError(err.message, 'auth');
+  }
+  if (err instanceof Anthropic.NotFoundError) return new NonRetryableAiError(err.message);
+  if (
+    err instanceof Anthropic.RateLimitError ||
+    err instanceof Anthropic.InternalServerError ||
+    err instanceof Anthropic.APIConnectionError
+  ) {
+    return new ProviderOverloadedError(
+      err.message,
+      err instanceof Anthropic.APIConnectionError ? 'network' : 'overloaded',
+    );
+  }
+  return err;
 }
 
 /**

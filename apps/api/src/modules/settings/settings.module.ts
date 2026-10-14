@@ -67,6 +67,7 @@ export class SettingsService {
       models: { default: normalizeModelRef(this.env.AI_DEFAULT_MODEL) },
       effort: { ...DEFAULT_EFFORT },
       maxSamplesPerProfile: 20,
+      fallbackModel: '',
     };
   }
 
@@ -80,11 +81,16 @@ export class SettingsService {
       models: normalizeModels({ ...defaults.models, ...stored.models }),
       effort: { ...defaults.effort, ...stored.effort },
       maxSamplesPerProfile: stored.maxSamplesPerProfile ?? defaults.maxSamplesPerProfile,
+      fallbackModel: stored.fallbackModel ? normalizeModelRef(stored.fallbackModel) : '',
     };
   }
 
   async updateAi(body: AiSettings, userId: string) {
-    const input = { ...body, models: normalizeModels(body.models) };
+    const input = {
+      ...body,
+      models: normalizeModels(body.models),
+      fallbackModel: body.fallbackModel ? normalizeModelRef(body.fallbackModel) : '',
+    };
     await this.prisma.systemSetting.upsert({
       where: { key: AI_KEY },
       create: { key: AI_KEY, value: input as unknown as Prisma.InputJsonValue },
@@ -212,6 +218,11 @@ export class SettingsService {
       meta: body as unknown as Record<string, unknown>,
     });
     return this.getVariants();
+  }
+
+  /** The fallback model reference from Settings (`provider:model`), or '' when none is set. */
+  async fallbackRef(): Promise<string> {
+    return (await this.getAi()).fallbackModel || '';
   }
 
   /** `model` is a `provider:model` reference, resolved by AiProviderRegistry. */

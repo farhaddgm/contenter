@@ -4,6 +4,8 @@ import { z } from 'zod';
 import {
   researchSources,
   NonRetryableAiError,
+  ProviderOverloadedError,
+  ProviderUnavailableError,
   type AiProvider,
   type ResearchRequest,
   type ResearchResult,
@@ -78,8 +80,9 @@ export class OpenAiProvider implements AiProvider {
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     if (!this.client) {
-      throw new NonRetryableAiError(
+      throw new ProviderUnavailableError(
         'OPENAI_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
+        'auth',
       );
     }
     // Contenter's effort levels share OpenAI's names.
@@ -110,8 +113,9 @@ export class OpenAiProvider implements AiProvider {
    */
   async research(req: ResearchRequest): Promise<ResearchResult> {
     if (!this.client) {
-      throw new NonRetryableAiError(
+      throw new ProviderUnavailableError(
         'OPENAI_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
+        'auth',
       );
     }
     const effort: OpenAiEffort =
@@ -288,15 +292,27 @@ export class OpenAiProvider implements AiProvider {
 }
 
 /** Failures that retrying will not fix become NonRetryableAiError; others are rethrown. */
-function permanentOrRaw(err: unknown): unknown {
-  if (
-    err instanceof OpenAI.BadRequestError ||
-    err instanceof OpenAI.AuthenticationError ||
-    err instanceof OpenAI.PermissionDeniedError ||
-    err instanceof OpenAI.NotFoundError ||
-    (err instanceof OpenAI.RateLimitError && err.code === 'insufficient_quota')
-  ) {
+export function permanentOrRaw(err: unknown): unknown {
+  if (err instanceof OpenAI.RateLimitError && err.code === 'insufficient_quota') {
+    return new ProviderUnavailableError(`OpenAI: ${err.message}`, 'quota');
+  }
+  if (err instanceof OpenAI.AuthenticationError || err instanceof OpenAI.PermissionDeniedError) {
+    return new ProviderUnavailableError(`OpenAI: ${err.message}`, 'auth');
+  }
+  if (err instanceof OpenAI.BadRequestError || err instanceof OpenAI.NotFoundError) {
     return new NonRetryableAiError(`OpenAI: ${err.message}`);
+  }
+  // 429 without insufficient_quota, 5xx, dropped connections and timeouts: the SDK already
+  // retried; the queue retries again and the executor may switch to the fallback model.
+  if (
+    err instanceof OpenAI.RateLimitError ||
+    err instanceof OpenAI.InternalServerError ||
+    err instanceof OpenAI.APIConnectionError
+  ) {
+    return new ProviderOverloadedError(
+      `OpenAI: ${err.message}`,
+      err instanceof OpenAI.APIConnectionError ? 'network' : 'overloaded',
+    );
   }
   return err;
 }

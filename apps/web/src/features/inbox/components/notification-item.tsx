@@ -8,6 +8,8 @@ import {
   MessageSquare,
   MessageSquareWarning,
   Send,
+  Shuffle,
+  Wallet,
   XCircle,
   type LucideIcon,
 } from 'lucide-react';
@@ -26,6 +28,9 @@ const ICON: Record<NotificationEvent, { icon: LucideIcon; tone: string }> = {
   COMMENT_REPLIED: { icon: CornerDownLeft, tone: 'text-primary' },
   CONTENT_DUE: { icon: BellRing, tone: 'text-destructive' },
   BACKUP_VERIFY_FAILED: { icon: DatabaseBackup, tone: 'text-destructive' },
+  AI_FALLBACK_USED: { icon: Shuffle, tone: 'text-warning' },
+  AI_BUDGET_WARNING: { icon: Wallet, tone: 'text-warning' },
+  AI_BUDGET_EXCEEDED: { icon: Wallet, tone: 'text-destructive' },
 };
 
 /** The text of a notification in the reader's language. */

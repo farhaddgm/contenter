@@ -60,6 +60,36 @@ export class NonRetryableAiError extends Error {
   readonly nonRetryable = true;
 }
 
+/** Why a vendor could not serve a request at all (as opposed to rejecting this one request). */
+export type UnavailableReason = 'quota' | 'auth' | 'overloaded' | 'network';
+
+/**
+ * The vendor is out of credit or refuses our key or permission. Retrying the same call cannot
+ * help, so it is non-retryable; the executor may still switch to the fallback model.
+ */
+export class ProviderUnavailableError extends NonRetryableAiError {
+  constructor(
+    message: string,
+    readonly reason: UnavailableReason,
+  ) {
+    super(message);
+  }
+}
+
+/** The vendor is overloaded or unreachable after the SDK's own retries; the queue may retry. */
+export class ProviderOverloadedError extends Error {
+  constructor(
+    message: string,
+    readonly reason: UnavailableReason,
+  ) {
+    super(message);
+  }
+}
+
+/** True for any error that means "this vendor cannot serve us now" — the cue for the fallback. */
+export const isProviderDown = (err: unknown): err is ProviderUnavailableError | ProviderOverloadedError =>
+  err instanceof ProviderUnavailableError || err instanceof ProviderOverloadedError;
+
 /**
  * The only boundary between Contenter and an LLM vendor.
  * Implementations must return data that already passed `schema` validation.

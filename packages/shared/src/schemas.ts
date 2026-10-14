@@ -560,6 +560,13 @@ export const AiSettingsSchema = z.object({
   models: z.record(z.string(), z.string().trim().min(3).max(120).regex(MODEL_REF_PATTERN)),
   effort: z.record(z.string(), z.enum(AiEffort)),
   maxSamplesPerProfile: z.number().int().min(1).max(50),
+  /**
+   * Model used when the chosen one's vendor is out of credit, rejects the key or is down
+   * (docs/44-reliability-and-cost.md). `provider:model`; empty/absent = no fallback.
+   */
+  fallbackModel: z
+    .union([z.string().trim().min(3).max(120).regex(MODEL_REF_PATTERN), z.literal('')])
+    .optional(),
 });
 export type AiSettings = z.infer<typeof AiSettingsSchema>;
 

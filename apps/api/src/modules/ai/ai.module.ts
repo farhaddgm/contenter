@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { SamplesCoreModule } from '../samples/samples-core.module';
+import { AiAlertsService } from './ai-alerts.service';
 import { AiExecutor } from './ai-executor.service';
 import { AiJobsService } from './ai-jobs.service';
 import { ContextLoader } from './context-loader.service';
@@ -49,6 +50,7 @@ const RUNNERS = [
   imports: [SamplesCoreModule],
   providers: [
     AiProviderRegistry,
+    AiAlertsService,
     PromptService,
     AiExecutor,
     ContextLoader,
@@ -56,6 +58,6 @@ const RUNNERS = [
     ...RUNNERS,
     { provide: AI_RUNNERS, inject: RUNNERS, useFactory: (...runners) => runners },
   ],
-  exports: [AiJobsService, PromptService, ContextLoader, AiProviderRegistry],
+  exports: [AiJobsService, PromptService, ContextLoader, AiProviderRegistry, AiAlertsService],
 })
 export class AiModule {}

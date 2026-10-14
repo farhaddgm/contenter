@@ -29,3 +29,4 @@ export * from './variants';
 export * from './api-keys';
 export * from './style-fit';
 export * from './export';
+export * from './ai-routing';

@@ -36,6 +36,12 @@ export class AiProviderRegistry {
     return { provider: this.isMock ? this.mock : this.live[provider], model };
   }
 
+  /** True when the vendor of this model reference has credentials (always true in mock mode). */
+  isConfigured(ref: string): boolean {
+    if (this.isMock) return true;
+    return this.live[parseModelRef(ref).provider].configured;
+  }
+
   async status(): Promise<AiProviderStatus[]> {
     return Promise.all(
       AiProviderName.map(async (name) => {
