@@ -45,6 +45,7 @@ import { MetricsCard } from './metrics-card';
 import { ChecklistCard } from './checklist-card';
 import { QualityCard } from './quality-card';
 import { ReadabilityCard } from './readability-card';
+import { SimilarityCard } from './similarity-card';
 import { RepurposeDialog, RepurposedCard } from './repurpose';
 import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
 import { TagPicker } from '@/features/tags/components/tag-picker';
@@ -618,6 +619,9 @@ export function ContentView({ contentId }: { contentId: string }) {
               />
             )}
             {version.id === content.currentVersionId && <QualityCard quality={content.quality} />}
+            {version.id === content.currentVersionId && (
+              <SimilarityCard similarity={content.similarity} />
+            )}
             {version.id === content.currentVersionId && (
               <ReadabilityCard readability={content.readability} />
             )}

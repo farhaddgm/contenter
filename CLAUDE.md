@@ -50,6 +50,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Readability (docs/47-readability.md)
 - `analyzeReadability` (shared, pure) counts sentence length, long sentences, word length, Latin share and stiff phrases (`DEFAULT_STIFF_PHRASES` + admin `SystemSetting` `readability`); `ContentsService.detail` returns it as `readability`. It is approximate and informational only: never add it to `quality.warnings`, the checklist's `QUALITY_CLEAN`, or any review/schedule guard. Under `MIN_READABILITY_WORDS` it raises no note.
 
+## Similarity (docs/48-similarity.md)
+- `contentSimilarity` (shared, pure: `fold` → 4-word shingles → max(Jaccard, containment)) is run by `SimilarityService` inside `ContentsService.detail` against contents, ideas, samples and READY references of the business, never against anything outside `visibleTopics(user)` (references need business VIEW) and never against the content's own source/siblings/idea. Thresholds live in `SystemSetting` `similarity`. Literal only (no embeddings) and warn-only: don't add it to `quality.warnings` or any guard.
+
 ## Repurposing, search & filters (docs/23-repurposing.md, docs/24-search-filters.md)
 - `REPURPOSE_CONTENT` follows the core rule: the request path only creates the empty `Content` shells (`sourceContentId`, `platform`, `format`) and enqueues jobs; `RepurposeContentRunner` writes version 1. A content's platform is `platform ?? topic.platform` (`effectivePlatform`) — use it, never `topic.platform` alone. Text search must go through `matchAllWords` / `termVariants` (shared `search.ts`) so Arabic and Persian letter/digit spellings match; never plain `contains` on a raw query. Content list filters live in the URL (`features/contents/filters.ts`).
 

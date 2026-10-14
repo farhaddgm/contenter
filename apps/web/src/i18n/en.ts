@@ -723,6 +723,30 @@ export const en: DeepStrings<Dictionary> = {
       by: '{{name}} · {{when}}',
       open: '{{count}} required point(s) are not done yet; the content cannot be scheduled until they are.',
     },
+    similarity: {
+      title: 'Similarity to other texts',
+      hint: 'Counted by code (no AI); it only warns and never blocks a step.',
+      similar:
+        'This text resembles the items below in its wording; make sure the repeat is intended.',
+      copy: 'This text is almost the same as the one below. If it is not a republication, rewrite it.',
+      kinds: {
+        CONTENT: 'Content',
+        IDEA: 'Idea',
+        SAMPLE: 'Sample',
+        REFERENCE: 'Reference',
+      },
+      limits:
+        'Only literal similarity is measured (consecutive words). A rewrite with the same meaning is not caught.',
+      settings: {
+        title: 'Similarity settings',
+        subtitle:
+          'From which percentage a text counts as "similar" or "almost a copy"; changes without a deploy.',
+        warnAt: 'Warn "similar" from (%)',
+        copyAt: '"Almost a copy" from (%)',
+        hint: 'Default: {{warn}}% and {{copy}}%. The second must be higher.',
+        invalid: 'Warning between 20 and 95, copy between 30 and 100 and higher than the warning.',
+      },
+    },
     readability: {
       title: 'Readability and plain writing (approximate)',
       hint: 'Counted by code, not AI. Persian has no accepted readability formula; these are approximations that only guide and never block a step.',

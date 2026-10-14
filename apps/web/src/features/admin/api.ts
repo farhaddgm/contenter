@@ -1,6 +1,7 @@
 /** Back-office API hooks: users, prompts, settings, audit, dashboard. */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  SimilaritySettings,
   ReadabilitySettings,
   AiSettings,
   AiSettingsResponse,
@@ -246,6 +247,27 @@ export function useUpdateReadabilitySettings() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['settings', 'readability'] });
       // the readability of every open content is computed with these settings
+      void qc.invalidateQueries({ queryKey: ['contents'] });
+    },
+  });
+}
+
+// ---------- similarity settings (docs/48) ----------
+export function useSimilaritySettings() {
+  return useQuery({
+    queryKey: ['settings', 'similarity'],
+    queryFn: () => api.get<SimilaritySettings>('/admin/settings/similarity'),
+  });
+}
+
+export function useUpdateSimilaritySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SimilaritySettings) =>
+      api.put<SimilaritySettings>('/admin/settings/similarity', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'similarity'] });
+      // the similarity of every open content is judged with these scores
       void qc.invalidateQueries({ queryKey: ['contents'] });
     },
   });

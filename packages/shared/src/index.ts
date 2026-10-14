@@ -22,3 +22,4 @@ export * from './productivity';
 export * from './checklist';
 export * from './feedback';
 export * from './readability';
+export * from './similarity';

@@ -48,3 +48,23 @@ describe('SettingsService readability', () => {
     );
   });
 });
+
+describe('SettingsService similarity', () => {
+  it('has defaults, ignores a damaged value (also copyAt below warnAt) and audits a change', async () => {
+    expect(await setup(undefined).svc.getSimilarity()).toEqual({ warnAt: 0.55, copyAt: 0.8 });
+    expect(await setup({ warnAt: 0.9, copyAt: 0.5 }).svc.getSimilarity()).toEqual({
+      warnAt: 0.55,
+      copyAt: 0.8,
+    });
+    expect(await setup({ warnAt: 0.4, copyAt: 0.7 }).svc.getSimilarity()).toEqual({
+      warnAt: 0.4,
+      copyAt: 0.7,
+    });
+    const { svc, upsert, log } = setup({ warnAt: 0.4, copyAt: 0.7 });
+    await svc.updateSimilarity({ warnAt: 0.4, copyAt: 0.7 }, 'u1');
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'settings.update', entityId: 'similarity' }),
+    );
+  });
+});

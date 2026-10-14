@@ -3,15 +3,18 @@ import { Prisma } from '@prisma/client';
 import {
   AiSettingsSchema,
   DEFAULT_READABILITY_SETTINGS,
+  DEFAULT_SIMILARITY_SETTINGS,
   DEFAULT_WORKFLOW,
   normalizeModelRef,
   ReadabilitySettingsSchema,
+  SimilaritySettingsSchema,
   WorkflowSettingsSchema,
   type AiEffort,
   type AiJobType,
   type AiSettings,
   type AiSettingsResponse,
   type ReadabilitySettings,
+  type SimilaritySettings,
   type WorkflowSettings,
 } from '@contenter/shared';
 import { ENV, type Env } from '../../config/env';
@@ -24,6 +27,7 @@ import { AiProviderRegistry } from '../ai/provider/provider-registry';
 const AI_KEY = 'ai';
 const WORKFLOW_KEY = 'workflow';
 const READABILITY_KEY = 'readability';
+const SIMILARITY_KEY = 'similarity';
 
 const DEFAULT_EFFORT: Record<AiJobType, AiEffort> = {
   ANALYZE_SAMPLE: 'high',
@@ -133,6 +137,29 @@ export class SettingsService {
     return this.getReadability();
   }
 
+  /** Warning and "almost a copy" scores of the similarity card (docs/48). */
+  async getSimilarity(): Promise<SimilaritySettings> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: SIMILARITY_KEY } });
+    const parsed = SimilaritySettingsSchema.safeParse(row?.value);
+    return parsed.success ? parsed.data : { ...DEFAULT_SIMILARITY_SETTINGS };
+  }
+
+  async updateSimilarity(body: SimilaritySettings, userId: string) {
+    await this.prisma.systemSetting.upsert({
+      where: { key: SIMILARITY_KEY },
+      create: { key: SIMILARITY_KEY, value: body as unknown as Prisma.InputJsonValue },
+      update: { value: body as unknown as Prisma.InputJsonValue },
+    });
+    this.audit.log({
+      userId,
+      action: 'settings.update',
+      entityType: 'SystemSetting',
+      entityId: SIMILARITY_KEY,
+      meta: body as unknown as Record<string, unknown>,
+    });
+    return this.getSimilarity();
+  }
+
   /** `model` is a `provider:model` reference, resolved by AiProviderRegistry. */
   async modelFor(task: AiJobType): Promise<{ model: string; effort: AiEffort }> {
     const s = await this.getAi();
@@ -192,6 +219,19 @@ export class SettingsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.settings.updateReadability(body, user.id);
+  }
+
+  @Get('similarity')
+  getSimilarity() {
+    return this.settings.getSimilarity();
+  }
+
+  @Put('similarity')
+  updateSimilarity(
+    @Body(new ZodValidationPipe(SimilaritySettingsSchema)) body: SimilaritySettings,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.settings.updateSimilarity(body, user.id);
   }
 
   private async withStatus(settings: AiSettings): Promise<AiSettingsResponse> {

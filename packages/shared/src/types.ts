@@ -5,6 +5,7 @@ import type { TermIssue } from './business-profile';
 import type { ContentChecklist } from './checklist';
 import type { QualityReport } from './quality';
 import type { ReadabilityReport } from './readability';
+import type { SimilarityReport } from './similarity';
 import type {
   AiJobStatus,
   AiJobType,
@@ -339,6 +340,8 @@ export interface Content {
   quality?: QualityReport | null;
   /** Detail only: approximate Persian readability of the current version (docs/47); null without a draft. */
   readability?: ReadabilityReport | null;
+  /** Detail only: literal similarity of the current version to other texts of the business (docs/48); null without a draft. */
+  similarity?: SimilarityReport | null;
   /** Detail only: the publishing checklist with its state (docs/45); null when the business has none. */
   checklist?: ContentChecklist | null;
 }
