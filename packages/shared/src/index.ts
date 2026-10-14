@@ -20,3 +20,4 @@ export * from './quality';
 export * from './metrics';
 export * from './productivity';
 export * from './checklist';
+export * from './feedback';

@@ -72,6 +72,7 @@ model User {
   notifications       Notification[]
   notificationPrefs   NotificationPreference[]
   checklistTicks      ContentChecklistTick[]    @relation("ChecklistTicker")
+  aiFeedback          AiFeedback[]
 }
 
 model RefreshToken {
@@ -594,6 +595,7 @@ model Topic {
   tags          Tag[]
   campaigns     Campaign[]
   editRuns      EditLearningRun[]
+  aiFeedback    AiFeedback[]
   learnings     LearningSuggestion[]
 
   @@index([status, createdAt])
@@ -1050,6 +1052,44 @@ model ContentVersion {
   comments  ContentComment[]
 
   @@unique([contentId, version])
+}
+
+// ───────────────────────── Feedback on AI output ─────────────────────────
+// See docs/46-ai-feedback.md. Mirrors packages/shared/src/feedback.ts.
+
+enum FeedbackTarget {
+  CONTENT_VERSION
+  PROFILE
+}
+
+enum FeedbackRating {
+  UP
+  DOWN
+}
+
+/// One person's 👍 / 👎 on one AI output. `jobId` is the job that made it (prompt version and model
+/// are read from there); `topicId` is kept so access and counts need no join.
+model AiFeedback {
+  id         String         @id @default(cuid())
+  userId     String
+  targetType FeedbackTarget
+  targetId   String
+  topicId    String
+  jobId      String?
+  rating     FeedbackRating
+  /// One of FeedbackReason (checked by Zod); only on a DOWN
+  reason     String?
+  note       String         @default("")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([topicId, targetType])
+  @@index([jobId])
+  @@index([createdAt])
 }
 
 // ───────────────────────── Publishing checklist ─────────────────────────

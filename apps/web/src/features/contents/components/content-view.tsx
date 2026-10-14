@@ -1,3 +1,4 @@
+import { FeedbackButtons } from '@/features/feedback/components/feedback-buttons';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import {
@@ -529,6 +530,13 @@ export function ContentView({ contentId }: { contentId: string }) {
                 }
                 actions={
                   <>
+                    {version.source === 'AI' && (
+                      <FeedbackButtons
+                        targetType="CONTENT_VERSION"
+                        targetId={version.id}
+                        topicId={content.topicId}
+                      />
+                    )}
                     <CopyButton text={fullText(version)} label={t('contents.copyAll')} />
                     {!isCurrent && editable && !frozen && (
                       <Button
