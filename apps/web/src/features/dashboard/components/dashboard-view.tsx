@@ -30,6 +30,7 @@ import { useT } from '@/i18n';
 import { Authorization, useAuthorization } from '@/lib/auth';
 import { useDashboard } from '@/features/admin/api';
 import { JobStatusBadge } from '@/features/jobs/components/job-status';
+import { ProductivityPanel } from './productivity-panel';
 import { formatNumber, formatRelative, formatUsd } from '@/utils/format';
 import { useUi } from '@/stores/ui';
 
@@ -108,6 +109,8 @@ export function DashboardView() {
           icon={<CircleDollarSign />}
         />
       </div>
+
+      <ProductivityPanel />
 
       {data.counts.topics === 0 && (
         <Card className="mt-6 border-dashed">

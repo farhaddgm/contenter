@@ -293,6 +293,32 @@ export const en: DeepStrings<Dictionary> = {
       CANCELED: 'Canceled',
     },
   },
+  productivity: {
+    title: 'Productivity',
+    subtitle:
+      'How much of what the AI drafts is approved as written, how long the way to approval takes and what the AI costs per approved content. All counted automatically from existing data.',
+    period: 'Period',
+    topic: 'Topic',
+    allTopics: 'All topics',
+    lastDays: 'Last {{n}} days',
+    approved: 'Approved contents',
+    unedited: 'Approved as written',
+    uneditedHint: '{{unedited}} as written · {{edited}} changed by an editor',
+    cycle: 'Median time to approval',
+    slowEnd: '90% are under {{value}}',
+    perApproved: 'AI cost per content',
+    totalCost: 'Total AI cost: {{value}}',
+    fewSamples:
+      'With fewer than {{min}} approved contents shares and medians are not shown (small numbers mislead).',
+    reviewLine: 'Median review time (last submit to approval): {{value}}',
+    hours: '{{n}} h',
+    days: '{{n}} days',
+    jobType: 'Job type',
+    jobs: 'Jobs',
+    failed: 'Failed',
+    retried: 'Retried',
+    cost: 'Cost',
+  },
   dashboard: {
     title: 'Dashboard',
     subtitle: 'Overview of content production and AI usage',
@@ -603,17 +629,21 @@ export const en: DeepStrings<Dictionary> = {
     termIssuesHint:
       'This version was checked against the business glossary (no AI). Fix it with a revision or a manual edit.',
     termFix: 'Fix terms with AI',
-    termFixFeedback: 'Fix these to follow the brand glossary and leave the rest of the text unchanged:',
+    termFixFeedback:
+      'Fix these to follow the brand glossary and leave the rest of the text unchanged:',
     metrics: {
       title: 'Performance (manual)',
-      subtitle: 'Read the numbers of the published post on the platform and enter them here. Contenter does not connect to the platform.',
+      subtitle:
+        'Read the numbers of the published post on the platform and enter them here. Contenter does not connect to the platform.',
       notPublished: 'Mark this content as published (Publishing section) to record its numbers.',
       empty: 'No numbers yet. Read the numbers every few days and add them.',
-      summary: 'Latest: {{date}} · engagement rate (likes, comments, shares and saves per view): {{rate}}',
+      summary:
+        'Latest: {{date}} · engagement rate (likes, comments, shares and saves per view): {{rate}}',
       add: 'Add numbers',
       paste: 'Paste a table',
       addTitle: 'Add performance numbers',
-      addHint: 'Enter the numbers as the platform shows them (cumulative). Entering the same day again replaces that day.',
+      addHint:
+        'Enter the numbers as the platform shows them (cumulative). Entering the same day again replaces that day.',
       saved: 'Numbers saved',
       date: 'Date',
       note: 'Note',
@@ -628,7 +658,8 @@ export const en: DeepStrings<Dictionary> = {
         revenue: 'Revenue',
       },
       pasteTitle: 'Paste a table of numbers',
-      pasteHint: 'The first row names the columns (date, views, likes, comments, shares, saves, clicks, conversions, revenue). Dates are Gregorian, like 2026-10-01.',
+      pasteHint:
+        'The first row names the columns (date, views, likes, comments, shares, saves, clicks, conversions, revenue). Dates are Gregorian, like 2026-10-01.',
       table: 'Table',
       defaultDay: 'Date for rows without one',
       defaultDayHint: 'If the table has no date column, every row is saved for this day.',
@@ -659,17 +690,21 @@ export const en: DeepStrings<Dictionary> = {
       },
       codes: {
         EMPTY_BODY: 'The text is empty.',
-        LENGTH_OVER: 'The text is {{length}} characters; this platform allows {{max}} ({{over}} too many).',
-        THREAD_POST_OVER: 'Post {{post}} of the thread is {{length}} characters; each post may have {{max}}.',
+        LENGTH_OVER:
+          'The text is {{length}} characters; this platform allows {{max}} ({{over}} too many).',
+        THREAD_POST_OVER:
+          'Post {{post}} of the thread is {{length}} characters; each post may have {{max}}.',
         HASHTAGS_OVER: '{{count}} hashtags; this platform accepts at most {{max}}.',
         TERM_AVOID: '"{{found}}" is banned by the brand glossary.',
         TERM_USE: '"{{found}}" must be written "{{term}}".',
         FACT_NUMBER_MISMATCH:
           'A number about "{{label}}" does not match the key fact. Fact: {{expected}} · in the text: {{found}} · sentence: "{{sentence}}"',
-        FACT_EXPIRED: 'The fact "{{label}}" ({{value}}) was only valid until {{validUntil}} and is still in the text.',
+        FACT_EXPIRED:
+          'The fact "{{label}}" ({{value}}) was only valid until {{validUntil}} and is still in the text.',
         PLACEHOLDER: 'A placeholder is left in the text: "{{found}}".',
         DIGITS_MIXED: 'Persian and Latin digits are mixed in one text; use one kind.',
-        ARABIC_LETTER: '{{count}} Arabic yeh/kaf used instead of the Persian letters (e.g. "{{example}}").',
+        ARABIC_LETTER:
+          '{{count}} Arabic yeh/kaf used instead of the Persian letters (e.g. "{{example}}").',
         HALF_SPACE: '{{count}} missing half-spaces (e.g. "{{example}}").',
         LATIN_PUNCTUATION: '{{count}} Latin commas, semicolons or question marks in Persian text.',
         SPACE_BEFORE_PUNCTUATION: '{{count}} spaces before punctuation.',

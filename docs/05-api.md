@@ -141,6 +141,7 @@
 | GET | `/dashboard` | آمار |
 | GET / POST | `/topics/:id/edit-learning` ، `/topics/:id/edit-learning/analyze` | آمار ویرایش‌ها و پیشنهادها / **۲۰۲** صف‌کردن تحلیل ([30-learn-from-edits.md](30-learn-from-edits.md)) |
 | POST | `/learning-suggestions/:id/accept` ، `/dismiss` | پذیرفتن (ساخت اصل، `{ text?, kind? }`) / رد پیشنهاد |
+| GET | `/dashboard/productivity?days&topicId&businessId` | **بهره‌وری**: تأیید بدون ویرایش، میانهٔ زمان تا تأیید، هزینه به‌ازای هر محتوا ([44-productivity-dashboard.md](44-productivity-dashboard.md)) |
 | GET | `/health` | سلامت DB و Redis (عمومی)؛ به‌علاوه `restoreCheck` (`ok` / `failed` / `never`) و `lastRestoreVerifiedAt` از بررسی هفتگی بازیابی پشتیبان ([13-operations.md](13-operations.md)) |
 
 ## اسمارت
