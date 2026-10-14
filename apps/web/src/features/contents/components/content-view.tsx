@@ -45,6 +45,7 @@ import { MetricsCard } from './metrics-card';
 import { ChecklistCard } from './checklist-card';
 import { useTopicPillars } from '@/features/coverage/api/coverage';
 import { GoldenCard } from '@/features/golden/components/golden-card';
+import { ExportMenu } from '@/features/export/components/export-menu';
 import { QualityCard } from './quality-card';
 import { StyleFitCard } from './style-fit-card';
 import { ReadabilityCard } from './readability-card';
@@ -474,48 +475,50 @@ export function ContentView({ contentId }: { contentId: string }) {
           </span>
         }
         actions={
-          editable &&
-          version && (
-            <>
-              <Button
-                variant="outline"
-                icon={<MessageSquareText />}
-                onClick={reviseDialog.open}
-                disabled={generating || frozen}
-              >
-                {t('contents.revise')}
-              </Button>
-              <Button
-                variant="outline"
-                icon={<Pencil />}
-                onClick={editDrawer.open}
-                disabled={generating || frozen}
-              >
-                {t('contents.editManually')}
-              </Button>
-              <Button
-                variant="outline"
-                icon={<Layers />}
-                onClick={repurposeDialog.open}
-                disabled={generating}
-              >
-                {t('repurpose.action')}
-              </Button>
-              {!generating && <ReviewActionButtons content={content} />}
-              <ConfirmationDialog
-                trigger={
-                  <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
-                    <Trash2 />
-                  </Button>
-                }
-                onConfirm={() =>
-                  remove
-                    .mutateAsync(content.id)
-                    .then(() => navigate(paths.app.topic.getHref(content.topicId, 'contents')))
-                }
-              />
-            </>
-          )
+          <>
+            {version && <ExportMenu scope={{ ids: [content.id] }} />}
+            {editable && version && (
+              <>
+                <Button
+                  variant="outline"
+                  icon={<MessageSquareText />}
+                  onClick={reviseDialog.open}
+                  disabled={generating || frozen}
+                >
+                  {t('contents.revise')}
+                </Button>
+                <Button
+                  variant="outline"
+                  icon={<Pencil />}
+                  onClick={editDrawer.open}
+                  disabled={generating || frozen}
+                >
+                  {t('contents.editManually')}
+                </Button>
+                <Button
+                  variant="outline"
+                  icon={<Layers />}
+                  onClick={repurposeDialog.open}
+                  disabled={generating}
+                >
+                  {t('repurpose.action')}
+                </Button>
+                {!generating && <ReviewActionButtons content={content} />}
+                <ConfirmationDialog
+                  trigger={
+                    <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
+                      <Trash2 />
+                    </Button>
+                  }
+                  onConfirm={() =>
+                    remove
+                      .mutateAsync(content.id)
+                      .then(() => navigate(paths.app.topic.getHref(content.topicId, 'contents')))
+                  }
+                />
+              </>
+            )}
+          </>
         }
       />
 

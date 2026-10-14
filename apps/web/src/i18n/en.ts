@@ -319,6 +319,31 @@ export const en: DeepStrings<Dictionary> = {
     retried: 'Retried',
     cost: 'Cost',
   },
+  export: {
+    button: 'Export',
+    title: 'Export contents',
+    single: 'The current version of this content.',
+    many: 'The current version of every content these filters show (at most {{max}} contents per export).',
+    matching: '{{n}} contents match these filters',
+    format: 'Format',
+    formats: {
+      markdown: 'Markdown (.md)',
+      csv: 'CSV for Excel (.csv)',
+      docx: 'Word (.docx)',
+      zip: 'ZIP of all',
+    },
+    formatHint: {
+      markdown:
+        'Each content with YAML metadata, title, text, call to action and hashtags; several in one file, one after the other.',
+      csv: 'One row per content with fixed columns; UTF-8 with a BOM so Excel opens Persian text correctly.',
+      docx: 'A right-to-left Word document for Persian text; each content on its own page.',
+      zip: 'One Markdown file per content, plus the CSV and the DOCX of all.',
+    },
+    onlyApproved: 'Only approved and published',
+    note: 'Only the current version; contents you cannot access are not included. In the CSV, text starting with = + - @ begins with an apostrophe so a spreadsheet does not run it as a formula.',
+    download: 'Download',
+    done: 'Saved "{{name}}"',
+  },
   styleFit: {
     title: 'Statistical style fit',
     hint: 'Counted by code (no AI) against the statistical range of the brand’s examples; it only guides and never blocks a step.',

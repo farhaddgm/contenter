@@ -22,6 +22,27 @@ interface RequestOptions {
   signal?: AbortSignal;
   /** internal: skip the refresh-and-retry dance */
   skipRefresh?: boolean;
+  /** The success response is a file, not JSON (bulk export). */
+  file?: boolean;
+}
+
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string;
+}
+
+/** The name from `Content-Disposition`, preferring the UTF-8 `filename*`. */
+export function fileNameOf(header: string | null, fallback = 'download'): string {
+  if (!header) return fallback;
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8);
+    } catch {
+      /* fall through to the plain name */
+    }
+  }
+  return /filename="([^"]+)"/i.exec(header)?.[1] ?? fallback;
 }
 
 function buildUrl(path: string, params?: Params) {
@@ -64,7 +85,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
       credentials: 'include',
       signal: opts.signal,
       headers: {
-        Accept: 'application/json',
+        Accept: opts.file ? '*/*' : 'application/json',
         // lets the server attach the current page to interaction logs and errors
         'X-Client-Route': window.location.pathname,
         ...(opts.body !== undefined && !form ? { 'Content-Type': 'application/json' } : {}),
@@ -92,6 +113,13 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     useAuthStore.getState().clear();
   }
 
+  if (opts.file && res.ok) {
+    const file: DownloadedFile = {
+      blob: await res.blob(),
+      fileName: fileNameOf(res.headers.get('Content-Disposition')),
+    };
+    return file as T;
+  }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -117,4 +145,7 @@ export const api = {
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, { body }),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body: body ?? {} }),
   delete: <T = void>(path: string) => request<T>('DELETE', path),
+  /** POST that answers with a file (kept as a Blob with the server's file name). */
+  download: (path: string, body: unknown) =>
+    request<DownloadedFile>('POST', path, { body, file: true }),
 };

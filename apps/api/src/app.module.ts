@@ -16,6 +16,7 @@ import { BusinessesModule } from './modules/businesses/businesses.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { ChecklistsModule } from './modules/checklists/checklists.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
+import { ExportModule } from './modules/export/export.module';
 import { StyleFitModule } from './modules/style-fit/style-fit.module';
 import { VariantsModule } from './modules/variants/variants.module';
 import { CoverageModule } from './modules/coverage/coverage.module';
@@ -76,6 +77,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     CoverageModule,
     VariantsModule,
     StyleFitModule,
+    ExportModule,
     ApiKeysModule,
     SearchModule,
     ReviewsModule,
