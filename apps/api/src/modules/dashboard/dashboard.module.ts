@@ -13,6 +13,7 @@ import { CurrentUser, Public, type AuthUser } from '../../common/auth.decorators
 import { AccessService } from '../../common/access';
 import { QueueService } from '../../infra/queue/queue.service';
 import { BackupStatusService } from '../ops/backup-status.service';
+import { OpsMetricsService } from '../ops/ops-metrics.service';
 import { buildProductivity } from './productivity';
 
 const DAYS = 14;
@@ -237,6 +238,7 @@ export class HealthController {
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
     private readonly backups: BackupStatusService,
+    private readonly ops: OpsMetricsService,
   ) {}
 
   @Public()
@@ -251,10 +253,14 @@ export class HealthController {
           .summary()
           .catch(() => ({ restoreCheck: 'never' as const, lastRestoreVerifiedAt: null }))
       : { restoreCheck: 'never' as const, lastRestoreVerifiedAt: null };
+    // deep checks (docs/54-ops-metrics.md): a live worker, a queue that moves; numbers and verdicts only
+    const deep = await this.ops.health(db, redis);
     return {
-      status: db && redis ? 'ok' : 'degraded',
+      status: deep.status,
       db,
       redis,
+      worker: deep.worker,
+      queue: deep.queue,
       ...restore,
       time: new Date().toISOString(),
     };

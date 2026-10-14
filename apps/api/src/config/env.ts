@@ -61,6 +61,15 @@ const EnvSchema = z.object({
     .min(32)
     .optional()
     .or(z.literal('').transform(() => undefined)),
+  /**
+   * Bearer token of `GET /api/metrics` (Prometheus text, docs/54-ops-metrics.md). Empty = the route
+   * does not exist. At least 32 characters; never the same as another token.
+   */
+  METRICS_TOKEN: z
+    .string()
+    .min(32)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   /** Independent, least-privilege business reader; never share Docoo credentials. */
   RESEARCHER_INTEGRATION_TOKEN: z
     .string()

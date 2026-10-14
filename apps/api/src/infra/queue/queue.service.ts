@@ -1,10 +1,14 @@
 import { Global, Inject, Injectable, Logger, Module, OnModuleDestroy } from '@nestjs/common';
+import { hostname } from 'node:os';
 import { Queue, UnrecoverableError, Worker, type Job } from 'bullmq';
 import IORedis from 'ioredis';
+import { WORKER_HEARTBEAT_EVERY_SECONDS, WORKER_HEARTBEAT_TTL_SECONDS } from '@contenter/shared';
 import { ENV, type Env } from '../../config/env';
 
 export const AI_QUEUE = 'ai-jobs';
 export const MAX_ATTEMPTS = 3;
+/** Redis keys of the worker heartbeats (docs/54-ops-metrics.md); one per worker process. */
+const HEARTBEAT_PREFIX = 'contenter:worker:';
 
 export interface AttemptInfo {
   attempt: number; // 1-based
@@ -28,6 +32,8 @@ export class QueueService implements OnModuleDestroy {
   private queue?: Queue;
   private worker?: Worker;
   private handler?: JobHandler;
+  private heartbeat?: NodeJS.Timeout;
+  private readonly heartbeatKey = `${HEARTBEAT_PREFIX}${hostname()}:${process.pid}`;
 
   constructor(@Inject(ENV) private readonly env: Env) {
     if (env.QUEUE_DRIVER === 'bullmq') {
@@ -79,6 +85,46 @@ export class QueueService implements OnModuleDestroy {
       this.logger.warn(`job ${job?.data.jobId} failed: ${err.message}`),
     );
     this.logger.log(`AI worker started (concurrency ${this.env.WORKER_CONCURRENCY})`);
+    this.startHeartbeat();
+  }
+
+  /**
+   * "A worker is alive": this process refreshes a Redis key with a short expiry. If the process or
+   * its event loop dies, the key lapses and `/api/health` says so within the TTL.
+   */
+  private startHeartbeat() {
+    const conn = this.connection;
+    if (!conn || this.heartbeat) return;
+    const beat = () =>
+      void conn
+        .set(this.heartbeatKey, new Date().toISOString(), 'EX', WORKER_HEARTBEAT_TTL_SECONDS)
+        .catch(() => undefined);
+    beat();
+    this.heartbeat = setInterval(beat, WORKER_HEARTBEAT_EVERY_SECONDS * 1000);
+    this.heartbeat.unref();
+  }
+
+  /** How many worker processes have a live heartbeat (0 for the inline queue). */
+  async liveWorkers(): Promise<number> {
+    if (!this.connection) return 0;
+    try {
+      let cursor = '0';
+      let n = 0;
+      do {
+        const [next, keys] = await this.connection.scan(
+          cursor,
+          'MATCH',
+          `${HEARTBEAT_PREFIX}*`,
+          'COUNT',
+          100,
+        );
+        cursor = next;
+        n += keys.length;
+      } while (cursor !== '0');
+      return n;
+    } catch {
+      return 0;
+    }
   }
 
   async stats() {
@@ -119,6 +165,9 @@ export class QueueService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    // a worker that shuts down on purpose is gone at once, not after the TTL
+    if (this.heartbeat) await this.connection?.del(this.heartbeatKey).catch(() => undefined);
     await this.worker?.close();
     await this.queue?.close();
     await this.connection?.quit().catch(() => undefined);
