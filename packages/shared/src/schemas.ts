@@ -458,6 +458,8 @@ export const UpdateContentSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
   /** null removes the content from its campaign. */
   campaignId: z.string().min(1).nullable().optional(),
+  /** null removes the content pillar label (docs/50-coverage-map.md). */
+  pillarId: z.string().min(1).nullable().optional(),
 });
 export type UpdateContentInput = z.infer<typeof UpdateContentSchema>;
 

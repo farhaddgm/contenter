@@ -56,6 +56,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Golden examples (docs/49-golden-examples.md)
 - `Content.goldenAt` is set only by an admin (`PUT /contents/:id/golden`) on APPROVED/published content of a project with a business, and cleared in `ReviewsService.resetAfterEdit`. `ContextLoader.business(topicId, target)` adds `examples` only when a draft is being written (`GENERATE_CONTENT`, `REPURPOSE_CONTENT`), re-checking approved/published at read time and excluding the content and its source; `formatBusiness` appends them as `[EXAMPLES]` inside the existing `business` variable — never a new prompt variable, and unchanged bytes when there are none. Limits live in `SystemSetting` `golden`.
 
+## Coverage map (docs/50-coverage-map.md)
+- `ContentPillar` (per business, ≤ 12, optional `targetShare`) and `Content.pillarId`; a pillar must belong to the content's topic's business (`CoverageService.assertForTopic`, 400 otherwise). Saving pillars replaces the list by id (a removed pillar leaves its contents unlabeled). The map is `buildCoverage` (shared, pure) over APPROVED/published contents, only from `visibleTopics`; unlabeled content always has its own row and shares use labeled content only (< 5 → no comparison). Labels are set by people; the model labels nothing.
+
 ## Repurposing, search & filters (docs/23-repurposing.md, docs/24-search-filters.md)
 - `REPURPOSE_CONTENT` follows the core rule: the request path only creates the empty `Content` shells (`sourceContentId`, `platform`, `format`) and enqueues jobs; `RepurposeContentRunner` writes version 1. A content's platform is `platform ?? topic.platform` (`effectivePlatform`) — use it, never `topic.platform` alone. Text search must go through `matchAllWords` / `termVariants` (shared `search.ts`) so Arabic and Persian letter/digit spellings match; never plain `contains` on a raw query. Content list filters live in the URL (`features/contents/filters.ts`).
 

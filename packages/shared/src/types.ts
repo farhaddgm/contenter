@@ -317,6 +317,8 @@ export interface Content {
   publishedUrl: string | null;
   /** Set by an admin on approved content that shows how the brand sounds (docs/49). */
   goldenAt: ISODate | null;
+  /** The content pillar of the business this covers (docs/50); null = unlabeled. */
+  pillarId: string | null;
   currentVersionId: string | null;
   lastJobId: string | null;
   createdAt: ISODate;

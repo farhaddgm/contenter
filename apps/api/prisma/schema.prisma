@@ -185,6 +185,7 @@ model Business {
   audits      BusinessAudit[]
   members     BusinessMember[]
   checklists  ChecklistTemplate[]
+  pillars     ContentPillar[]
 
   @@index([status, updatedAt])
 }
@@ -960,6 +961,8 @@ model Content {
   publishedUrl     String?
   /// An admin marked this approved content as an example of the brand's voice (docs/49-golden-examples.md); cleared when the text changes
   goldenAt         DateTime?
+  /// The content pillar of the business this piece covers (docs/50-coverage-map.md); null = unlabeled
+  pillarId         String?
   /// The `scheduledAt` the "time to publish" reminder was already sent for (docs/25-notifications.md)
   dueNotifiedFor   DateTime?
   currentVersionId String?       @unique
@@ -972,6 +975,7 @@ model Content {
   idea           Idea?                  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
   profile        ContentProfile?        @relation(fields: [profileId], references: [id], onDelete: SetNull)
   campaign       Campaign?              @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  pillar         ContentPillar?         @relation(fields: [pillarId], references: [id], onDelete: SetNull)
   currentVersion ContentVersion?        @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   versions       ContentVersion[]       @relation("ContentVersions")
   tags           Tag[]
@@ -987,6 +991,7 @@ model Content {
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
   @@index([campaignId])
+  @@index([pillarId])
   @@index([scheduledAt])
   @@index([publishedAt])
   @@index([sourceContentId])
@@ -1540,4 +1545,22 @@ model WalkerIssue {
   error        AppError?          @relation(fields: [errorId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
+}
+
+/// A theme the business wants its content to cover (docs/50-coverage-map.md). `targetShare` is the wanted
+/// percent of the labeled content; deleting a pillar leaves its contents unlabeled.
+model ContentPillar {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  targetShare Int?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contents Content[]
+
+  @@unique([businessId, name])
+  @@index([businessId, order])
 }

@@ -43,6 +43,7 @@ import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
 import { MetricsCard } from './metrics-card';
 import { ChecklistCard } from './checklist-card';
+import { useTopicPillars } from '@/features/coverage/api/coverage';
 import { GoldenCard } from '@/features/golden/components/golden-card';
 import { QualityCard } from './quality-card';
 import { ReadabilityCard } from './readability-card';
@@ -353,6 +354,7 @@ function OrganizeCard({ content, editable }: { content: Content; editable: boole
   const setTags = useSetContentTags(content.id);
   const update = useUpdateContent(content.id);
   const { data: campaigns = [] } = useCampaigns(content.topicId);
+  const { data: pillars = [] } = useTopicPillars(content.topicId);
   // archived campaigns stay selectable only for a content that is already in one
   const options = campaigns
     .filter((c) => c.status === 'ACTIVE' || c.id === content.campaignId)
@@ -372,6 +374,20 @@ function OrganizeCard({ content, editable }: { content: Content; editable: boole
             />
           )}
         </Field>
+        {pillars.length > 0 && (
+          <Field label={t('coverage.pillar')}>
+            {(id) => (
+              <Select
+                id={id}
+                disabled={!editable}
+                placeholder={t('coverage.unlabeled')}
+                value={content.pillarId ?? ''}
+                options={pillars.map((p) => ({ value: p.id, label: p.name }))}
+                onChange={(e) => update.mutate({ pillarId: e.target.value || null }, { onError })}
+              />
+            )}
+          </Field>
+        )}
         <Field label={t('campaigns.one')}>
           {(id) => (
             <Select

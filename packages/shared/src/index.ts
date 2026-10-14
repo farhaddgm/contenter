@@ -24,3 +24,4 @@ export * from './feedback';
 export * from './readability';
 export * from './similarity';
 export * from './golden';
+export * from './coverage';

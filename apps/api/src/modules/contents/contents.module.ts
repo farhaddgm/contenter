@@ -43,6 +43,7 @@ import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
 import { SettingsService } from '../settings/settings.module';
+import { CoverageService } from '../coverage/coverage.module';
 import { SimilarityService } from '../similarity/similarity.module';
 import { ChecklistsService } from '../checklists/checklists.module';
 import { ReviewsModule } from '../reviews/reviews.module';
@@ -72,6 +73,7 @@ export class ContentsService {
     private readonly checklists: ChecklistsService,
     private readonly settings: SettingsService,
     private readonly similarity: SimilarityService,
+    private readonly coverage: CoverageService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
@@ -370,6 +372,13 @@ export class ContentsService {
         select: { id: true },
       });
       if (!campaign) throw new BadRequestException('Campaign does not belong to this topic');
+    }
+    if (input.pillarId) {
+      const content = await this.prisma.content.findUnique({
+        where: { id },
+        select: { topicId: true },
+      });
+      await this.coverage.assertForTopic(content?.topicId ?? '', input.pillarId);
     }
     await this.prisma.content.update({ where: { id }, data: input });
     this.audit.log({
