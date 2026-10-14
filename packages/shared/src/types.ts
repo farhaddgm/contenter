@@ -2,7 +2,11 @@
  * API response shapes (what the web app receives).
  */
 import type { TermIssue } from './business-profile';
+import type { ContentChecklist } from './checklist';
 import type { QualityReport } from './quality';
+import type { ReadabilityReport } from './readability';
+import type { SimilarityReport } from './similarity';
+import type { StyleFitReport } from './style-fit';
 import type {
   AiJobStatus,
   AiJobType,
@@ -312,6 +316,13 @@ export interface Content {
   /** Set by hand once the content is live elsewhere; a published content is frozen. */
   publishedAt: ISODate | null;
   publishedUrl: string | null;
+  /** Set by an admin on approved content that shows how the brand sounds (docs/49). */
+  goldenAt: ISODate | null;
+  /** The content pillar of the business this covers (docs/50); null = unlabeled. */
+  pillarId: string | null;
+  /** Drafts written together for one idea share this id (docs/51); null for a single draft. */
+  variantGroupId: string | null;
+  variantAngle: string | null;
   currentVersionId: string | null;
   lastJobId: string | null;
   createdAt: ISODate;
@@ -335,6 +346,18 @@ export interface Content {
   termIssues?: TermIssue[];
   /** Detail only: the pre-publish quality gate of the current version (docs/41); null without a draft. */
   quality?: QualityReport | null;
+  /** Detail only: approximate Persian readability of the current version (docs/47); null without a draft. */
+  readability?: ReadabilityReport | null;
+  /** Detail only: literal similarity of the current version to other texts of the business (docs/48); null without a draft. */
+  similarity?: SimilarityReport | null;
+  /**
+   * Detail only: where the current version lies against the statistical range of the topic's samples
+   * (or the business's Instagram averages) (docs/53). `null` without a draft or without any data;
+   * `{ tooFew }` when there are samples but too few.
+   */
+  styleFit?: StyleFitReport | { tooFew: true; basedOn: number; needed: number } | null;
+  /** Detail only: the publishing checklist with its state (docs/45); null when the business has none. */
+  checklist?: ContentChecklist | null;
 }
 
 export type PersonRef = Pick<User, 'id' | 'name'>;

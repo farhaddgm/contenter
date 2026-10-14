@@ -34,6 +34,7 @@ import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
 import { AccessService, TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
+import { ChecklistsService } from '../checklists/checklists.module';
 import { TAG_SELECT } from '../tags/tag-select';
 
 const ITEM_SELECT = {
@@ -78,6 +79,7 @@ export class CalendarService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly access: AccessService,
+    private readonly checklists: ChecklistsService,
   ) {}
 
   async list(query: CalendarQuery, user: AuthUser): Promise<CalendarResponse> {
@@ -124,6 +126,8 @@ export class CalendarService {
       throw new ConflictException('Only approved, unpublished content can be scheduled');
     }
     if (content.publishedAt) throw new ConflictException('The content is already published');
+    // unplanning is always allowed; planning needs the required checklist points done (docs/45)
+    if (input.scheduledAt) await this.checklists.assertReady(id);
     const updated = await this.prisma.content.update({
       where: { id },
       data: { scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null },
@@ -236,5 +240,6 @@ export class CalendarController {
 @Module({
   controllers: [CalendarController],
   providers: [CalendarService],
+  exports: [CalendarService],
 })
 export class CalendarModule {}

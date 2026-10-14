@@ -24,6 +24,10 @@ import { useAiSettings, useUpdateAiSettings } from '@/features/admin/api';
 import { GoogleDriveCard } from '@/features/businesses/components/google-drive-card';
 import { GoogleAccessCard } from '@/features/settings/components/google-access-card';
 import { NotificationSettingsCard } from '@/features/inbox/components/settings-card';
+import { VariantSettingsCard } from '@/features/settings/components/variants-card';
+import { GoldenSettingsCard } from '@/features/settings/components/golden-card';
+import { SimilaritySettingsCard } from '@/features/settings/components/similarity-card';
+import { ReadabilitySettingsCard } from '@/features/settings/components/readability-card';
 import { WorkflowCard } from '@/features/settings/components/workflow-card';
 import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
@@ -253,6 +257,10 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
       )}
       <div className="mt-6">
         <WorkflowCard />
+        <ReadabilitySettingsCard />
+        <SimilaritySettingsCard />
+        <GoldenSettingsCard />
+        <VariantSettingsCard />
       </div>
       <div className="mt-6">
         <NotificationSettingsCard />

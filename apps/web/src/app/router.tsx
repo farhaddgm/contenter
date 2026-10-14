@@ -69,6 +69,10 @@ const router = createBrowserRouter([
         lazy: lazyRoute(() => import('./routes/app/calendar/calendar')),
       },
       {
+        path: paths.app.contentCompare.path,
+        lazy: lazyRoute(() => import('./routes/app/contents/compare')),
+      },
+      {
         path: paths.app.content.path,
         lazy: lazyRoute(() => import('./routes/app/contents/content')),
       },

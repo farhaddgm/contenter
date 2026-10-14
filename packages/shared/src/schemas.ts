@@ -377,6 +377,8 @@ export const GenerateContentSchema = z
     ideaId: z.string().optional(),
     brief: z.string().trim().max(5000).optional().default(''),
     format: z.enum(ContentFormat).optional(),
+    /** How many drafts to write side by side (docs/51-draft-variants.md). */
+    variants: z.number().int().min(1).max(3).optional().default(1),
   })
   .refine((v) => !!v.ideaId || (v.brief ?? '').length >= 10, {
     message: 'Either ideaId or a brief (min 10 chars) is required',
@@ -458,6 +460,8 @@ export const UpdateContentSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
   /** null removes the content from its campaign. */
   campaignId: z.string().min(1).nullable().optional(),
+  /** null removes the content pillar label (docs/50-coverage-map.md). */
+  pillarId: z.string().min(1).nullable().optional(),
 });
 export type UpdateContentInput = z.infer<typeof UpdateContentSchema>;
 

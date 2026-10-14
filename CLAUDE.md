@@ -41,6 +41,39 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Calendar & publishing (docs/22-calendar-publishing.md)
 - Only APPROVED content has `scheduledAt`; leaving APPROVED or changing the text clears it (`ReviewsService`). A content with `publishedAt` is frozen: edit/restore/AI revise and every review step answer 409 until unpublished. Publishing on platforms is manual — the app only records it. Calendar dates in the web come from `Intl` (`utils/calendar.ts`), never a hand-written Jalali converter.
 
+## Publishing checklist (docs/45-publish-checklist.md)
+- Per-business `ChecklistTemplate` (platform null = all) + per-content `ContentChecklistTick`; points keep their `id` across edits. An open **required** point makes `CalendarService.schedule` answer 409 (unscheduling is always free); approval and "mark published" are never blocked. `auto: 'QUALITY_CLEAN'` points are answered by the quality gate, are never required and never block. Ticks are cleared in `ReviewsService.resetAfterEdit` (when reviewed/approved text goes back to DRAFT).
+
+## AI feedback (docs/46-ai-feedback.md)
+- `AiFeedback` is one 👍/👎 per (user, target) on an AI-written `CONTENT_VERSION` (`source = AI`) or an AI-built `PROFILE` (has `jobId`); each vote stores the producing `jobId` so prompt version/model come from `AiJob`. Voting needs topic VIEW and is open to every role (`@Roles(...)` on the controller); reason/note only with 👎; the note stays out of the audit log. The summary is counted by `buildFeedbackSummary`, never by the model.
+
+## Readability (docs/47-readability.md)
+- `analyzeReadability` (shared, pure) counts sentence length, long sentences, word length, Latin share and stiff phrases (`DEFAULT_STIFF_PHRASES` + admin `SystemSetting` `readability`); `ContentsService.detail` returns it as `readability`. It is approximate and informational only: never add it to `quality.warnings`, the checklist's `QUALITY_CLEAN`, or any review/schedule guard. Under `MIN_READABILITY_WORDS` it raises no note.
+
+## Similarity (docs/48-similarity.md)
+- `contentSimilarity` (shared, pure: `fold` → 4-word shingles → max(Jaccard, containment)) is run by `SimilarityService` inside `ContentsService.detail` against contents, ideas, samples and READY references of the business, never against anything outside `visibleTopics(user)` (references need business VIEW) and never against the content's own source/siblings/idea. Thresholds live in `SystemSetting` `similarity`. Literal only (no embeddings) and warn-only: don't add it to `quality.warnings` or any guard.
+
+## Golden examples (docs/49-golden-examples.md)
+- `Content.goldenAt` is set only by an admin (`PUT /contents/:id/golden`) on APPROVED/published content of a project with a business, and cleared in `ReviewsService.resetAfterEdit`. `ContextLoader.business(topicId, target)` adds `examples` only when a draft is being written (`GENERATE_CONTENT`, `REPURPOSE_CONTENT`), re-checking approved/published at read time and excluding the content and its source; `formatBusiness` appends them as `[EXAMPLES]` inside the existing `business` variable — never a new prompt variable, and unchanged bytes when there are none. Limits live in `SystemSetting` `golden`.
+
+## Coverage map (docs/50-coverage-map.md)
+- `ContentPillar` (per business, ≤ 12, optional `targetShare`) and `Content.pillarId`; a pillar must belong to the content's topic's business (`CoverageService.assertForTopic`, 400 otherwise). Saving pillars replaces the list by id (a removed pillar leaves its contents unlabeled). The map is `buildCoverage` (shared, pure) over APPROVED/published contents, only from `visibleTopics`; unlabeled content always has its own row and shares use labeled content only (< 5 → no comparison). Labels are set by people; the model labels nothing.
+
+## Draft variants (docs/51-draft-variants.md)
+- `variants` (1–3, capped by `SystemSetting` `variants`) on `POST /topics/:id/contents/generate` creates N empty contents sharing `variantGroupId` plus one `GENERATE_CONTENT` job each; the angle (`VARIANT_ANGLES`, fixed in shared, handed out in order — never chosen by the model) is stored on `Content.variantAngle` and appended to that job's `brief` variable by `withAngle` (don't edit the prompt template for it: the eval prompt guard). Picking (`planPick`, pure) sends the group's other DRAFT/FAILED contents to REJECTED with a review-history row — never deletes — and refuses while any is GENERATING. The compare numbers are counted by code; similarity checks skip the content's own variant group.
+
+## Personal API keys & /api/v1 (docs/52-api-keys.md)
+- A bearer token starting `ctk_` is an API key: `JwtAuthGuard` accepts it **only** on handlers marked `@AllowApiKey(scope)` (403 everywhere else, before any lookup) — never add that decorator to a review/approval/schedule/publish/edit route or to key management; `api-key-guard.spec.ts` pins the exact set. The key speaks for its owner with the owner's *current* role (inactive owner → 401, demoted owner loses write scopes), only a SHA-256 is stored, the whole key is returned once at creation and never logged or audited. `/api/v1` documents (`ApiV1*` in shared) only ever gain fields. ≤ 5 active keys per user, default expiry 90 days.
+
+## StyleFit (docs/53-style-fit.md)
+- `styleStats` / `targetsFromTexts` / `targetsFromInstagram` / `assessStyleFit` (shared, pure) compare the draft's eight counts with a range from ≥ 3 analyzed samples of the topic, else from the business's Instagram averages (≥ 6 posts, needs business VIEW); no data → no card, too few → "not enough data". It says "inside the statistical range", never that the text "reads like the brand", and never blocks. Don't derive ranges from the model's `SampleAnalysis` JSON — they come from the raw sample text.
+
+## Deep health & metrics (docs/54-ops-metrics.md)
+- Worker processes write a Redis heartbeat (`contenter:worker:<host>:<pid>`, 30 s / 90 s TTL, `QueueService.startHeartbeat`); `OpsMetricsService` builds `/api/health`'s `worker`/`queue` and `/api/metrics` from `AiJob` rows + heartbeats. `evaluateHealth` turns `status` degraded only for db/redis down, no worker **after `WORKER_STARTUP_GRACE_SECONDS` (> deploy.sh's 150 s wait)**, or a job waiting > 15 min — never lengthen deploy risk by making a new check red during startup. `/api/metrics` exists only with its own `METRICS_TOKEN` (404 otherwise or if it equals another service token); metric labels are limited to `ALLOWED_LABELS` (no user/business/topic ids) — `renderPrometheus` throws on others.
+
+## Bulk export (docs/55-bulk-export.md)
+- `POST /contents/export` builds Markdown/CSV/DOCX/ZIP in memory from the **current version** of ≤ `EXPORT_MAX_ITEMS` contents the caller can see (`visibleTopics`; a missing/hidden id is one indistinguishable 404). Text formats live in `packages/shared/src/export.ts`, DOCX/ZIP packaging (`jszip`, fixed entry dates, deterministic) in `modules/export`. Every CSV text cell goes through `csvCell` (formula-injection guard `'` prefix, BOM, CRLF) — never write a CSV cell any other way. Not reachable with an API key.
+
 ## Repurposing, search & filters (docs/23-repurposing.md, docs/24-search-filters.md)
 - `REPURPOSE_CONTENT` follows the core rule: the request path only creates the empty `Content` shells (`sourceContentId`, `platform`, `format`) and enqueues jobs; `RepurposeContentRunner` writes version 1. A content's platform is `platform ?? topic.platform` (`effectivePlatform`) — use it, never `topic.platform` alone. Text search must go through `matchAllWords` / `termVariants` (shared `search.ts`) so Arabic and Persian letter/digit spellings match; never plain `contains` on a raw query. Content list filters live in the URL (`features/contents/filters.ts`).
 

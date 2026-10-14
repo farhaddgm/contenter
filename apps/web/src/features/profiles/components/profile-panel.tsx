@@ -1,3 +1,4 @@
+import { FeedbackButtons } from '@/features/feedback/components/feedback-buttons';
 import { useMemo, useState } from 'react';
 import {
   Archive,
@@ -505,46 +506,55 @@ export function ProfilePanel({
                     }),
                   ].join(' · ')}
                   actions={
-                    canWrite && (
-                      <>
-                        {isDraft && (
+                    <>
+                      {profile.data.jobId && (
+                        <FeedbackButtons
+                          targetType="PROFILE"
+                          targetId={profile.data.id}
+                          topicId={topicId}
+                        />
+                      )}
+                      {canWrite && (
+                        <>
+                          {isDraft && (
+                            <Button
+                              variant="success"
+                              icon={<CheckCircle2 />}
+                              isLoading={approve.isPending}
+                              onClick={() =>
+                                approve.mutate(profile.data!.id, {
+                                  onSuccess: () => notify.success(t('profiles.approved')),
+                                  onError: (e) => notify.error(t('common.error'), e.message),
+                                })
+                              }
+                            >
+                              {t('profiles.approve')}
+                            </Button>
+                          )}
                           <Button
-                            variant="success"
-                            icon={<CheckCircle2 />}
-                            isLoading={approve.isPending}
-                            onClick={() =>
-                              approve.mutate(profile.data!.id, {
-                                onSuccess: () => notify.success(t('profiles.approved')),
-                                onError: (e) => notify.error(t('common.error'), e.message),
-                              })
-                            }
+                            variant="outline"
+                            icon={<Copy />}
+                            isLoading={duplicate.isPending}
+                            onClick={() => startDuplicate(profile.data!.id)}
                           >
-                            {t('profiles.approve')}
+                            {t('profiles.duplicate')}
                           </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          icon={<Copy />}
-                          isLoading={duplicate.isPending}
-                          onClick={() => startDuplicate(profile.data!.id)}
-                        >
-                          {t('profiles.duplicate')}
-                        </Button>
-                        {profile.data.status !== 'ARCHIVED' && (
-                          <ConfirmationDialog
-                            tone="default"
-                            confirmLabel={t('profiles.archive')}
-                            title={t('profiles.archive')}
-                            trigger={
-                              <Button variant="outline" icon={<Archive />}>
-                                {t('profiles.archive')}
-                              </Button>
-                            }
-                            onConfirm={() => archive.mutateAsync(profile.data!.id)}
-                          />
-                        )}
-                      </>
-                    )
+                          {profile.data.status !== 'ARCHIVED' && (
+                            <ConfirmationDialog
+                              tone="default"
+                              confirmLabel={t('profiles.archive')}
+                              title={t('profiles.archive')}
+                              trigger={
+                                <Button variant="outline" icon={<Archive />}>
+                                  {t('profiles.archive')}
+                                </Button>
+                              }
+                              onConfirm={() => archive.mutateAsync(profile.data!.id)}
+                            />
+                          )}
+                        </>
+                      )}
+                    </>
                   }
                 />
                 <CardBody className="space-y-4">

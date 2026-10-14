@@ -135,3 +135,14 @@ export function toApiParams(
     order: f.order,
   } as ContentListQuery & Record<string, string | number | undefined>;
 }
+
+/** The same filters as a bulk export takes them: `GET /contents` parameters without paging. */
+export function toExportFilter(
+  f: ContentFilters,
+  extra: { topicId?: string } = {},
+): Record<string, string | undefined> {
+  const { page: _page, pageSize: _pageSize, ...rest } = toApiParams(f, extra);
+  void _page;
+  void _pageSize;
+  return rest as Record<string, string | undefined>;
+}

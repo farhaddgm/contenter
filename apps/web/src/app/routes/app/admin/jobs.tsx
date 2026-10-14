@@ -1,3 +1,4 @@
+import { FeedbackSummaryCard } from '@/features/feedback/components/feedback-summary-card';
 import { useState } from 'react';
 import { Ban, RotateCw } from 'lucide-react';
 import { AiJobStatus, AiJobType, type AiJob } from '@contenter/shared';
@@ -181,6 +182,7 @@ export default function JobsRoute() {
   return (
     <>
       <PageHeader title={t('jobs.title')} description={t('jobs.subtitle')} />
+      <FeedbackSummaryCard />
       {q && q.driver === 'bullmq' && (
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
           <StatCard

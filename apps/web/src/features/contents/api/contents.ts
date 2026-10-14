@@ -51,7 +51,11 @@ export function useGenerateContent(topicId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: GenerateContentInput) =>
-      api.post<{ jobId: string; contentId: string }>(`/topics/${topicId}/contents/generate`, data),
+      api.post<{
+        jobId: string;
+        contentId: string;
+        variants: { contentId: string; jobId: string; angle: string | null }[];
+      }>(`/topics/${topicId}/contents/generate`, data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: contentKeys.all });
       void qc.invalidateQueries({ queryKey: ['ideas'] });
@@ -231,4 +235,14 @@ export function useDeleteMetric(contentId: string) {
   return useMetricMutation(contentId, (id: string) =>
     api.delete<MetricsResponse>(`/content-metrics/${id}`),
   );
+}
+
+/** Ticks or unticks one point of the publishing checklist (docs/45). */
+export function useToggleChecklistItem(contentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, checked }: { itemId: string; checked: boolean }) =>
+      api.put<void>(`/contents/${contentId}/checklist/${itemId}`, { checked }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.one(contentId) }),
+  });
 }

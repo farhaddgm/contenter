@@ -21,11 +21,12 @@ import {
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuthUser } from '../../common/auth.decorators';
 import { AuditService } from '../audit/audit.service';
+import { ChecklistsService } from '../checklists/checklists.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.module';
 
 /** The Prisma delegates the review code touches, so it also runs inside a transaction. */
-type Db = Pick<Prisma.TransactionClient, 'content' | 'contentReview'>;
+type Db = Pick<Prisma.TransactionClient, 'content' | 'contentReview' | 'contentChecklistTick'>;
 
 const MIN_NOTE_LENGTH = 3;
 
@@ -42,6 +43,7 @@ export class ReviewsService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
+    private readonly checklists: ChecklistsService,
   ) {}
 
   /** What `user` may do with the content now, for the detail response. */
@@ -199,6 +201,8 @@ export class ReviewsService {
     });
     const reset = content && resetAfterEdit(content);
     if (!content || !reset) return false;
+    // what people confirmed in the checklist was about the text that is gone
+    await this.checklists.clearTicks(db, contentId);
     await db.content.update({
       where: { id: contentId },
       data: {
@@ -208,6 +212,8 @@ export class ReviewsService {
         submittedAt: null,
         // the plan was for the approved text, which is gone
         scheduledAt: null,
+        // an example must be approved text, and this text is no longer the approved one
+        goldenAt: null,
       },
     });
     await db.contentReview.create({

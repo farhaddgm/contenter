@@ -11,6 +11,7 @@ import type { AuthUser } from '../../common/auth.decorators';
 import type { AuditService } from '../audit/audit.service';
 import type { SettingsService } from '../settings/settings.module';
 import type { NotificationsService } from '../notifications/notifications.service';
+import type { ChecklistsService } from '../checklists/checklists.module';
 import { CommentsService } from './comments.service';
 import { ReviewsService } from './reviews.service';
 
@@ -60,13 +61,15 @@ function setup(
     contentReview: { create },
   };
   const prisma = { ...tx, $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) };
+  const clearTicks = vi.fn(async () => undefined);
   const svc = new ReviewsService(
     prisma as unknown as PrismaService,
     audit,
     settings(opts.requireFinal),
     notifications,
+    { clearTicks } as unknown as ChecklistsService,
   );
-  return { svc, updateMany, update, create, tx, notify };
+  return { svc, updateMany, update, create, tx, notify, clearTicks };
 }
 
 const draft: Stored = {
@@ -223,13 +226,15 @@ describe('ReviewsService and the calendar', () => {
 
 describe('ReviewsService.resetAfterEdit', () => {
   it('returns approved text to DRAFT and records why', async () => {
-    const { svc, tx, create } = setup({
+    const { svc, tx, create, clearTicks } = setup({
       status: 'APPROVED',
       reviewStage: null,
       submittedById: 'au',
       currentVersionId: 'v2',
     });
     await expect(svc.resetAfterEdit(tx as never, 'c1', 'ed')).resolves.toBe(true);
+    // what people ticked in the checklist was about the text that is gone
+    expect(clearTicks).toHaveBeenCalledWith(tx, 'c1');
     expect(tx.content.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
       data: {
@@ -238,6 +243,8 @@ describe('ReviewsService.resetAfterEdit', () => {
         submittedById: null,
         submittedAt: null,
         scheduledAt: null,
+        // the text is no longer the one that was approved as an example
+        goldenAt: null,
       },
     });
     expect(create).toHaveBeenCalledWith({
@@ -246,9 +253,10 @@ describe('ReviewsService.resetAfterEdit', () => {
   });
 
   it('leaves a draft alone', async () => {
-    const { svc, tx, create } = setup(draft);
+    const { svc, tx, create, clearTicks } = setup(draft);
     await expect(svc.resetAfterEdit(tx as never, 'c1', 'ed')).resolves.toBe(false);
     expect(create).not.toHaveBeenCalled();
+    expect(clearTicks).not.toHaveBeenCalled();
   });
 });
 

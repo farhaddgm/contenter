@@ -141,6 +141,31 @@
 | GET | `/dashboard` | آمار |
 | GET / POST | `/topics/:id/edit-learning` ، `/topics/:id/edit-learning/analyze` | آمار ویرایش‌ها و پیشنهادها / **۲۰۲** صف‌کردن تحلیل ([30-learn-from-edits.md](30-learn-from-edits.md)) |
 | POST | `/learning-suggestions/:id/accept` ، `/dismiss` | پذیرفتن (ساخت اصل، `{ text?, kind? }`) / رد پیشنهاد |
+| GET / PUT | `/businesses/:id/checklists` | چک‌لیست انتشار کسب‌وکار / جایگزینی کامل ([45-publish-checklist.md](45-publish-checklist.md)) |
+| PUT | `/contents/:id/checklist/:itemId` | **۲۰۴** `{ checked }` — تیک بند چک‌لیست یک محتوا |
+| GET | `/dashboard/productivity?days&topicId&businessId` | **بهره‌وری**: تأیید بدون ویرایش، میانهٔ زمان تا تأیید، هزینه به‌ازای هر محتوا ([44-productivity-dashboard.md](44-productivity-dashboard.md)) |
+| POST | `/topics/:id/contents/generate` | بدنه: `{ ideaId? \| brief, format?, variants? (۱–۳) }`؛ با `variants > 1` چند پیش‌نویس با `variantGroupId` یکسان ([51-draft-variants.md](51-draft-variants.md)) |
+| GET | `/contents/:id` | فیلدهای محاسبه‌شده با کد: `quality`، `readability`، `similarity`، `styleFit` ([53-style-fit.md](53-style-fit.md))، `checklist`، `termIssues` |
+| POST | `/contents/export` | بدنه: `{ ids \| filter, format: markdown\|csv\|docx\|zip, onlyApproved? }` ← فایل؛ فقط نسخهٔ جاری، تا ۲۰۰ محتوا، `visibleTopics` ([55-bulk-export.md](55-bulk-export.md)) |
+| GET / POST / DELETE | `/api-keys[/:id]` | کلیدهای API شخصی خود کاربر (همهٔ نقش‌ها؛ فقط با توکن ورود): فهرست / ساخت (کل کلید یک بار) / لغو `204` ([52-api-keys.md](52-api-keys.md)) |
+| GET | `/v1/topics` ، `/v1/contents` ، `/v1/contents/:id` | **با کلید** `contents:read` |
+| POST | `/v1/topics/:id/contents/generate` | **با کلید** `contents:write`: `{ contentId, jobId }` |
+| GET | `/v1/calendar?from&to` | **با کلید** `calendar:read` |
+| GET | `/contents/:id/variants` | پیش‌نویس‌های هم‌گروه با عددهای مقایسه |
+| POST | `/contents/:id/variants/pick` | انتخاب این پیش‌نویس؛ بقیهٔ پیش‌نویس‌ها `REJECTED` می‌شوند |
+| GET | `/topics/:id/variant-limit` | سقف تعداد پیش‌نویس هم‌زمان |
+| GET / PUT | `/admin/settings/variants` | سقف پیش‌نویس هم‌زمان (۱–۳) |
+| GET / PUT | `/businesses/:id/pillars` | ستون‌های محتوایی کسب‌وکار / جایگزینی کامل ([50-coverage-map.md](50-coverage-map.md)) |
+| GET | `/businesses/:id/coverage?days&by&staleDays` | **نقشهٔ پوشش**: ستون × پلتفرم یا دورهٔ ۳۰ روزه، سهم و فاصله از هدف |
+| GET | `/topics/:id/pillars` | ستون‌هایی که محتوای این موضوع می‌تواند داشته باشد |
+| PUT | `/contents/:id/golden` | ADMIN: `{ golden }` علامت نمونهٔ طلایی (فقط محتوای تأییدشده/منتشرشده) ([49-golden-examples.md](49-golden-examples.md)) |
+| GET | `/businesses/:id/golden` | نمونه‌های طلایی کسب‌وکار با حدود تنظیم‌شده |
+| GET / PUT | `/admin/settings/golden` | تعداد نمونه (۰–۳) و نویسهٔ هر نمونه در پرامپت |
+| GET / PUT | `/admin/settings/similarity` | آستانهٔ «شبیه» و «تقریباً کپی» (۰–۱)؛ فیلد `similarity` در `GET /contents/:id` ([48-similarity.md](48-similarity.md)) |
+| GET / PUT | `/admin/settings/readability` | عبارت‌های رسمی اضافه و سقف میانگین طول جمله برای شاخص خوانایی؛ فیلد `readability` در `GET /contents/:id` ([47-readability.md](47-readability.md)) |
+| GET | `/ai-feedback/mine?targetType&topicId` | رأی‌های 👍/👎 خود کاربر روی خروجی‌های AI یک موضوع ([46-ai-feedback.md](46-ai-feedback.md)) |
+| PUT / DELETE | `/ai-feedback/:targetType/:targetId` | ثبت/تغییر `{ rating, reason?, note? }` / پس‌گرفتن (`204`)؛ همهٔ نقش‌ها |
+| GET | `/admin/ai-feedback/summary?days` | خلاصهٔ رأی‌ها به‌تفکیک پرامپت و مدل (ADMIN) |
 | GET | `/health` | سلامت DB و Redis (عمومی)؛ به‌علاوه `restoreCheck` (`ok` / `failed` / `never`) و `lastRestoreVerifiedAt` از بررسی هفتگی بازیابی پشتیبان ([13-operations.md](13-operations.md)) |
 
 ## اسمارت

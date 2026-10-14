@@ -1,0 +1,68 @@
+# Sample Prometheus alerting rules for Contenter (docs/54-ops-metrics.md).
+# Not installed by anything: copy to your Prometheus `rule_files` and adjust the thresholds.
+# Metric names come from GET /api/metrics (bearer METRICS_TOKEN).
+groups:
+  - name: contenter
+    rules:
+      - alert: ContenterDown
+        expr: up{job="contenter"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "The Contenter API does not answer /api/metrics"
+
+      - alert: ContenterWorkerDown
+        # absent for the inline queue; 0 = no worker heartbeat (the heartbeat lapses 90 s after the worker stops)
+        expr: contenter_worker_ok == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "No Contenter worker is alive; AI jobs are not being processed"
+
+      - alert: ContenterQueueStalled
+        # the oldest waiting job is older than 15 minutes (the same limit /api/health calls "degraded")
+        expr: contenter_ai_jobs_oldest_waiting_seconds > 900
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "AI jobs have been waiting for more than 15 minutes"
+
+      - alert: ContenterJobsStuck
+        expr: contenter_ai_jobs_stuck > 0
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "AI jobs have been running for more than 30 minutes"
+
+      - alert: ContenterJobFailuresHigh
+        # failed share of the jobs that finished in the last 24 hours; tune to your normal rate
+        expr: |
+          contenter_ai_jobs_finished_window{status="FAILED"}
+            / ignoring(status) sum(contenter_ai_jobs_finished_window) > 0.25
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than a quarter of the AI jobs of the last day failed"
+
+      - alert: ContenterAiCostSpike
+        # compare with your own daily budget (USD)
+        expr: contenter_ai_cost_usd_window{window="24h"} > 20
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "AI cost in the last 24 hours is above the daily budget"
+
+      - alert: ContenterRestoreCheckFailed
+        expr: contenter_restore_check_ok == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "The weekly backup restore check failed"
+
+      - alert: ContenterRestoreCheckOld
+        # the weekly check should pass at least every 8 days
+        expr: contenter_restore_check_age_seconds > 8 * 86400
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: "The backup restore check has not passed for more than 8 days"

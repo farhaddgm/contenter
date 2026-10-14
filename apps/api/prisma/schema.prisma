@@ -71,6 +71,9 @@ model User {
   resolvedComments    ContentComment[]          @relation("CommentResolver")
   notifications       Notification[]
   notificationPrefs   NotificationPreference[]
+  checklistTicks      ContentChecklistTick[]    @relation("ChecklistTicker")
+  aiFeedback          AiFeedback[]
+  apiKeys             ApiKey[]
 }
 
 model RefreshToken {
@@ -182,6 +185,8 @@ model Business {
   terms       BusinessTerm[]
   audits      BusinessAudit[]
   members     BusinessMember[]
+  checklists  ChecklistTemplate[]
+  pillars     ContentPillar[]
 
   @@index([status, updatedAt])
 }
@@ -592,6 +597,7 @@ model Topic {
   tags          Tag[]
   campaigns     Campaign[]
   editRuns      EditLearningRun[]
+  aiFeedback    AiFeedback[]
   learnings     LearningSuggestion[]
 
   @@index([status, createdAt])
@@ -954,6 +960,14 @@ model Content {
   /// Set by hand once the content is live elsewhere; a published content is frozen
   publishedAt      DateTime?
   publishedUrl     String?
+  /// An admin marked this approved content as an example of the brand's voice (docs/49-golden-examples.md); cleared when the text changes
+  goldenAt         DateTime?
+  /// The content pillar of the business this piece covers (docs/50-coverage-map.md); null = unlabeled
+  pillarId         String?
+  /// Drafts written together for one idea share this id; null = a single draft (docs/51-draft-variants.md)
+  variantGroupId   String?
+  /// The fixed writing angle this draft was asked for (`VariantAngle` in packages/shared)
+  variantAngle     String?
   /// The `scheduledAt` the "time to publish" reminder was already sent for (docs/25-notifications.md)
   dueNotifiedFor   DateTime?
   currentVersionId String?       @unique
@@ -962,24 +976,28 @@ model Content {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  topic          Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  idea           Idea?            @relation(fields: [ideaId], references: [id], onDelete: SetNull)
-  profile        ContentProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  campaign       Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  currentVersion ContentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  versions       ContentVersion[] @relation("ContentVersions")
+  topic          Topic                  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  idea           Idea?                  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  profile        ContentProfile?        @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  campaign       Campaign?              @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  pillar         ContentPillar?         @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+  currentVersion ContentVersion?        @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       ContentVersion[]       @relation("ContentVersions")
   tags           Tag[]
-  submittedBy    User?            @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
-  source         Content?         @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
-  repurposed     Content[]        @relation("Repurposed")
+  submittedBy    User?                  @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  source         Content?               @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  repurposed     Content[]              @relation("Repurposed")
   reviews        ContentReview[]
   comments       ContentComment[]
   metrics        ContentMetric[]
   notifications  Notification[]
+  checklistTicks ContentChecklistTick[]
 
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
   @@index([campaignId])
+  @@index([pillarId])
+  @@index([variantGroupId])
   @@index([scheduledAt])
   @@index([publishedAt])
   @@index([sourceContentId])
@@ -1047,6 +1065,77 @@ model ContentVersion {
   comments  ContentComment[]
 
   @@unique([contentId, version])
+}
+
+// ───────────────────────── Feedback on AI output ─────────────────────────
+// See docs/46-ai-feedback.md. Mirrors packages/shared/src/feedback.ts.
+
+enum FeedbackTarget {
+  CONTENT_VERSION
+  PROFILE
+}
+
+enum FeedbackRating {
+  UP
+  DOWN
+}
+
+/// One person's 👍 / 👎 on one AI output. `jobId` is the job that made it (prompt version and model
+/// are read from there); `topicId` is kept so access and counts need no join.
+model AiFeedback {
+  id         String         @id @default(cuid())
+  userId     String
+  targetType FeedbackTarget
+  targetId   String
+  topicId    String
+  jobId      String?
+  rating     FeedbackRating
+  /// One of FeedbackReason (checked by Zod); only on a DOWN
+  reason     String?
+  note       String         @default("")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([topicId, targetType])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+// ───────────────────────── Publishing checklist ─────────────────────────
+// See docs/45-publish-checklist.md. Mirrors packages/shared/src/checklist.ts.
+
+/// The points a person confirms before a content is scheduled: one row per business and platform
+/// (platform null = every platform). `items` is ChecklistItem[]; each keeps its id when edited.
+model ChecklistTemplate {
+  id          String    @id @default(cuid())
+  businessId  String
+  platform    Platform?
+  items       Json
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+/// A person ticked one point (`itemId` of a template item) of a content. Cleared when the reviewed text changes.
+model ContentChecklistTick {
+  id          String   @id @default(cuid())
+  contentId   String
+  itemId      String
+  checkedById String?
+  createdAt   DateTime @default(now())
+
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  checkedBy User?   @relation("ChecklistTicker", fields: [checkedById], references: [id], onDelete: SetNull)
+
+  @@unique([contentId, itemId])
 }
 
 // ───────────────────────── Learning from edits ─────────────────────────
@@ -1462,4 +1551,42 @@ model WalkerIssue {
   error        AppError?          @relation(fields: [errorId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
+}
+
+/// A theme the business wants its content to cover (docs/50-coverage-map.md). `targetShare` is the wanted
+/// percent of the labeled content; deleting a pillar leaves its contents unlabeled.
+model ContentPillar {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  targetShare Int?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contents Content[]
+
+  @@unique([businessId, name])
+  @@index([businessId, order])
+}
+
+/// A personal API key (docs/52-api-keys.md). Only a SHA-256 of the key is stored, never the key;
+/// `prefix` (first characters, unique) finds the row. The key carries its owner's identity
+/// narrowed by `scopes` (`ApiKeyScope` in packages/shared).
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  prefix     String    @unique
+  hash       String
+  scopes     String[]
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
