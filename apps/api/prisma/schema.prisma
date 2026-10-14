@@ -73,6 +73,7 @@ model User {
   notificationPrefs   NotificationPreference[]
   checklistTicks      ContentChecklistTick[]    @relation("ChecklistTicker")
   aiFeedback          AiFeedback[]
+  apiKeys             ApiKey[]
 }
 
 model RefreshToken {
@@ -1568,4 +1569,24 @@ model ContentPillar {
 
   @@unique([businessId, name])
   @@index([businessId, order])
+}
+
+/// A personal API key (docs/52-api-keys.md). Only a SHA-256 of the key is stored, never the key;
+/// `prefix` (first characters, unique) finds the row. The key carries its owner's identity
+/// narrowed by `scopes` (`ApiKeyScope` in packages/shared).
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  prefix     String    @unique
+  hash       String
+  scopes     String[]
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

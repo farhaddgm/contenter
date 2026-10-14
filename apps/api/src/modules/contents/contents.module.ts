@@ -515,5 +515,6 @@ export class ContentsController {
   imports: [ReviewsModule],
   controllers: [ContentsController, MetricsController],
   providers: [ContentsService, MetricsService],
+  exports: [ContentsService],
 })
 export class ContentsModule {}

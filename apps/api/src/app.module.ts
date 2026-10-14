@@ -15,6 +15,7 @@ import { BrandDocsModule } from './modules/brand-docs/brand-docs.module';
 import { BusinessesModule } from './modules/businesses/businesses.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { ChecklistsModule } from './modules/checklists/checklists.module';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { VariantsModule } from './modules/variants/variants.module';
 import { CoverageModule } from './modules/coverage/coverage.module';
 import { GoldenModule } from './modules/golden/golden.module';
@@ -73,6 +74,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     GoldenModule,
     CoverageModule,
     VariantsModule,
+    ApiKeysModule,
     SearchModule,
     ReviewsModule,
     EditLearningModule,
