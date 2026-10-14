@@ -27,3 +27,4 @@ export * from './golden';
 export * from './coverage';
 export * from './variants';
 export * from './api-keys';
+export * from './style-fit';

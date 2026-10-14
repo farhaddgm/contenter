@@ -319,6 +319,32 @@ export const en: DeepStrings<Dictionary> = {
     retried: 'Retried',
     cost: 'Cost',
   },
+  styleFit: {
+    title: 'Statistical style fit',
+    hint: 'Counted by code (no AI) against the statistical range of the brand’s examples; it only guides and never blocks a step.',
+    summary: '{{inside}} of {{total}} measures inside the examples’ range',
+    source: {
+      SAMPLES: 'based on {{n}} samples',
+      INSTAGRAM: 'based on the averages of {{n}} Instagram posts',
+    },
+    tooFew: 'Not enough data: {{have}} usable analyzed samples, at least {{need}} are needed.',
+    metrics: {
+      chars: 'Length (characters)',
+      avgSentenceWords: 'Mean sentence length (words)',
+      paragraphs: 'Paragraphs',
+      hashtags: 'Hashtags',
+      emojis: 'Emoji',
+      persianShare: 'Share of Persian letters',
+      question: 'Question',
+      cta: 'Call to action',
+    },
+    status: { inside: 'Inside', below: 'Below', above: 'Above' },
+    has: 'has one',
+    hasNot: 'has none',
+    samplesAll: 'samples usually have one',
+    samplesNone: 'samples usually have none',
+    note: 'This only says the numbers are inside the examples’ statistical range, not that the text "reads like" the brand. The range is the mean ± the spread of the samples (± half the mean for Instagram).',
+  },
   apiKeys: {
     title: 'Personal API keys',
     subtitle:

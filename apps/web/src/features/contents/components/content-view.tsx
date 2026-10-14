@@ -46,6 +46,7 @@ import { ChecklistCard } from './checklist-card';
 import { useTopicPillars } from '@/features/coverage/api/coverage';
 import { GoldenCard } from '@/features/golden/components/golden-card';
 import { QualityCard } from './quality-card';
+import { StyleFitCard } from './style-fit-card';
 import { ReadabilityCard } from './readability-card';
 import { SimilarityCard } from './similarity-card';
 import { RepurposeDialog, RepurposedCard } from './repurpose';
@@ -658,6 +659,9 @@ export function ContentView({ contentId }: { contentId: string }) {
               <ReadabilityCard readability={content.readability} />
             )}
             <SelfCheckCard version={version} />
+            {version.id === content.currentVersionId && (
+              <StyleFitCard styleFit={content.styleFit} />
+            )}
             <Card>
               <CardHeader
                 title={

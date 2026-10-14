@@ -6,6 +6,7 @@ import type { ContentChecklist } from './checklist';
 import type { QualityReport } from './quality';
 import type { ReadabilityReport } from './readability';
 import type { SimilarityReport } from './similarity';
+import type { StyleFitReport } from './style-fit';
 import type {
   AiJobStatus,
   AiJobType,
@@ -349,6 +350,12 @@ export interface Content {
   readability?: ReadabilityReport | null;
   /** Detail only: literal similarity of the current version to other texts of the business (docs/48); null without a draft. */
   similarity?: SimilarityReport | null;
+  /**
+   * Detail only: where the current version lies against the statistical range of the topic's samples
+   * (or the business's Instagram averages) (docs/53). `null` without a draft or without any data;
+   * `{ tooFew }` when there are samples but too few.
+   */
+  styleFit?: StyleFitReport | { tooFew: true; basedOn: number; needed: number } | null;
   /** Detail only: the publishing checklist with its state (docs/45); null when the business has none. */
   checklist?: ContentChecklist | null;
 }

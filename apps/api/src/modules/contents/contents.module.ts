@@ -45,6 +45,7 @@ import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
 import { SettingsService } from '../settings/settings.module';
+import { StyleFitService } from '../style-fit/style-fit.module';
 import { CoverageService } from '../coverage/coverage.module';
 import { SimilarityService } from '../similarity/similarity.module';
 import { ChecklistsService } from '../checklists/checklists.module';
@@ -76,6 +77,7 @@ export class ContentsService {
     private readonly settings: SettingsService,
     private readonly similarity: SimilarityService,
     private readonly coverage: CoverageService,
+    private readonly styleFit: StyleFitService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
@@ -135,6 +137,7 @@ export class ContentsService {
         quality: null,
         readability: null,
         similarity: null,
+        styleFit: null,
         checklist: await this.checklists.forContent(id),
       };
     const topic = await this.prisma.topic.findUnique({
@@ -175,6 +178,13 @@ export class ContentsService {
         variantGroupId: c.variantGroupId,
         title: v.title,
         body: v.body,
+      }),
+      styleFit: await this.styleFit.forContent(user, {
+        topicId: c.topicId,
+        businessId: topic?.businessId ?? null,
+        body: v.body,
+        hashtags: v.hashtags,
+        cta: v.cta,
       }),
       readability: analyzeReadability({
         body: v.body,

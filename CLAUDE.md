@@ -65,6 +65,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Personal API keys & /api/v1 (docs/52-api-keys.md)
 - A bearer token starting `ctk_` is an API key: `JwtAuthGuard` accepts it **only** on handlers marked `@AllowApiKey(scope)` (403 everywhere else, before any lookup) — never add that decorator to a review/approval/schedule/publish/edit route or to key management; `api-key-guard.spec.ts` pins the exact set. The key speaks for its owner with the owner's *current* role (inactive owner → 401, demoted owner loses write scopes), only a SHA-256 is stored, the whole key is returned once at creation and never logged or audited. `/api/v1` documents (`ApiV1*` in shared) only ever gain fields. ≤ 5 active keys per user, default expiry 90 days.
 
+## StyleFit (docs/53-style-fit.md)
+- `styleStats` / `targetsFromTexts` / `targetsFromInstagram` / `assessStyleFit` (shared, pure) compare the draft's eight counts with a range from ≥ 3 analyzed samples of the topic, else from the business's Instagram averages (≥ 6 posts, needs business VIEW); no data → no card, too few → "not enough data". It says "inside the statistical range", never that the text "reads like the brand", and never blocks. Don't derive ranges from the model's `SampleAnalysis` JSON — they come from the raw sample text.
+
 ## Repurposing, search & filters (docs/23-repurposing.md, docs/24-search-filters.md)
 - `REPURPOSE_CONTENT` follows the core rule: the request path only creates the empty `Content` shells (`sourceContentId`, `platform`, `format`) and enqueues jobs; `RepurposeContentRunner` writes version 1. A content's platform is `platform ?? topic.platform` (`effectivePlatform`) — use it, never `topic.platform` alone. Text search must go through `matchAllWords` / `termVariants` (shared `search.ts`) so Arabic and Persian letter/digit spellings match; never plain `contains` on a raw query. Content list filters live in the URL (`features/contents/filters.ts`).
 

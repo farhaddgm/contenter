@@ -145,6 +145,7 @@
 | PUT | `/contents/:id/checklist/:itemId` | **۲۰۴** `{ checked }` — تیک بند چک‌لیست یک محتوا |
 | GET | `/dashboard/productivity?days&topicId&businessId` | **بهره‌وری**: تأیید بدون ویرایش، میانهٔ زمان تا تأیید، هزینه به‌ازای هر محتوا ([44-productivity-dashboard.md](44-productivity-dashboard.md)) |
 | POST | `/topics/:id/contents/generate` | بدنه: `{ ideaId? \| brief, format?, variants? (۱–۳) }`؛ با `variants > 1` چند پیش‌نویس با `variantGroupId` یکسان ([51-draft-variants.md](51-draft-variants.md)) |
+| GET | `/contents/:id` | فیلدهای محاسبه‌شده با کد: `quality`، `readability`، `similarity`، `styleFit` ([53-style-fit.md](53-style-fit.md))، `checklist`، `termIssues` |
 | GET / POST / DELETE | `/api-keys[/:id]` | کلیدهای API شخصی خود کاربر (همهٔ نقش‌ها؛ فقط با توکن ورود): فهرست / ساخت (کل کلید یک بار) / لغو `204` ([52-api-keys.md](52-api-keys.md)) |
 | GET | `/v1/topics` ، `/v1/contents` ، `/v1/contents/:id` | **با کلید** `contents:read` |
 | POST | `/v1/topics/:id/contents/generate` | **با کلید** `contents:write`: `{ contentId, jobId }` |
