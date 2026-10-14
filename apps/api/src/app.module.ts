@@ -19,7 +19,7 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { ExportModule } from './modules/export/export.module';
 import { StyleFitModule } from './modules/style-fit/style-fit.module';
 import { VariantsModule } from './modules/variants/variants.module';
-import { CoverageModule } from './modules/coverage/coverage.module';
+import { CoverageModule } from './modules/pillars/coverage.module';
 import { GoldenModule } from './modules/golden/golden.module';
 import { SimilarityModule } from './modules/similarity/similarity.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';

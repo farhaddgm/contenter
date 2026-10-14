@@ -43,7 +43,7 @@ import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
 import { MetricsCard } from './metrics-card';
 import { ChecklistCard } from './checklist-card';
-import { useTopicPillars } from '@/features/coverage/api/coverage';
+import { useTopicPillars } from '@/features/pillars/api/coverage';
 import { GoldenCard } from '@/features/golden/components/golden-card';
 import { ExportMenu } from '@/features/export/components/export-menu';
 import { QualityCard } from './quality-card';

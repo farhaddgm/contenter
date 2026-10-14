@@ -46,7 +46,7 @@ import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
 import { SettingsService } from '../settings/settings.module';
 import { StyleFitService } from '../style-fit/style-fit.module';
-import { CoverageService } from '../coverage/coverage.module';
+import { CoverageService } from '../pillars/coverage.module';
 import { SimilarityService } from '../similarity/similarity.module';
 import { ChecklistsService } from '../checklists/checklists.module';
 import { ReviewsModule } from '../reviews/reviews.module';
