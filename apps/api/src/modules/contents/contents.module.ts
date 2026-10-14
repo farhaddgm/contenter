@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  analyzeReadability,
   checkContentQuality,
   checkTerms,
   ContentListQuerySchema,
@@ -41,6 +42,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { SettingsService } from '../settings/settings.module';
 import { ChecklistsService } from '../checklists/checklists.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { ReviewsService } from '../reviews/reviews.service';
@@ -67,6 +69,7 @@ export class ContentsService {
     private readonly access: AccessService,
     private readonly reviews: ReviewsService,
     private readonly checklists: ChecklistsService,
+    private readonly settings: SettingsService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
@@ -124,6 +127,7 @@ export class ContentsService {
         ...c,
         termIssues: [],
         quality: null,
+        readability: null,
         checklist: await this.checklists.forContent(id),
       };
     const topic = await this.prisma.topic.findUnique({
@@ -139,12 +143,13 @@ export class ContentsService {
     });
     const terms = topic?.business?.terms ?? [];
     const text = [v.title, v.body, v.hashtags.join(' '), v.cta].join('\n');
+    const platform = effectivePlatform(c, c.topic);
     const quality = checkContentQuality({
       title: v.title,
       body: v.body,
       hashtags: v.hashtags,
       cta: v.cta,
-      platform: effectivePlatform(c, c.topic),
+      platform,
       format: c.format,
       terms,
       facts: topic?.business?.facts ?? [],
@@ -153,6 +158,12 @@ export class ContentsService {
       ...c,
       termIssues: terms.length ? checkTerms(text, terms) : [],
       quality,
+      readability: analyzeReadability({
+        body: v.body,
+        cta: v.cta,
+        platform,
+        settings: await this.settings.getReadability(),
+      }),
       checklist: await this.checklists.forContent(id, quality),
     };
   }

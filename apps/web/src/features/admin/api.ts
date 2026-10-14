@@ -1,6 +1,7 @@
 /** Back-office API hooks: users, prompts, settings, audit, dashboard. */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  ReadabilitySettings,
   AiSettings,
   AiSettingsResponse,
   AuditLog,
@@ -224,6 +225,27 @@ export function useUpdateWorkflowSettings() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['settings', 'workflow'] });
       // the review info of every open content carries the setting
+      void qc.invalidateQueries({ queryKey: ['contents'] });
+    },
+  });
+}
+
+// ---------- readability settings (docs/47) ----------
+export function useReadabilitySettings() {
+  return useQuery({
+    queryKey: ['settings', 'readability'],
+    queryFn: () => api.get<ReadabilitySettings>('/admin/settings/readability'),
+  });
+}
+
+export function useUpdateReadabilitySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ReadabilitySettings) =>
+      api.put<ReadabilitySettings>('/admin/settings/readability', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'readability'] });
+      // the readability of every open content is computed with these settings
       void qc.invalidateQueries({ queryKey: ['contents'] });
     },
   });

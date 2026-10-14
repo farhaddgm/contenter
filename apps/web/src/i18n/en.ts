@@ -723,6 +723,41 @@ export const en: DeepStrings<Dictionary> = {
       by: '{{name}} · {{when}}',
       open: '{{count}} required point(s) are not done yet; the content cannot be scheduled until they are.',
     },
+    readability: {
+      title: 'Readability and plain writing (approximate)',
+      hint: 'Counted by code, not AI. Persian has no accepted readability formula; these are approximations that only guide and never block a step.',
+      tooShort: 'The text is too short to judge; the numbers are only shown.',
+      avgSentence: 'Mean sentence length',
+      longShare: 'Long sentences (over 30 words)',
+      wordLength: 'Mean word length',
+      words: '{{n}} words',
+      letters: '{{n}} letters',
+      upTo: 'up to {{n}}',
+      ok: 'The sentences are simple.',
+      stiffFound: 'Stiff or translated-sounding phrases found:',
+      codes: {
+        SENTENCES_LONG_AVG:
+          'Sentences average {{avg}} words; for this platform up to {{max}} reads better. Shorten them.',
+        SENTENCES_LONG_SHARE:
+          '{{count}} of {{total}} sentences have more than {{words}} words; split them.',
+        WORDS_HEAVY: 'Words average {{avg}} letters (over {{max}}): use simpler words.',
+        LATIN_HEAVY: '{{share}}% of the words are Latin; write the common Persian equivalent.',
+        STIFF_PHRASES:
+          '{{count}} stiff or translated-sounding phrase(s) found ({{phrases}}): write more simply or colloquially.',
+      },
+      settings: {
+        title: 'Readability settings',
+        subtitle:
+          'Add your own stiff phrases and set the mean sentence length limit without a deploy.',
+        phrases: 'Extra phrases',
+        phrasesHint: 'One phrase per line (2–60 characters, at most 50).',
+        phrasesPlaceholder: 'innovative solution',
+        builtIn: 'Built-in list:',
+        limit: 'Mean sentence length limit (words)',
+        limitHint: 'Leave empty to use each platform’s limit; 5–80 applies one limit to all.',
+        invalid: 'The phrases or the limit are not valid.',
+      },
+    },
     quality: {
       title: 'Pre-publish quality check',
       hint: 'Done by code (no AI). It only warns and never blocks a review step.',

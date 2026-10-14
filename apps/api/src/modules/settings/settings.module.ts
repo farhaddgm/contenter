@@ -2,13 +2,16 @@ import { Body, Controller, Get, Global, Inject, Injectable, Module, Put } from '
 import { Prisma } from '@prisma/client';
 import {
   AiSettingsSchema,
+  DEFAULT_READABILITY_SETTINGS,
   DEFAULT_WORKFLOW,
   normalizeModelRef,
+  ReadabilitySettingsSchema,
   WorkflowSettingsSchema,
   type AiEffort,
   type AiJobType,
   type AiSettings,
   type AiSettingsResponse,
+  type ReadabilitySettings,
   type WorkflowSettings,
 } from '@contenter/shared';
 import { ENV, type Env } from '../../config/env';
@@ -20,6 +23,7 @@ import { AiProviderRegistry } from '../ai/provider/provider-registry';
 
 const AI_KEY = 'ai';
 const WORKFLOW_KEY = 'workflow';
+const READABILITY_KEY = 'readability';
 
 const DEFAULT_EFFORT: Record<AiJobType, AiEffort> = {
   ANALYZE_SAMPLE: 'high',
@@ -106,6 +110,29 @@ export class SettingsService {
     return this.getWorkflow();
   }
 
+  /** Admin-editable phrases and sentence limit of the readability card (docs/47). */
+  async getReadability(): Promise<ReadabilitySettings> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: READABILITY_KEY } });
+    const parsed = ReadabilitySettingsSchema.safeParse(row?.value);
+    return parsed.success ? parsed.data : { ...DEFAULT_READABILITY_SETTINGS };
+  }
+
+  async updateReadability(body: ReadabilitySettings, userId: string) {
+    await this.prisma.systemSetting.upsert({
+      where: { key: READABILITY_KEY },
+      create: { key: READABILITY_KEY, value: body as unknown as Prisma.InputJsonValue },
+      update: { value: body as unknown as Prisma.InputJsonValue },
+    });
+    this.audit.log({
+      userId,
+      action: 'settings.update',
+      entityType: 'SystemSetting',
+      entityId: READABILITY_KEY,
+      meta: body as unknown as Record<string, unknown>,
+    });
+    return this.getReadability();
+  }
+
   /** `model` is a `provider:model` reference, resolved by AiProviderRegistry. */
   async modelFor(task: AiJobType): Promise<{ model: string; effort: AiEffort }> {
     const s = await this.getAi();
@@ -152,6 +179,19 @@ export class SettingsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.settings.updateWorkflow(body, user.id);
+  }
+
+  @Get('readability')
+  getReadability() {
+    return this.settings.getReadability();
+  }
+
+  @Put('readability')
+  updateReadability(
+    @Body(new ZodValidationPipe(ReadabilitySettingsSchema)) body: ReadabilitySettings,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.settings.updateReadability(body, user.id);
   }
 
   private async withStatus(settings: AiSettings): Promise<AiSettingsResponse> {

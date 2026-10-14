@@ -47,6 +47,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## AI feedback (docs/46-ai-feedback.md)
 - `AiFeedback` is one 👍/👎 per (user, target) on an AI-written `CONTENT_VERSION` (`source = AI`) or an AI-built `PROFILE` (has `jobId`); each vote stores the producing `jobId` so prompt version/model come from `AiJob`. Voting needs topic VIEW and is open to every role (`@Roles(...)` on the controller); reason/note only with 👎; the note stays out of the audit log. The summary is counted by `buildFeedbackSummary`, never by the model.
 
+## Readability (docs/47-readability.md)
+- `analyzeReadability` (shared, pure) counts sentence length, long sentences, word length, Latin share and stiff phrases (`DEFAULT_STIFF_PHRASES` + admin `SystemSetting` `readability`); `ContentsService.detail` returns it as `readability`. It is approximate and informational only: never add it to `quality.warnings`, the checklist's `QUALITY_CLEAN`, or any review/schedule guard. Under `MIN_READABILITY_WORDS` it raises no note.
+
 ## Repurposing, search & filters (docs/23-repurposing.md, docs/24-search-filters.md)
 - `REPURPOSE_CONTENT` follows the core rule: the request path only creates the empty `Content` shells (`sourceContentId`, `platform`, `format`) and enqueues jobs; `RepurposeContentRunner` writes version 1. A content's platform is `platform ?? topic.platform` (`effectivePlatform`) — use it, never `topic.platform` alone. Text search must go through `matchAllWords` / `termVariants` (shared `search.ts`) so Arabic and Persian letter/digit spellings match; never plain `contains` on a raw query. Content list filters live in the URL (`features/contents/filters.ts`).
 
