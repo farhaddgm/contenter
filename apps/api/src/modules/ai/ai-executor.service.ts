@@ -1,10 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
-import { isSourceBlocked, normalizeModelRef, type AiJobType } from '@contenter/shared';
+import {
+  isSourceBlocked,
+  normalizeModelRef,
+  type AiEffort,
+  type AiJobType,
+} from '@contenter/shared';
 import { SettingsService } from '../settings/settings.module';
 import { NO_BUSINESS } from './context';
 import { AiAlertsService } from './ai-alerts.service';
+import { AiBatchService } from './batch/ai-batch.service';
+import { batchContext, JobDeferredError, type BatchContext } from './batch/batch-context';
 import {
+  isBatchProvider,
   isProviderDown,
   NonRetryableAiError,
   type AiUsage,
@@ -61,6 +69,7 @@ export class AiExecutor {
     private readonly prompts: PromptService,
     private readonly settings: SettingsService,
     private readonly alerts: AiAlertsService,
+    private readonly batches: AiBatchService,
   ) {}
 
   /**
@@ -108,6 +117,11 @@ export class AiExecutor {
     const { model: ref, effort } = await this.settings.modelFor(args.task);
     const system = renderTemplate(prompt.system, args.vars);
     const user = appendMissingBlocks(prompt.user, renderTemplate(prompt.user, args.vars), args.vars);
+    const ctx = batchContext.getStore();
+    if (ctx?.economy) {
+      const answered = await this.economy(ctx, args, { ref, effort, system, user });
+      if (answered) return { ...answered, prompt: { key: prompt.key, version: prompt.version } };
+    }
     const result = await this.withFallback(ref, (useRef) => {
       const { provider, model } = this.providers.resolve(useRef);
       return provider.generateStructured({
@@ -121,6 +135,50 @@ export class AiExecutor {
       });
     });
     return { ...result, prompt: { key: prompt.key, version: prompt.version } };
+  }
+
+  /**
+   * Economy mode (docs/44): the call goes to the vendor's batch API. The first run stores the
+   * request and defers the job; the run after the batch answered finds the answer by position and
+   * returns it as if it were live. A batch that failed lets this call (and the rest of the run)
+   * go live at the normal price. Returns null when the call should run live.
+   */
+  private async economy<T>(
+    ctx: BatchContext,
+    args: { task: AiJobType; schema: ZodType<T>; imageUrls?: string[] },
+    call: { ref: string; effort: AiEffort; system: string; user: string },
+  ): Promise<Omit<ExecutionResult<T>, 'prompt'> | null> {
+    const seq = ctx.seq++;
+    const stored = await this.batches.find(ctx.jobId, seq);
+    const ref = stored?.model ?? call.ref;
+    const { provider, model } = this.providers.resolve(ref);
+    if (!isBatchProvider(provider) || !this.providers.isConfigured(ref)) {
+      ctx.economy = false;
+      return null;
+    }
+    if (!stored) {
+      const params = await provider.buildBatchParams({
+        task: args.task,
+        model,
+        effort: call.effort,
+        system: call.system,
+        user: call.user,
+        imageUrls: args.imageUrls,
+        schema: args.schema,
+      });
+      await this.batches.create(ctx.jobId, seq, ref, params);
+      throw new JobDeferredError();
+    }
+    if (stored.status === 'DONE') {
+      const parsed = provider.parseBatchResult(stored.result, args.schema);
+      return { ...parsed, usage: { ...parsed.usage, batch: true } };
+    }
+    if (stored.status === 'FAILED') {
+      this.logger.warn(`batch call ${seq} of job ${ctx.jobId} failed (${stored.error}); running live`);
+      ctx.economy = false;
+      return null;
+    }
+    throw new JobDeferredError();
   }
 
   /**

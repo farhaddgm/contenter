@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { AiExecutor } from './ai-executor.service';
 import type { AiAlertsService } from './ai-alerts.service';
+import type { AiBatchService } from './batch/ai-batch.service';
 import {
   isProviderDown,
   NonRetryableAiError,
@@ -68,7 +69,11 @@ function setup(opts: {
   } as unknown as SettingsService;
   const send = vi.fn(async () => true);
   const alerts = { send } as unknown as AiAlertsService;
-  return { exec: new AiExecutor(registry, prompts, settings, alerts), resolve, send };
+  return {
+    exec: new AiExecutor(registry, prompts, settings, alerts, {} as unknown as AiBatchService),
+    resolve,
+    send,
+  };
 }
 
 const run = (exec: AiExecutor) =>

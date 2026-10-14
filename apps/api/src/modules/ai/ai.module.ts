@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { SamplesCoreModule } from '../samples/samples-core.module';
 import { AiAlertsService } from './ai-alerts.service';
+import { AiBatchService } from './batch/ai-batch.service';
 import { BudgetController, BudgetService } from './budget.service';
 import { AiExecutor } from './ai-executor.service';
 import { AiJobsService } from './ai-jobs.service';
@@ -53,6 +54,7 @@ const RUNNERS = [
   providers: [
     AiProviderRegistry,
     AiAlertsService,
+    AiBatchService,
     BudgetService,
     PromptService,
     AiExecutor,

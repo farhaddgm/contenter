@@ -379,6 +379,8 @@ export const GenerateContentSchema = z
     format: z.enum(ContentFormat).optional(),
     /** How many drafts to write side by side (docs/51-draft-variants.md). */
     variants: z.number().int().min(1).max(3).optional().default(1),
+    /** Economy mode: about half the price, the result comes within 24 hours (docs/44). */
+    economy: z.boolean().optional(),
   })
   .refine((v) => !!v.ideaId || (v.brief ?? '').length >= 10, {
     message: 'Either ideaId or a brief (min 10 chars) is required',
@@ -531,6 +533,8 @@ export const RepurposeContentSchema = z
       .max(MAX_REPURPOSE_TARGETS),
     /** Direction for the writer, e.g. "shorter, more formal". */
     notes: z.string().trim().max(2000).optional().default(''),
+    /** Economy mode: about half the price, the result comes within 24 hours (docs/44). */
+    economy: z.boolean().optional(),
   })
   .refine(
     (v) =>

@@ -152,7 +152,15 @@ export const AiJobType = [
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 
-export const AiJobStatus = ['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELED'] as const;
+export const AiJobStatus = [
+  'QUEUED',
+  'RUNNING',
+  'SUCCEEDED',
+  'FAILED',
+  'CANCELED',
+  /** Economy mode: waiting for the vendor's batch result (docs/44). */
+  'WAITING',
+] as const;
 export type AiJobStatus = (typeof AiJobStatus)[number];
 
 export const AiEffort = ['low', 'medium', 'high', 'xhigh', 'max'] as const;

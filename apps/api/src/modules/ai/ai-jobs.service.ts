@@ -7,12 +7,13 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Prisma, type AiJob } from '@prisma/client';
-import type { AiJobStatus, AiJobType, PaginationQuery } from '@contenter/shared';
+import { isEconomyTask, type AiJobStatus, type AiJobType, type PaginationQuery } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { PermanentJobError, QueueService, type AttemptInfo } from '../../infra/queue/queue.service';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { ErrorTrackerService } from '../smart/smart-core.services';
+import { batchContext, JobDeferredError } from './batch/batch-context';
 import { BudgetService } from './budget.service';
 import { estimateCostUsd } from './pricing';
 import { NonRetryableAiError } from './provider/ai-provider';
@@ -25,6 +26,8 @@ export interface EnqueueArgs {
   topicId?: string | null;
   input?: Record<string, unknown>;
   userId?: string | null;
+  /** Economy mode: the vendor's batch API, about half the price, an answer within 24 hours. */
+  economy?: boolean;
 }
 
 const errorMessage = (err: unknown) =>
@@ -60,6 +63,7 @@ export class AiJobsService implements OnModuleInit {
         topicId: args.topicId ?? null,
         input: (args.input ?? {}) as Prisma.InputJsonValue,
         createdById: args.userId ?? null,
+        economy: !!args.economy && isEconomyTask(args.type),
       },
     });
     // With the hard stop on and the month's budget used up, the job is recorded as failed (the
@@ -104,7 +108,11 @@ export class AiJobsService implements OnModuleInit {
     });
 
     try {
-      const result = await runner.run(job);
+      // an economy job's model calls may defer it; see batch/batch-context.ts
+      const result = await batchContext.run(
+        { jobId, economy: job.economy && isEconomyTask(job.type), seq: 0 },
+        () => runner.run(job),
+      );
       await this.prisma.aiJob.update({
         where: { id: jobId },
         data: {
@@ -122,6 +130,14 @@ export class AiJobsService implements OnModuleInit {
       });
       void this.budget.check();
     } catch (err) {
+      if (err instanceof JobDeferredError) {
+        // not a failure: the model call is with the vendor's batch queue; the poller wakes the job
+        await this.prisma.aiJob.update({
+          where: { id: jobId },
+          data: { status: 'WAITING', error: null },
+        });
+        return;
+      }
       const permanent =
         err instanceof NonRetryableAiError ||
         err instanceof PermanentJobError ||

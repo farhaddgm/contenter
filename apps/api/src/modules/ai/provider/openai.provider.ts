@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import { z } from 'zod';
 import {
   researchSources,
@@ -7,6 +7,9 @@ import {
   ProviderOverloadedError,
   ProviderUnavailableError,
   type AiProvider,
+  type BatchItemResult,
+  type BatchPoll,
+  type BatchProvider,
   type ResearchRequest,
   type ResearchResult,
   type StructuredRequest,
@@ -39,7 +42,7 @@ const MODELS_TTL_MS = 60 * 60 * 1000;
  * - Contenter effort → `reasoning.effort` on reasoning models (clamped if a model rejects it).
  * - Streaming, so long generations never hit HTTP timeouts. Nothing is stored at OpenAI.
  */
-export class OpenAiProvider implements AiProvider {
+export class OpenAiProvider implements AiProvider, BatchProvider {
   readonly name = 'openai';
   private readonly logger = new Logger(OpenAiProvider.name);
   private readonly client: OpenAI | null;
@@ -211,14 +214,13 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  private async call<T>(
-    client: OpenAI,
+  /** The Responses API request of a structured call, without the transport (`stream`). */
+  private structuredBody<T>(
     req: StructuredRequest<T>,
     imageUrls: string[],
     effort: OpenAiEffort,
-  ): Promise<StructuredResult<T>> {
-    const params: OpenAI.Responses.ResponseCreateParamsStreaming = {
-      stream: true,
+  ): Omit<OpenAI.Responses.ResponseCreateParamsStreaming, 'stream'> {
+    return {
       model: req.model,
       instructions: req.system,
       input: [
@@ -246,49 +248,165 @@ export class OpenAiProvider implements AiProvider {
       store: false,
       ...(isReasoningModel(req.model) ? { reasoning: { effort } } : {}),
     };
-
-    const response = await client.responses.stream(params).finalResponse();
-
-    const refusal = response.output
-      .flatMap((item) => (item.type === 'message' ? item.content : []))
-      .find((c) => c.type === 'refusal');
-    if (refusal && refusal.type === 'refusal') {
-      throw new NonRetryableAiError(`Model declined the request: ${refusal.refusal}`);
-    }
-    if (response.status === 'incomplete') {
-      const reason = response.incomplete_details?.reason;
-      throw new NonRetryableAiError(
-        reason === 'max_output_tokens'
-          ? 'Output was truncated (max_tokens reached)'
-          : `Model declined the request (${reason ?? 'incomplete'})`,
-      );
-    }
-
-    let json: unknown;
-    try {
-      json = JSON.parse(response.output_text);
-    } catch {
-      throw new NonRetryableAiError('Model returned invalid JSON');
-    }
-    const parsed = req.schema.safeParse(json);
-    if (!parsed.success) {
-      throw new NonRetryableAiError(`Model output failed validation: ${parsed.error.message}`);
-    }
-
-    const u = response.usage;
-    const cached = u?.input_tokens_details?.cached_tokens ?? 0;
-    return {
-      data: parsed.data,
-      model: response.model,
-      usage: {
-        // OpenAI counts cached tokens inside input_tokens; keep the buckets disjoint.
-        inputTokens: Math.max(0, (u?.input_tokens ?? 0) - cached),
-        outputTokens: u?.output_tokens ?? 0,
-        cacheReadTokens: cached,
-        cacheWriteTokens: 0,
-      },
-    };
   }
+
+  private async call<T>(
+    client: OpenAI,
+    req: StructuredRequest<T>,
+    imageUrls: string[],
+    effort: OpenAiEffort,
+  ): Promise<StructuredResult<T>> {
+    const params: OpenAI.Responses.ResponseCreateParamsStreaming = {
+      ...this.structuredBody(req, imageUrls, effort),
+      stream: true,
+    };
+    const response = await client.responses.stream(params).finalResponse();
+    return finishStructured(response, req.schema);
+  }
+
+  // ───────────── batch mode (docs/44) ─────────────
+
+  async buildBatchParams(req: StructuredRequest<unknown>): Promise<Record<string, unknown>> {
+    return this.structuredBody(req, req.imageUrls ?? [], req.effort) as Record<string, unknown>;
+  }
+
+  /** One JSONL file of requests, one batch; results arrive within 24 hours at half the price. */
+  async submitBatch(
+    items: { customId: string; params: Record<string, unknown> }[],
+  ): Promise<{ batchRef: string }> {
+    if (!this.client) {
+      throw new ProviderUnavailableError('OPENAI_API_KEY is not set.', 'auth');
+    }
+    try {
+      const jsonl = items
+        .map((i) =>
+          JSON.stringify({
+            custom_id: i.customId,
+            method: 'POST',
+            url: '/v1/responses',
+            body: i.params,
+          }),
+        )
+        .join('\n');
+      const file = await this.client.files.create({
+        file: await toFile(Buffer.from(jsonl, 'utf8'), 'contenter-batch.jsonl'),
+        purpose: 'batch',
+      });
+      const batch = await this.client.batches.create({
+        input_file_id: file.id,
+        endpoint: '/v1/responses',
+        completion_window: '24h',
+      });
+      return { batchRef: batch.id };
+    } catch (err) {
+      throw permanentOrRaw(err);
+    }
+  }
+
+  async pollBatch(batchRef: string): Promise<BatchPoll> {
+    if (!this.client) {
+      throw new ProviderUnavailableError('OPENAI_API_KEY is not set.', 'auth');
+    }
+    try {
+      const b = await this.client.batches.retrieve(batchRef);
+      if (['validating', 'in_progress', 'finalizing', 'cancelling'].includes(b.status)) {
+        return { state: 'running' };
+      }
+      if (!b.output_file_id && !b.error_file_id) {
+        return {
+          state: 'failed',
+          error: b.errors?.data?.[0]?.message ?? `The batch ended as "${b.status}" without results`,
+        };
+      }
+      const results: Record<string, BatchItemResult> = {};
+      for (const fileId of [b.output_file_id, b.error_file_id]) {
+        if (!fileId) continue;
+        const text = await (await this.client.files.content(fileId)).text();
+        for (const line of text.split('\n')) {
+          if (!line.trim()) continue;
+          const row = JSON.parse(line) as {
+            custom_id: string;
+            response?: { status_code: number; body: unknown };
+            error?: { message?: string } | null;
+          };
+          if (row.response && row.response.status_code === 200) {
+            results[row.custom_id] = { ok: true, raw: row.response.body };
+          } else {
+            const body = row.response?.body as { error?: { message?: string } } | undefined;
+            results[row.custom_id] = {
+              ok: false,
+              error: row.error?.message ?? body?.error?.message ?? `HTTP ${row.response?.status_code}`,
+            };
+          }
+        }
+      }
+      return { state: 'done', results };
+    } catch (err) {
+      throw permanentOrRaw(err);
+    }
+  }
+
+  parseBatchResult<T>(raw: unknown, schema: z.ZodType<T>): StructuredResult<T> {
+    return finishStructured(raw as ResponseLike, schema);
+  }
+}
+
+/** What `finishStructured` needs of a response; also satisfied by a batch's raw JSON body. */
+type ResponseLike = Pick<
+  OpenAI.Responses.Response,
+  'output' | 'status' | 'incomplete_details' | 'usage' | 'model'
+> & { output_text?: string };
+
+/** The model's text: the SDK helper when present, else the `output_text` parts of the messages. */
+function outputTextOf(response: ResponseLike): string {
+  if (typeof response.output_text === 'string') return response.output_text;
+  return response.output
+    .flatMap((item) => (item.type === 'message' ? item.content : []))
+    .map((c) => (c.type === 'output_text' ? c.text : ''))
+    .join('');
+}
+
+/** Refusal / truncation checks, JSON parse, Zod validation and usage of one structured answer. */
+function finishStructured<T>(response: ResponseLike, schema: z.ZodType<T>): StructuredResult<T> {
+  const refusal = response.output
+    .flatMap((item) => (item.type === 'message' ? item.content : []))
+    .find((c) => c.type === 'refusal');
+  if (refusal && refusal.type === 'refusal') {
+    throw new NonRetryableAiError(`Model declined the request: ${refusal.refusal}`);
+  }
+  if (response.status === 'incomplete') {
+    const reason = response.incomplete_details?.reason;
+    throw new NonRetryableAiError(
+      reason === 'max_output_tokens'
+        ? 'Output was truncated (max_tokens reached)'
+        : `Model declined the request (${reason ?? 'incomplete'})`,
+    );
+  }
+
+  let json: unknown;
+  try {
+    json = JSON.parse(outputTextOf(response));
+  } catch {
+    throw new NonRetryableAiError('Model returned invalid JSON');
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    throw new NonRetryableAiError(`Model output failed validation: ${parsed.error.message}`);
+  }
+
+  const u = response.usage;
+  const cached = u?.input_tokens_details?.cached_tokens ?? 0;
+  return {
+    data: parsed.data,
+    model: response.model,
+    usage: {
+      // OpenAI counts cached tokens inside input_tokens; keep the buckets disjoint.
+      inputTokens: Math.max(0, (u?.input_tokens ?? 0) - cached),
+      outputTokens: u?.output_tokens ?? 0,
+      cacheReadTokens: cached,
+      cacheWriteTokens: 0,
+    },
+  };
 }
 
 /** Failures that retrying will not fix become NonRetryableAiError; others are rethrown. */

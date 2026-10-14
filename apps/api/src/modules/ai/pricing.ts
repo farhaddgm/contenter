@@ -44,6 +44,8 @@ const CACHE_READ_MULTIPLIER = 0.1;
 const CACHE_WRITE_MULTIPLIER = 1.25;
 /** Server-side web search fee (both vendors list about $10 per 1,000 searches). */
 const WEB_SEARCH_USD = 0.01;
+/** Both vendors bill their batch APIs at half the normal token price. */
+const BATCH_MULTIPLIER = 0.5;
 
 export function priceFor(model: string): Price | undefined {
   // Tolerate prefixes ("mock/", "openai:") and dated snapshot suffixes ("gpt-5-2025-08-07").
@@ -55,12 +57,13 @@ export function estimateCostUsd(model: string, usage: AiUsage): number {
   if (model.startsWith('mock/')) return 0;
   const p = priceFor(model);
   if (!p) return 0;
-  const cost =
+  const tokens =
     (usage.inputTokens * p.input +
       usage.cacheReadTokens * p.input * (p.cacheRead ?? CACHE_READ_MULTIPLIER) +
       usage.cacheWriteTokens * p.input * (p.cacheWrite ?? CACHE_WRITE_MULTIPLIER) +
       usage.outputTokens * p.output) /
-      1_000_000 +
-    (usage.webSearches ?? 0) * WEB_SEARCH_USD;
+    1_000_000;
+  const cost =
+    tokens * (usage.batch ? BATCH_MULTIPLIER : 1) + (usage.webSearches ?? 0) * WEB_SEARCH_USD;
   return Math.round(cost * 1_000_000) / 1_000_000;
 }

@@ -298,6 +298,7 @@ export const en: DeepStrings<Dictionary> = {
       SUCCEEDED: 'Succeeded',
       FAILED: 'Failed',
       CANCELED: 'Canceled',
+      WAITING: 'Waiting for the batch result',
     },
   },
   productivity: {
@@ -850,6 +851,11 @@ export const en: DeepStrings<Dictionary> = {
     cta: 'Call to action',
     notes: 'Production notes',
     selfCheck: 'AI self-check',
+    economy: {
+      label: 'Economy mode',
+      on: "The request goes to the vendor's batch API: about half the price, but the result may take up to 24 hours. If the batch does not deliver, the job runs at the normal price.",
+      off: 'The result is made right now, at the normal price.',
+    },
     termIssues: 'Brand glossary issues',
     termIssuesHint:
       'This version was checked against the business glossary (no AI). Fix it with a revision or a manual edit.',

@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod';
 import {
   BusinessSectionKey,
   type BusinessBuildResult,
@@ -16,6 +17,8 @@ import {
 import {
   NonRetryableAiError,
   type AiProvider,
+  type BatchPoll,
+  type BatchProvider,
   type ResearchRequest,
   type ResearchResult,
   type StructuredRequest,
@@ -58,8 +61,40 @@ function requestedKeys(user: string): BusinessSectionKey[] {
  * Deterministic provider for local development, demos and tests (AI_PROVIDER=mock).
  * Returns schema-valid Persian placeholder data without calling any external service.
  */
-export class MockProvider implements AiProvider {
+export class MockProvider implements AiProvider, BatchProvider {
   readonly name = 'mock';
+
+  // ───────────── batch mode: answers at once, so economy mode works without a vendor ─────────────
+
+  /** Batches submitted by this process; a restart forgets them and the jobs run live. */
+  private readonly batches = new Map<string, Record<string, Record<string, unknown>>>();
+
+  async buildBatchParams(req: StructuredRequest<unknown>): Promise<Record<string, unknown>> {
+    const answer = await this.generateStructured(req);
+    return { mock: true, data: answer.data, model: answer.model, usage: answer.usage };
+  }
+
+  async submitBatch(
+    items: { customId: string; params: Record<string, unknown> }[],
+  ): Promise<{ batchRef: string }> {
+    const batchRef = `mock-batch-${Date.now()}-${this.batches.size}`;
+    this.batches.set(batchRef, Object.fromEntries(items.map((i) => [i.customId, i.params])));
+    return { batchRef };
+  }
+
+  async pollBatch(batchRef: string): Promise<BatchPoll> {
+    const items = this.batches.get(batchRef);
+    if (!items) return { state: 'failed', error: 'The mock batch is unknown (the process restarted)' };
+    return {
+      state: 'done',
+      results: Object.fromEntries(Object.entries(items).map(([id, raw]) => [id, { ok: true, raw }])),
+    };
+  }
+
+  parseBatchResult<T>(raw: unknown, schema: ZodType<T>): StructuredResult<T> {
+    const r = raw as { data: unknown; model: string; usage: StructuredResult<T>['usage'] };
+    return { data: schema.parse(r.data), model: r.model, usage: r.usage };
+  }
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     await new Promise((r) => setTimeout(r, 300));

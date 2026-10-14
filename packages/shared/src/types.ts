@@ -461,6 +461,8 @@ export interface AiJob {
   costUsd: number;
   promptKey: string | null;
   promptVersion: number | null;
+  /** Run through the vendor's batch API: cheaper, result within 24 hours. */
+  economy?: boolean;
   startedAt: ISODate | null;
   finishedAt: ISODate | null;
   createdAt: ISODate;

@@ -40,3 +40,20 @@ export function suggestRouting(strong: string, light: string): Record<string, st
   }
   return models;
 }
+
+/**
+ * Tasks that may run in economy mode (the vendor's batch API, docs/44): one model call, no web
+ * search, nobody waiting at the screen. Research steps cannot be batched, so the business tasks
+ * that research stay out.
+ */
+export const ECONOMY_TASKS: readonly AiJobType[] = [
+  'GENERATE_CONTENT',
+  'REVISE_CONTENT',
+  'REPURPOSE_CONTENT',
+  'IDEATE',
+  'ANALYZE_SAMPLE',
+  'BUILD_PROFILE',
+  'LEARN_FROM_EDITS',
+];
+
+export const isEconomyTask = (type: AiJobType) => ECONOMY_TASKS.includes(type);

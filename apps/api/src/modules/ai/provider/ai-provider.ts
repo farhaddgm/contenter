@@ -8,6 +8,8 @@ export interface AiUsage {
   cacheWriteTokens: number;
   /** Server-side web searches run by the vendor (billed per search). */
   webSearches?: number;
+  /** Answered through the vendor's batch API, billed at about half price (docs/44). */
+  batch?: boolean;
 }
 
 export interface ResearchRequest {
@@ -105,9 +107,39 @@ export interface AiProvider {
   research(req: ResearchRequest): Promise<ResearchResult>;
 }
 
+// ─────────────────────────────── batch mode ───────────────────────────────
+
+/** What a vendor's batch returned for one request. */
+export type BatchItemResult = { ok: true; raw: unknown } | { ok: false; error: string };
+
+/** State of a submitted batch; `results` is keyed by the `customId` of each request. */
+export type BatchPoll =
+  | { state: 'running' }
+  | { state: 'done'; results: Record<string, BatchItemResult> }
+  | { state: 'failed'; error: string };
+
+/**
+ * Optional capability of a provider: structured calls through the vendor's batch API (about half
+ * the price, an answer within 24 hours). Used by economy-mode jobs (docs/44). A request is
+ * turned into plain JSON when the call is made (`buildBatchParams`), submitted later together
+ * with others (`submitBatch`), and the raw answer is read back with the task's schema
+ * (`parseBatchResult`).
+ */
+export interface BatchProvider {
+  buildBatchParams(req: StructuredRequest<unknown>): Promise<Record<string, unknown>>;
+  submitBatch(
+    items: { customId: string; params: Record<string, unknown> }[],
+  ): Promise<{ batchRef: string }>;
+  pollBatch(batchRef: string): Promise<BatchPoll>;
+  parseBatchResult<T>(raw: unknown, schema: ZodType<T>): StructuredResult<T>;
+}
+
+export const isBatchProvider = (p: AiProvider): p is AiProvider & BatchProvider =>
+  typeof (p as Partial<BatchProvider>).submitBatch === 'function';
+
 /** Adds up usage of several calls made for one job. */
 export function sumUsage(...items: AiUsage[]): AiUsage {
-  return items.reduce<AiUsage>(
+  const total = items.reduce<AiUsage>(
     (acc, u) => ({
       inputTokens: acc.inputTokens + u.inputTokens,
       outputTokens: acc.outputTokens + u.outputTokens,
@@ -117,6 +149,8 @@ export function sumUsage(...items: AiUsage[]): AiUsage {
     }),
     { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, webSearches: 0 },
   );
+  // half price only when every call of the job was a batch call
+  return items.length > 0 && items.every((u) => u.batch) ? { ...total, batch: true } : total;
 }
 
 /**

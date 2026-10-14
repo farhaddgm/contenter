@@ -46,6 +46,7 @@ export const statusTone: Record<string, BadgeTone> = {
   SKIPPED: 'neutral',
   NONE: 'neutral',
   QUEUED: 'warning',
+  WAITING: 'outline',
   RUNNING: 'primary',
   GENERATING: 'primary',
   DONE: 'success',
