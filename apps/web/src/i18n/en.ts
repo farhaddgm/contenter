@@ -1411,6 +1411,37 @@ export const en: DeepStrings<Dictionary> = {
       light: 'Cheap model',
       apply: 'Fill the model table',
     },
+    budget: {
+      title: 'Monthly AI budget',
+      subtitle:
+        'Spending of all AI jobs in a month. By default it only warns; with the hard stop, new jobs do not run once the cap is used up.',
+      thisMonth: 'Month {{label}}',
+      cap: 'Monthly cap (USD)',
+      capHint: 'Empty = no cap. Default 20 USD, about one monthly ChatGPT subscription.',
+      noCap: 'No cap',
+      warnAt: 'Warn at this share of the cap (%)',
+      calendar: 'Month follows',
+      persian: 'Persian calendar (from day 1 of the Persian month)',
+      gregory: 'Gregorian calendar',
+      hardStop: 'Hard stop when the cap is used up',
+      hardStopOn:
+        'After the cap is used up, a new AI job does not run and the job says why. Queued jobs finish.',
+      hardStopOff:
+        'Warn only: admins are told at the warning level and when the cap is used up; jobs continue.',
+      blockedNow:
+        'The cap is used up and the hard stop is on: new jobs do not run until you raise the cap or the month changes.',
+      level: {
+        none: 'No cap is set.',
+        ok: 'Within budget.',
+        warning: 'You reached the warning level.',
+        exceeded: 'The cap is used up.',
+      },
+      byTask: 'Biggest spenders by task',
+      byBusiness: 'Cap per business (optional)',
+      noBusiness: 'No spending yet and no business cap set.',
+      businessCap: 'Business cap',
+      addBusiness: 'Add a cap for a business…',
+    },
   },
   audit: {
     title: 'Audit log',

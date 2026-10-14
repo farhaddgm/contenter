@@ -13,6 +13,7 @@ import { PermanentJobError, QueueService, type AttemptInfo } from '../../infra/q
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { ErrorTrackerService } from '../smart/smart-core.services';
+import { BudgetService } from './budget.service';
 import { estimateCostUsd } from './pricing';
 import { NonRetryableAiError } from './provider/ai-provider';
 import { AI_RUNNERS, type AiRunner } from './runners/runner';
@@ -39,6 +40,7 @@ export class AiJobsService implements OnModuleInit {
     private readonly queue: QueueService,
     private readonly audit: AuditService,
     private readonly errors: ErrorTrackerService,
+    private readonly budget: BudgetService,
     @Inject(AI_RUNNERS) runners: AiRunner[],
   ) {
     this.runners = new Map(runners.map((r) => [r.type, r]));
@@ -60,6 +62,24 @@ export class AiJobsService implements OnModuleInit {
         createdById: args.userId ?? null,
       },
     });
+    // With the hard stop on and the month's budget used up, the job is recorded as failed (the
+    // runner's onFailure cleans up whatever shell the caller created) instead of being run.
+    const blocked = await this.budget.blockReason(args).catch(() => null);
+    if (blocked) {
+      const failed = await this.prisma.aiJob.update({
+        where: { id: job.id },
+        data: { status: 'FAILED', error: blocked, finishedAt: new Date() },
+      });
+      await this.runners.get(job.type)?.onFailure?.(failed, blocked).catch(() => undefined);
+      this.audit.log({
+        userId: args.userId,
+        action: 'ai.budget_blocked',
+        entityType: args.targetType,
+        entityId: args.targetId,
+        meta: { jobId: job.id, type: args.type },
+      });
+      return failed;
+    }
     await this.queue.enqueue(job.id);
     this.audit.log({
       userId: args.userId,
@@ -100,6 +120,7 @@ export class AiJobsService implements OnModuleInit {
           finishedAt: new Date(),
         },
       });
+      void this.budget.check();
     } catch (err) {
       const permanent =
         err instanceof NonRetryableAiError ||
