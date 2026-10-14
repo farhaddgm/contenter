@@ -24,6 +24,8 @@ export interface SimilaritySubject {
   businessId: string | null;
   ideaId: string | null;
   sourceContentId: string | null;
+  /** Drafts written together are alternatives on purpose, so they are not compared (docs/51). */
+  variantGroupId?: string | null;
   title: string;
   body: string;
 }
@@ -69,6 +71,9 @@ export class SimilarityService {
         where: {
           id: { notIn: family },
           OR: [{ sourceContentId: null }, { sourceContentId: { notIn: family } }],
+          ...(c.variantGroupId
+            ? { AND: [{ OR: [{ variantGroupId: null }, { variantGroupId: { not: c.variantGroupId } }] }] }
+            : {}),
           topic,
           currentVersionId: { not: null },
         },

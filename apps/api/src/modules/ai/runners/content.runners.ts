@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { AiJob, Prisma } from '@prisma/client';
-import { ContentDraftResultSchema, type ContentDraftResult } from '@contenter/shared';
+import {
+  ContentDraftResultSchema,
+  VARIANT_ANGLE_INSTRUCTION,
+  isVariantAngle,
+  type ContentDraftResult,
+} from '@contenter/shared';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { AiExecutor } from '../ai-executor.service';
 import { ContextLoader } from '../context-loader.service';
@@ -69,7 +74,9 @@ export class GenerateContentRunner implements AiRunner {
         principles: formatPrinciples(principles),
         brand_docs: formatBrandDocs(brandDocs),
         idea: formatIdea(content.idea),
-        brief: content.brief || '(none)',
+        // a draft written next to others gets its fixed angle (docs/51-draft-variants.md) after the
+        // brief; the prompt template itself is untouched
+        brief: withAngle(content.brief || '(none)', content.variantAngle),
       },
     });
 
@@ -355,4 +362,9 @@ export class RepurposeContentRunner implements AiRunner {
       data: { status: 'GENERATING' },
     });
   }
+}
+
+/** The brief with the draft's fixed writing angle appended; unchanged for a single draft. */
+export function withAngle(brief: string, angle: string | null): string {
+  return isVariantAngle(angle) ? `${brief}\n\n${VARIANT_ANGLE_INSTRUCTION[angle]}` : brief;
 }

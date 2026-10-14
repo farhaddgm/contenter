@@ -377,6 +377,8 @@ export const GenerateContentSchema = z
     ideaId: z.string().optional(),
     brief: z.string().trim().max(5000).optional().default(''),
     format: z.enum(ContentFormat).optional(),
+    /** How many drafts to write side by side (docs/51-draft-variants.md). */
+    variants: z.number().int().min(1).max(3).optional().default(1),
   })
   .refine((v) => !!v.ideaId || (v.brief ?? '').length >= 10, {
     message: 'Either ideaId or a brief (min 10 chars) is required',

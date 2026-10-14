@@ -963,6 +963,10 @@ model Content {
   goldenAt         DateTime?
   /// The content pillar of the business this piece covers (docs/50-coverage-map.md); null = unlabeled
   pillarId         String?
+  /// Drafts written together for one idea share this id; null = a single draft (docs/51-draft-variants.md)
+  variantGroupId   String?
+  /// The fixed writing angle this draft was asked for (`VariantAngle` in packages/shared)
+  variantAngle     String?
   /// The `scheduledAt` the "time to publish" reminder was already sent for (docs/25-notifications.md)
   dueNotifiedFor   DateTime?
   currentVersionId String?       @unique
@@ -992,6 +996,7 @@ model Content {
   @@index([status, updatedAt])
   @@index([campaignId])
   @@index([pillarId])
+  @@index([variantGroupId])
   @@index([scheduledAt])
   @@index([publishedAt])
   @@index([sourceContentId])

@@ -51,7 +51,11 @@ export function useGenerateContent(topicId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: GenerateContentInput) =>
-      api.post<{ jobId: string; contentId: string }>(`/topics/${topicId}/contents/generate`, data),
+      api.post<{
+        jobId: string;
+        contentId: string;
+        variants: { contentId: string; jobId: string; angle: string | null }[];
+      }>(`/topics/${topicId}/contents/generate`, data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: contentKeys.all });
       void qc.invalidateQueries({ queryKey: ['ideas'] });

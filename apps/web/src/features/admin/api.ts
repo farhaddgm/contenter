@@ -1,6 +1,7 @@
 /** Back-office API hooks: users, prompts, settings, audit, dashboard. */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  VariantSettings,
   GoldenSettings,
   SimilaritySettings,
   ReadabilitySettings,
@@ -289,6 +290,26 @@ export function useUpdateGoldenSettings() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['settings', 'golden'] });
       void qc.invalidateQueries({ queryKey: ['businesses'] });
+    },
+  });
+}
+
+// ---------- simultaneous drafts cap (docs/51) ----------
+export function useVariantSettings() {
+  return useQuery({
+    queryKey: ['settings', 'variants'],
+    queryFn: () => api.get<VariantSettings>('/admin/settings/variants'),
+  });
+}
+
+export function useUpdateVariantSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: VariantSettings) =>
+      api.put<VariantSettings>('/admin/settings/variants', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'variants'] });
+      void qc.invalidateQueries({ queryKey: ['topics'] });
     },
   });
 }

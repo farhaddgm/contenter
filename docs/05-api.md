@@ -144,6 +144,11 @@
 | GET / PUT | `/businesses/:id/checklists` | چک‌لیست انتشار کسب‌وکار / جایگزینی کامل ([45-publish-checklist.md](45-publish-checklist.md)) |
 | PUT | `/contents/:id/checklist/:itemId` | **۲۰۴** `{ checked }` — تیک بند چک‌لیست یک محتوا |
 | GET | `/dashboard/productivity?days&topicId&businessId` | **بهره‌وری**: تأیید بدون ویرایش، میانهٔ زمان تا تأیید، هزینه به‌ازای هر محتوا ([44-productivity-dashboard.md](44-productivity-dashboard.md)) |
+| POST | `/topics/:id/contents/generate` | بدنه: `{ ideaId? \| brief, format?, variants? (۱–۳) }`؛ با `variants > 1` چند پیش‌نویس با `variantGroupId` یکسان ([51-draft-variants.md](51-draft-variants.md)) |
+| GET | `/contents/:id/variants` | پیش‌نویس‌های هم‌گروه با عددهای مقایسه |
+| POST | `/contents/:id/variants/pick` | انتخاب این پیش‌نویس؛ بقیهٔ پیش‌نویس‌ها `REJECTED` می‌شوند |
+| GET | `/topics/:id/variant-limit` | سقف تعداد پیش‌نویس هم‌زمان |
+| GET / PUT | `/admin/settings/variants` | سقف پیش‌نویس هم‌زمان (۱–۳) |
 | GET / PUT | `/businesses/:id/pillars` | ستون‌های محتوایی کسب‌وکار / جایگزینی کامل ([50-coverage-map.md](50-coverage-map.md)) |
 | GET | `/businesses/:id/coverage?days&by&staleDays` | **نقشهٔ پوشش**: ستون × پلتفرم یا دورهٔ ۳۰ روزه، سهم و فاصله از هدف |
 | GET | `/topics/:id/pillars` | ستون‌هایی که محتوای این موضوع می‌تواند داشته باشد |

@@ -319,6 +319,9 @@ export interface Content {
   goldenAt: ISODate | null;
   /** The content pillar of the business this covers (docs/50); null = unlabeled. */
   pillarId: string | null;
+  /** Drafts written together for one idea share this id (docs/51); null for a single draft. */
+  variantGroupId: string | null;
+  variantAngle: string | null;
   currentVersionId: string | null;
   lastJobId: string | null;
   createdAt: ISODate;

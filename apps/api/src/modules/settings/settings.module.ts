@@ -4,10 +4,12 @@ import {
   AiSettingsSchema,
   DEFAULT_GOLDEN_SETTINGS,
   DEFAULT_READABILITY_SETTINGS,
+  DEFAULT_VARIANT_SETTINGS,
   DEFAULT_SIMILARITY_SETTINGS,
   DEFAULT_WORKFLOW,
   normalizeModelRef,
   GoldenSettingsSchema,
+  VariantSettingsSchema,
   ReadabilitySettingsSchema,
   SimilaritySettingsSchema,
   WorkflowSettingsSchema,
@@ -17,6 +19,7 @@ import {
   type AiSettingsResponse,
   type GoldenSettings,
   type ReadabilitySettings,
+  type VariantSettings,
   type SimilaritySettings,
   type WorkflowSettings,
 } from '@contenter/shared';
@@ -32,6 +35,7 @@ const WORKFLOW_KEY = 'workflow';
 const READABILITY_KEY = 'readability';
 const SIMILARITY_KEY = 'similarity';
 const GOLDEN_KEY = 'golden';
+const VARIANTS_KEY = 'variants';
 
 const DEFAULT_EFFORT: Record<AiJobType, AiEffort> = {
   ANALYZE_SAMPLE: 'high',
@@ -187,6 +191,29 @@ export class SettingsService {
     return this.getGolden();
   }
 
+  /** The most drafts one generate request may ask for (each one costs a generation; docs/51). */
+  async getVariants(): Promise<VariantSettings> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: VARIANTS_KEY } });
+    const parsed = VariantSettingsSchema.safeParse(row?.value);
+    return parsed.success ? parsed.data : { ...DEFAULT_VARIANT_SETTINGS };
+  }
+
+  async updateVariants(body: VariantSettings, userId: string) {
+    await this.prisma.systemSetting.upsert({
+      where: { key: VARIANTS_KEY },
+      create: { key: VARIANTS_KEY, value: body as unknown as Prisma.InputJsonValue },
+      update: { value: body as unknown as Prisma.InputJsonValue },
+    });
+    this.audit.log({
+      userId,
+      action: 'settings.update',
+      entityType: 'SystemSetting',
+      entityId: VARIANTS_KEY,
+      meta: body as unknown as Record<string, unknown>,
+    });
+    return this.getVariants();
+  }
+
   /** `model` is a `provider:model` reference, resolved by AiProviderRegistry. */
   async modelFor(task: AiJobType): Promise<{ model: string; effort: AiEffort }> {
     const s = await this.getAi();
@@ -272,6 +299,19 @@ export class SettingsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.settings.updateGolden(body, user.id);
+  }
+
+  @Get('variants')
+  getVariants() {
+    return this.settings.getVariants();
+  }
+
+  @Put('variants')
+  updateVariants(
+    @Body(new ZodValidationPipe(VariantSettingsSchema)) body: VariantSettings,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.settings.updateVariants(body, user.id);
   }
 
   private async withStatus(settings: AiSettings): Promise<AiSettingsResponse> {

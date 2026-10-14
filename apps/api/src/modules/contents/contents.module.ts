@@ -15,6 +15,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
   analyzeReadability,
@@ -22,6 +23,7 @@ import {
   checkTerms,
   ContentListQuerySchema,
   defaultFormatFor,
+  variantAnglesFor,
   effectivePlatform,
   RepurposeContentSchema,
   EditContentVersionSchema,
@@ -170,6 +172,7 @@ export class ContentsService {
         businessId: topic?.businessId ?? null,
         ideaId: c.ideaId,
         sourceContentId: c.sourceContentId,
+        variantGroupId: c.variantGroupId,
         title: v.title,
         body: v.body,
       }),
@@ -195,29 +198,45 @@ export class ContentsService {
       : null;
     if (data.ideaId && !idea) throw new BadRequestException('Idea does not belong to this topic');
 
-    const content = await this.prisma.content.create({
-      data: {
+    // Several drafts: N empty shells that share a group, one job each, each with its own fixed angle
+    // (docs/51-draft-variants.md). One draft is the old, single path.
+    const { maxVariants } = await this.settings.getVariants();
+    if (data.variants > maxVariants) {
+      throw new BadRequestException(`At most ${maxVariants} drafts can be written at once`);
+    }
+    const angles = data.variants > 1 ? variantAnglesFor(data.variants) : [];
+    const variantGroupId = angles.length ? randomUUID() : null;
+    const made: { contentId: string; jobId: string; angle: string | null }[] = [];
+    for (let i = 0; i < Math.max(1, angles.length); i++) {
+      const angle = angles[i] ?? null;
+      const content = await this.prisma.content.create({
+        data: {
+          topicId,
+          ideaId: idea?.id ?? null,
+          title: idea?.title ?? data.brief!.slice(0, 120),
+          brief: data.brief ?? '',
+          format: data.format ?? idea?.format ?? 'POST',
+          status: 'GENERATING',
+          createdById: user.id,
+          variantGroupId,
+          variantAngle: angle,
+          // a content written from a tagged idea starts with the idea's tags
+          ...(idea?.tags.length ? { tags: { connect: idea.tags } } : {}),
+        },
+      });
+      const job = await this.jobs.enqueue({
+        type: 'GENERATE_CONTENT',
+        targetType: 'Content',
+        targetId: content.id,
         topicId,
-        ideaId: idea?.id ?? null,
-        title: idea?.title ?? data.brief!.slice(0, 120),
-        brief: data.brief ?? '',
-        format: data.format ?? idea?.format ?? 'POST',
-        status: 'GENERATING',
-        createdById: user.id,
-        // a content written from a tagged idea starts with the idea's tags
-        ...(idea?.tags.length ? { tags: { connect: idea.tags } } : {}),
-      },
-    });
-    const job = await this.jobs.enqueue({
-      type: 'GENERATE_CONTENT',
-      targetType: 'Content',
-      targetId: content.id,
-      topicId,
-      input: data,
-      userId: user.id,
-    });
-    await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
-    return { jobId: job.id, contentId: content.id };
+        input: { ...data, ...(angle ? { variantAngle: angle } : {}) },
+        userId: user.id,
+      });
+      await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
+      made.push({ contentId: content.id, jobId: job.id, angle });
+    }
+    // `jobId` / `contentId` stay the first draft's, as before; `variants` lists them all
+    return { jobId: made[0]!.jobId, contentId: made[0]!.contentId, variants: made };
   }
 
   async revise(id: string, input: ReviseContentInput, user: AuthUser) {

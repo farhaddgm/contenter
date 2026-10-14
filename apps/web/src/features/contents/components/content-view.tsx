@@ -462,6 +462,14 @@ export function ContentView({ contentId }: { contentId: string }) {
               </Badge>
             )}
             {content.idea && <span className="text-xs">💡 {content.idea.title}</span>}
+            {content.variantGroupId && (
+              <Link
+                to={paths.app.contentCompare.getHref(content.id)}
+                className="text-xs text-primary hover:underline"
+              >
+                {t('variants.compareLink')}
+              </Link>
+            )}
           </span>
         }
         actions={

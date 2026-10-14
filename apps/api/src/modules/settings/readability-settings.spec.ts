@@ -86,3 +86,15 @@ describe('SettingsService golden', () => {
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'golden' }));
   });
 });
+
+describe('SettingsService variants', () => {
+  it('has defaults, ignores a damaged value and audits a change', async () => {
+    expect(await setup(undefined).svc.getVariants()).toEqual({ maxVariants: 3 });
+    expect(await setup({ maxVariants: 7 }).svc.getVariants()).toEqual({ maxVariants: 3 });
+    expect(await setup({ maxVariants: 2 }).svc.getVariants()).toEqual({ maxVariants: 2 });
+    const { svc, upsert, log } = setup({ maxVariants: 1 });
+    await svc.updateVariants({ maxVariants: 1 }, 'u1');
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'variants' }));
+  });
+});
