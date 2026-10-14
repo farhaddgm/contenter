@@ -134,6 +134,14 @@ export interface BatchProvider {
   parseBatchResult<T>(raw: unknown, schema: ZodType<T>): StructuredResult<T>;
 }
 
+/** Optional capability: turning texts into vectors (docs/44). Only OpenAI offers it. */
+export interface EmbeddingProvider {
+  embed(texts: string[], model: string): Promise<{ vectors: number[][]; usage: AiUsage }>;
+}
+
+export const isEmbeddingProvider = (p: AiProvider): p is AiProvider & EmbeddingProvider =>
+  typeof (p as Partial<EmbeddingProvider>).embed === 'function';
+
 export const isBatchProvider = (p: AiProvider): p is AiProvider & BatchProvider =>
   typeof (p as Partial<BatchProvider>).submitBatch === 'function';
 

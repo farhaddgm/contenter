@@ -38,6 +38,9 @@ const PRICES: Record<string, Price> = {
   'gpt-4o-mini': { input: 0.15, output: 0.6, cacheRead: 0.5, cacheWrite: 0 },
   o3: { input: 2, output: 8, cacheRead: 0.25, cacheWrite: 0 },
   'o4-mini': { input: 1.1, output: 4.4, cacheRead: 0.25, cacheWrite: 0 },
+  // embeddings: input only
+  'text-embedding-3-small': { input: 0.02, output: 0 },
+  'text-embedding-3-large': { input: 0.13, output: 0 },
 };
 
 const CACHE_READ_MULTIPLIER = 0.1;

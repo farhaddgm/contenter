@@ -297,6 +297,7 @@ export const fa = {
       BUSINESS_AUDIT: 'بررسی کیفیت پروفایل کسب‌وکار',
       REPURPOSE_CONTENT: 'نسخه برای پلتفرم دیگر',
       LEARN_FROM_EDITS: 'یادگیری از ویرایش‌ها',
+      EMBED_REFERENCE: 'نمایه‌سازی معنایی منبع',
     },
     jobStatus: {
       QUEUED: 'در صف',

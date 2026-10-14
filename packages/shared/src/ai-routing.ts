@@ -19,6 +19,7 @@ export const AI_TASK_WEIGHT: Record<AiJobType, AiTaskWeight> = {
   BUSINESS_REVISE: 'heavy',
   BUSINESS_AUDIT: 'heavy',
   LEARN_FROM_EDITS: 'heavy',
+  EMBED_REFERENCE: 'light',
   REVISE_CONTENT: 'light',
   REPURPOSE_CONTENT: 'light',
   IDEATE: 'light',

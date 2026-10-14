@@ -25,9 +25,11 @@ import {
   RepurposeContentRunner,
   ReviseContentRunner,
 } from './runners/content.runners';
+import { EmbedReferenceRunner } from './runners/embed-reference.runner';
 import { IdeateRunner } from './runners/ideate.runner';
 import { LearnFromEditsRunner } from './runners/learn-from-edits.runner';
 import { AI_RUNNERS } from './runners/runner';
+import { SemanticRetriever } from './semantic/semantic.service';
 import { SmartChatRunner } from './runners/smart-chat.runner';
 
 const RUNNERS = [
@@ -38,6 +40,7 @@ const RUNNERS = [
   ReviseContentRunner,
   RepurposeContentRunner,
   LearnFromEditsRunner,
+  EmbedReferenceRunner,
   SmartChatRunner,
   BusinessDiscoverRunner,
   BusinessBuildRunner,
@@ -56,6 +59,7 @@ const RUNNERS = [
     AiAlertsService,
     AiBatchService,
     BudgetService,
+    SemanticRetriever,
     PromptService,
     AiExecutor,
     ContextLoader,
@@ -70,6 +74,7 @@ const RUNNERS = [
     AiProviderRegistry,
     AiAlertsService,
     BudgetService,
+    SemanticRetriever,
   ],
 })
 export class AiModule {}

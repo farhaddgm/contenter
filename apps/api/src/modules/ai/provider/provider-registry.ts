@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AiProviderName, parseModelRef, type AiProviderStatus } from '@contenter/shared';
 import { ENV, type Env } from '../../../config/env';
-import type { AiProvider } from './ai-provider';
+import { isEmbeddingProvider, type AiProvider, type EmbeddingProvider } from './ai-provider';
 import { AnthropicProvider } from './anthropic.provider';
 import { MockProvider } from './mock.provider';
 import { OpenAiProvider } from './openai.provider';
@@ -21,8 +21,10 @@ export class AiProviderRegistry {
   private readonly live: Record<AiProviderName, LiveProvider>;
   private readonly mock = new MockProvider();
   readonly isMock: boolean;
+  private readonly env: Env;
 
   constructor(@Inject(ENV) env: Env) {
+    this.env = env;
     this.isMock = env.AI_PROVIDER === 'mock';
     this.live = {
       anthropic: new AnthropicProvider(env.ANTHROPIC_API_KEY, env.AI_REFUSAL_FALLBACK),
@@ -34,6 +36,18 @@ export class AiProviderRegistry {
   resolve(ref: string): { provider: AiProvider; model: string } {
     const { provider, model } = parseModelRef(ref);
     return { provider: this.isMock ? this.mock : this.live[provider], model };
+  }
+
+  /**
+   * The embeddings vendor and model for semantic retrieval (docs/44), or null when it is off or
+   * no configured vendor offers embeddings (then the whole text is shared equally, as before).
+   */
+  embedder(): { provider: AiProvider & EmbeddingProvider; model: string; ref: string } | null {
+    if (this.env.SEMANTIC_RETRIEVAL === 'off') return null;
+    const { provider: vendor, model } = parseModelRef(this.env.EMBEDDING_MODEL);
+    const provider = this.isMock ? this.mock : this.live[vendor];
+    if (!this.isMock && !this.live[vendor].configured) return null;
+    return isEmbeddingProvider(provider) ? { provider, model, ref: `${vendor}:${model}` } : null;
   }
 
   /** True when the vendor of this model reference has credentials (always true in mock mode). */

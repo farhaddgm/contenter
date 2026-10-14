@@ -7,9 +7,11 @@ import {
   ProviderOverloadedError,
   ProviderUnavailableError,
   type AiProvider,
+  type AiUsage,
   type BatchItemResult,
   type BatchPoll,
   type BatchProvider,
+  type EmbeddingProvider,
   type ResearchRequest,
   type ResearchResult,
   type StructuredRequest,
@@ -42,7 +44,7 @@ const MODELS_TTL_MS = 60 * 60 * 1000;
  * - Contenter effort → `reasoning.effort` on reasoning models (clamped if a model rejects it).
  * - Streaming, so long generations never hit HTTP timeouts. Nothing is stored at OpenAI.
  */
-export class OpenAiProvider implements AiProvider, BatchProvider {
+export class OpenAiProvider implements AiProvider, BatchProvider, EmbeddingProvider {
   readonly name = 'openai';
   private readonly logger = new Logger(OpenAiProvider.name);
   private readonly client: OpenAI | null;
@@ -262,6 +264,35 @@ export class OpenAiProvider implements AiProvider, BatchProvider {
     };
     const response = await client.responses.stream(params).finalResponse();
     return finishStructured(response, req.schema);
+  }
+
+  /** Embeddings of texts, in request order, at most 256 per call. */
+  async embed(
+    texts: string[],
+    model: string,
+  ): Promise<{ vectors: number[][]; usage: AiUsage }> {
+    if (!this.client) {
+      throw new ProviderUnavailableError('OPENAI_API_KEY is not set.', 'auth');
+    }
+    const vectors: number[][] = [];
+    let tokens = 0;
+    try {
+      for (let i = 0; i < texts.length; i += 256) {
+        const res = await this.client.embeddings.create({
+          model,
+          input: texts.slice(i, i + 256),
+          encoding_format: 'float',
+        });
+        for (const d of [...res.data].sort((a, b) => a.index - b.index)) vectors.push(d.embedding);
+        tokens += res.usage?.prompt_tokens ?? 0;
+      }
+    } catch (err) {
+      throw permanentOrRaw(err);
+    }
+    return {
+      vectors,
+      usage: { inputTokens: tokens, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+    };
   }
 
   // ───────────── batch mode (docs/44) ─────────────

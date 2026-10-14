@@ -19,6 +19,7 @@ import {
   type AiProvider,
   type BatchPoll,
   type BatchProvider,
+  type EmbeddingProvider,
   type ResearchRequest,
   type ResearchResult,
   type StructuredRequest,
@@ -61,8 +62,30 @@ function requestedKeys(user: string): BusinessSectionKey[] {
  * Deterministic provider for local development, demos and tests (AI_PROVIDER=mock).
  * Returns schema-valid Persian placeholder data without calling any external service.
  */
-export class MockProvider implements AiProvider, BatchProvider {
+export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvider {
   readonly name = 'mock';
+
+  /**
+   * Deterministic stand-in for an embedding model: words are hashed into 128 buckets and the
+   * counts normalized, so texts that share words get similar vectors. Good for tests and demos.
+   */
+  async embed(texts: string[]): Promise<{ vectors: number[][]; usage: StructuredResult<unknown>['usage'] }> {
+    const vectors = texts.map((text) => {
+      const v = new Array<number>(128).fill(0);
+      for (const word of text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1)) {
+        let h = 5381;
+        for (const ch of word) h = (h * 33 + ch.codePointAt(0)!) % 1_000_003;
+        v[h % 128] += 1;
+      }
+      const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+      return v.map((x) => x / norm);
+    });
+    const chars = texts.reduce((n, t) => n + t.length, 0);
+    return {
+      vectors,
+      usage: { inputTokens: Math.ceil(chars / 4), outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+    };
+  }
 
   // ───────────── batch mode: answers at once, so economy mode works without a vendor ─────────────
 

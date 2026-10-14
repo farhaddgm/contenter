@@ -291,6 +291,7 @@ export const en: DeepStrings<Dictionary> = {
       BUSINESS_AUDIT: 'Audit business profile',
       REPURPOSE_CONTENT: 'Repurpose for another platform',
       LEARN_FROM_EDITS: 'Learn from edits',
+      EMBED_REFERENCE: 'Index a reference for semantic search',
     },
     jobStatus: {
       QUEUED: 'Queued',

@@ -327,8 +327,31 @@ model BusinessReference {
   business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   googleAccount GoogleDriveAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)
   createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  chunks        ReferenceChunk[]
 
   @@index([businessId, createdAt])
+}
+
+/// A piece of a reference's text with its embedding, for picking the passages that fit a task
+/// when the references are too big to send whole (docs/44). Vectors are plain double arrays: the
+/// cosine is computed in code, so no Postgres extension is needed.
+model ReferenceChunk {
+  id          String   @id @default(cuid())
+  referenceId String
+  businessId  String
+  idx         Int
+  text        String
+  embedding   Float[]
+  /// The embedding model (`provider:model`); chunks of another model are not mixed in
+  model       String
+  /// Hash of the reference's text the chunks were cut from; a change makes them stale
+  contentHash String
+  createdAt   DateTime @default(now())
+
+  reference BusinessReference @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+
+  @@unique([referenceId, idx])
+  @@index([businessId])
 }
 
 /// Google account connected (OAuth, drive.readonly) to read private Google Docs/Drive files.
@@ -1301,6 +1324,8 @@ enum AiJobType {
   BUSINESS_AUDIT
   REPURPOSE_CONTENT
   LEARN_FROM_EDITS
+  /// Splits a business reference into chunks and embeds them (docs/44)
+  EMBED_REFERENCE
 }
 
 enum AiJobStatus {

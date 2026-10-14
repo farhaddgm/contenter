@@ -21,6 +21,7 @@ import {
   type UpdateReferenceInput,
 } from '@contenter/shared';
 import { type AuthUser } from '../../common/auth.decorators';
+import { SemanticRetriever } from '../ai/semantic/semantic.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DriveReadError, GoogleDriveService } from '../google-drive/google-drive.service';
@@ -132,6 +133,7 @@ export class ReferencesService {
     private readonly assets: AssetImportService,
     private readonly instagram: InstagramService,
     private readonly crawler: WebsiteCrawlerService,
+    private readonly semantic: SemanticRetriever,
   ) {}
 
   async list(businessId: string) {
@@ -313,6 +315,27 @@ export class ReferencesService {
    * Checks the references an AI job is about to use (all active ones, or `ids`) and returns
    * how many are readable. Used by the service to reject a job that would have nothing to read.
    */
+  /**
+   * (Re)builds the semantic index of the business's readable references (docs/44): one
+   * EMBED_REFERENCE job each, skipped when a job is already working on it or the text did not
+   * change. `available` is false when no embeddings vendor is configured.
+   */
+  async reindex(businessId: string, user: AuthUser) {
+    const refs = await this.prisma.businessReference.findMany({
+      where: usableWhere(businessId),
+      select: { id: true },
+    });
+    const queued = await this.semantic.index(refs, user.id);
+    this.audit.log({
+      userId: user.id,
+      action: 'business.reindex_references',
+      entityType: 'Business',
+      entityId: businessId,
+      meta: { references: refs.length, queued },
+    });
+    return { references: refs.length, queued };
+  }
+
   async readyCount(businessId: string, ids?: string[]) {
     return this.prisma.businessReference.count({ where: usableWhere(businessId, ids) });
   }
