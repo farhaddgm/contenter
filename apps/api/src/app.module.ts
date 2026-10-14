@@ -14,6 +14,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BrandDocsModule } from './modules/brand-docs/brand-docs.module';
 import { BusinessesModule } from './modules/businesses/businesses.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { ChecklistsModule } from './modules/checklists/checklists.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ContentsModule } from './modules/contents/contents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -61,6 +62,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     IdeasModule,
     ContentsModule,
     CalendarModule,
+    ChecklistsModule,
     SearchModule,
     ReviewsModule,
     EditLearningModule,

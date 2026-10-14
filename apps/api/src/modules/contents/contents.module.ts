@@ -41,6 +41,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { ChecklistsService } from '../checklists/checklists.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { ReviewsService } from '../reviews/reviews.service';
 import { TAG_SELECT } from '../tags/tag-select';
@@ -65,6 +66,7 @@ export class ContentsService {
     private readonly audit: AuditService,
     private readonly access: AccessService,
     private readonly reviews: ReviewsService,
+    private readonly checklists: ChecklistsService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
@@ -117,7 +119,13 @@ export class ContentsService {
     ]);
     const c = { ...base, review, reviews };
     const v = c.currentVersion;
-    if (!v) return { ...c, termIssues: [], quality: null };
+    if (!v)
+      return {
+        ...c,
+        termIssues: [],
+        quality: null,
+        checklist: await this.checklists.forContent(id),
+      };
     const topic = await this.prisma.topic.findUnique({
       where: { id: c.topicId },
       select: {
@@ -141,7 +149,12 @@ export class ContentsService {
       terms,
       facts: topic?.business?.facts ?? [],
     });
-    return { ...c, termIssues: terms.length ? checkTerms(text, terms) : [], quality };
+    return {
+      ...c,
+      termIssues: terms.length ? checkTerms(text, terms) : [],
+      quality,
+      checklist: await this.checklists.forContent(id, quality),
+    };
   }
 
   /** Creates the content shell (status GENERATING) and queues the AI draft. */

@@ -48,6 +48,7 @@ import { AuditCard } from '@/features/businesses/components/audit-card';
 import { HealthCard } from '@/features/businesses/components/health-card';
 import { KnowledgePanel } from '@/features/businesses/components/knowledge-panel';
 import { useDriveResultNotice } from '@/features/businesses/components/google-drive-card';
+import { ChecklistsCard } from '@/features/businesses/components/checklists-card';
 import { NotesCard } from '@/features/businesses/components/notes-card';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
 import { SectionCard } from '@/features/businesses/components/section-card';
@@ -267,7 +268,12 @@ export default function BusinessRoute() {
                 label: t(`businesses.tabs.${value}`),
               }))}
             />
-            {tab === 'knowledge' && <KnowledgePanel businessId={business.id} />}
+            {tab === 'knowledge' && (
+              <>
+                <KnowledgePanel businessId={business.id} />
+                <ChecklistsCard businessId={business.id} />
+              </>
+            )}
             {tab === 'references' && <ReferencesCard businessId={business.id} />}
             {tab === 'assets' && <AssetsPanel businessId={business.id} />}
             {tab === 'profile' && (

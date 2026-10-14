@@ -232,3 +232,13 @@ export function useDeleteMetric(contentId: string) {
     api.delete<MetricsResponse>(`/content-metrics/${id}`),
   );
 }
+
+/** Ticks or unticks one point of the publishing checklist (docs/45). */
+export function useToggleChecklistItem(contentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, checked }: { itemId: string; checked: boolean }) =>
+      api.put<void>(`/contents/${contentId}/checklist/${itemId}`, { checked }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.one(contentId) }),
+  });
+}

@@ -41,6 +41,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 ## Calendar & publishing (docs/22-calendar-publishing.md)
 - Only APPROVED content has `scheduledAt`; leaving APPROVED or changing the text clears it (`ReviewsService`). A content with `publishedAt` is frozen: edit/restore/AI revise and every review step answer 409 until unpublished. Publishing on platforms is manual — the app only records it. Calendar dates in the web come from `Intl` (`utils/calendar.ts`), never a hand-written Jalali converter.
 
+## Publishing checklist (docs/45-publish-checklist.md)
+- Per-business `ChecklistTemplate` (platform null = all) + per-content `ContentChecklistTick`; points keep their `id` across edits. An open **required** point makes `CalendarService.schedule` answer 409 (unscheduling is always free); approval and "mark published" are never blocked. `auto: 'QUALITY_CLEAN'` points are answered by the quality gate, are never required and never block. Ticks are cleared in `ReviewsService.resetAfterEdit` (when reviewed/approved text goes back to DRAFT).
+
 ## Repurposing, search & filters (docs/23-repurposing.md, docs/24-search-filters.md)
 - `REPURPOSE_CONTENT` follows the core rule: the request path only creates the empty `Content` shells (`sourceContentId`, `platform`, `format`) and enqueues jobs; `RepurposeContentRunner` writes version 1. A content's platform is `platform ?? topic.platform` (`effectivePlatform`) — use it, never `topic.platform` alone. Text search must go through `matchAllWords` / `termVariants` (shared `search.ts`) so Arabic and Persian letter/digit spellings match; never plain `contains` on a raw query. Content list filters live in the URL (`features/contents/filters.ts`).
 

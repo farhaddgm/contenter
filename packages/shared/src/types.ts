@@ -2,6 +2,7 @@
  * API response shapes (what the web app receives).
  */
 import type { TermIssue } from './business-profile';
+import type { ContentChecklist } from './checklist';
 import type { QualityReport } from './quality';
 import type {
   AiJobStatus,
@@ -335,6 +336,8 @@ export interface Content {
   termIssues?: TermIssue[];
   /** Detail only: the pre-publish quality gate of the current version (docs/41); null without a draft. */
   quality?: QualityReport | null;
+  /** Detail only: the publishing checklist with its state (docs/45); null when the business has none. */
+  checklist?: ContentChecklist | null;
 }
 
 export type PersonRef = Pick<User, 'id' | 'name'>;

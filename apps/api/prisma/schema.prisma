@@ -71,6 +71,7 @@ model User {
   resolvedComments    ContentComment[]          @relation("CommentResolver")
   notifications       Notification[]
   notificationPrefs   NotificationPreference[]
+  checklistTicks      ContentChecklistTick[]    @relation("ChecklistTicker")
 }
 
 model RefreshToken {
@@ -182,6 +183,7 @@ model Business {
   terms       BusinessTerm[]
   audits      BusinessAudit[]
   members     BusinessMember[]
+  checklists  ChecklistTemplate[]
 
   @@index([status, updatedAt])
 }
@@ -962,20 +964,21 @@ model Content {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  topic          Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  idea           Idea?            @relation(fields: [ideaId], references: [id], onDelete: SetNull)
-  profile        ContentProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  campaign       Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  currentVersion ContentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  versions       ContentVersion[] @relation("ContentVersions")
+  topic          Topic                  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  idea           Idea?                  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  profile        ContentProfile?        @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  campaign       Campaign?              @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  currentVersion ContentVersion?        @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       ContentVersion[]       @relation("ContentVersions")
   tags           Tag[]
-  submittedBy    User?            @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
-  source         Content?         @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
-  repurposed     Content[]        @relation("Repurposed")
+  submittedBy    User?                  @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  source         Content?               @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  repurposed     Content[]              @relation("Repurposed")
   reviews        ContentReview[]
   comments       ContentComment[]
   metrics        ContentMetric[]
   notifications  Notification[]
+  checklistTicks ContentChecklistTick[]
 
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
@@ -1047,6 +1050,39 @@ model ContentVersion {
   comments  ContentComment[]
 
   @@unique([contentId, version])
+}
+
+// ───────────────────────── Publishing checklist ─────────────────────────
+// See docs/45-publish-checklist.md. Mirrors packages/shared/src/checklist.ts.
+
+/// The points a person confirms before a content is scheduled: one row per business and platform
+/// (platform null = every platform). `items` is ChecklistItem[]; each keeps its id when edited.
+model ChecklistTemplate {
+  id          String    @id @default(cuid())
+  businessId  String
+  platform    Platform?
+  items       Json
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+/// A person ticked one point (`itemId` of a template item) of a content. Cleared when the reviewed text changes.
+model ContentChecklistTick {
+  id          String   @id @default(cuid())
+  contentId   String
+  itemId      String
+  checkedById String?
+  createdAt   DateTime @default(now())
+
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  checkedBy User?   @relation("ChecklistTicker", fields: [checkedById], references: [id], onDelete: SetNull)
+
+  @@unique([contentId, itemId])
 }
 
 // ───────────────────────── Learning from edits ─────────────────────────

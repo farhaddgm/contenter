@@ -4,6 +4,7 @@ import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AccessService } from '../../common/access';
 import type { AuthUser } from '../../common/auth.decorators';
 import type { AuditService } from '../audit/audit.service';
+import type { ChecklistsService } from '../checklists/checklists.module';
 import { CalendarService } from './calendar.module';
 
 const user: AuthUser = { id: 'u1', email: 'u@x.test', role: 'EDITOR' };
@@ -34,7 +35,9 @@ const row = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function make(opts: { content?: unknown; rows?: unknown[]; ready?: unknown[] } = {}) {
+function make(
+  opts: { content?: unknown; rows?: unknown[]; ready?: unknown[]; checklistOpen?: boolean } = {},
+) {
   const findMany = vi.fn();
   findMany.mockResolvedValueOnce(opts.rows ?? []).mockResolvedValueOnce(opts.ready ?? []);
   const update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => data);
@@ -46,10 +49,17 @@ function make(opts: { content?: unknown; rows?: unknown[]; ready?: unknown[] } =
     },
     $transaction: async (queries: Promise<unknown>[]) => Promise.all(queries),
   };
+  const assertReady = vi.fn(async () => {
+    if (opts.checklistOpen)
+      throw new ConflictException('1 required checklist point(s) are not done yet');
+  });
   return {
-    svc: new CalendarService(prisma as unknown as PrismaService, audit, access),
+    svc: new CalendarService(prisma as unknown as PrismaService, audit, access, {
+      assertReady,
+    } as unknown as ChecklistsService),
     findMany,
     update,
+    assertReady,
   };
 }
 
@@ -120,6 +130,25 @@ describe('CalendarService.schedule', () => {
     expect(update.mock.calls[0]![0].data).toEqual({
       scheduledAt: new Date('2026-10-20T09:00:00.000Z'),
     });
+  });
+
+  it('plans only when the required checklist points are done, and says so before touching the content', async () => {
+    const open = make({ content: approved, checklistOpen: true });
+    await expect(
+      open.svc.schedule('c1', { scheduledAt: '2026-10-20T09:00:00.000Z' }, user),
+    ).rejects.toThrow(/checklist/);
+    expect(open.assertReady).toHaveBeenCalledWith('c1');
+    expect(open.update).not.toHaveBeenCalled();
+  });
+
+  it('never asks about the checklist when taking a content off the calendar', async () => {
+    const { svc, update, assertReady } = make({
+      content: { ...approved, scheduledAt: new Date('2026-10-20T09:00:00Z') },
+      checklistOpen: true,
+    });
+    await svc.schedule('c1', { scheduledAt: null }, user);
+    expect(assertReady).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalled();
   });
 
   it('refuses anything that is not approved', async () => {

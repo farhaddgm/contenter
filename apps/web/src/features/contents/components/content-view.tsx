@@ -41,6 +41,7 @@ import { SchedulePanel } from '@/features/calendar/components/schedule-panel';
 import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
 import { MetricsCard } from './metrics-card';
+import { ChecklistCard } from './checklist-card';
 import { QualityCard } from './quality-card';
 import { RepurposeDialog, RepurposedCard } from './repurpose';
 import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
@@ -598,6 +599,13 @@ export function ContentView({ contentId }: { contentId: string }) {
                 contentId={content.id}
                 issues={content.termIssues ?? []}
                 canFix={editable && !generating && !frozen}
+              />
+            )}
+            {version.id === content.currentVersionId && (
+              <ChecklistCard
+                contentId={content.id}
+                checklist={content.checklist}
+                editable={editable && !frozen}
               />
             )}
             {version.id === content.currentVersionId && <QualityCard quality={content.quality} />}

@@ -677,6 +677,14 @@ export const en: DeepStrings<Dictionary> = {
         DUPLICATE_DAY: 'The day {{arg}} appears twice; the last row is saved.',
       },
     },
+    checklist: {
+      title: 'Publishing checklist',
+      hint: 'Points the business wants confirmed before a content is scheduled. A required point blocks scheduling until it is ticked.',
+      required: 'Required',
+      auto: 'Automatic: no quality warnings',
+      by: '{{name}} · {{when}}',
+      open: '{{count}} required point(s) are not done yet; the content cannot be scheduled until they are.',
+    },
     quality: {
       title: 'Pre-publish quality check',
       hint: 'Done by code (no AI). It only warns and never blocks a review step.',
@@ -1301,6 +1309,20 @@ export const en: DeepStrings<Dictionary> = {
     nav: { errors: 'Error tracker', issues: 'Walker issue log', interactions: 'Interaction log' },
   },
   businesses: {
+    checklists: {
+      title: 'Publishing checklist',
+      hint: 'Points the team confirms before each content is scheduled: for every platform or just one. A required point blocks scheduling until it is ticked; an automatic point only shows whether the text has quality warnings and never blocks.',
+      empty: 'No checklist yet.',
+      allPlatforms: 'Every platform',
+      forPlatform: '{{platform}} only',
+      point: 'Point',
+      required: 'Required',
+      auto: 'Automatic',
+      addPoint: 'Add point',
+      addFor: 'Add a checklist for…',
+      addChecklist: 'Add checklist',
+      saved: 'Checklist saved.',
+    },
     title: 'Businesses',
     subtitle:
       'Each business has its own profile; every AI job in the projects linked to it follows that profile.',
