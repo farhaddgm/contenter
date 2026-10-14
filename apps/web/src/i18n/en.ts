@@ -319,6 +319,32 @@ export const en: DeepStrings<Dictionary> = {
     retried: 'Retried',
     cost: 'Cost',
   },
+  golden: {
+    title: 'Golden example',
+    canMark: 'This text is approved. You can make it an example of the brand voice.',
+    isGolden:
+      'This text is a golden example of the brand and is shown to the model when later drafts are written.',
+    mark: 'Mark as golden example',
+    remove: 'Remove the mark',
+    marked: 'Marked as a golden example',
+    removed: 'Mark removed',
+    hint: 'Editing the text removes the mark. The model reads it only as a reference for tone and structure and must not copy its sentences.',
+    listTitle: 'Golden examples',
+    listHint:
+      'When a draft is written, up to {{max}} of the closest examples (same platform and format), at most {{chars}} characters each, are given to the model.',
+    off: 'Golden examples are switched off in the settings (0 examples).',
+    empty: 'No example is marked yet. Press "Mark as golden example" on an approved content.',
+    notEligible: 'No longer approved; not sent',
+    settings: {
+      title: 'Golden example settings',
+      subtitle:
+        'How many examples, and how long, go into a draft prompt; more examples cost more tokens.',
+      count: 'Number of examples',
+      countHint: '0 = off, at most {{max}}',
+      chars: 'Characters per example',
+      invalid: 'The count must be 0–3 and the length 300–4000.',
+    },
+  },
   feedback: {
     label: 'Feedback on the AI text',
     up: 'Good',

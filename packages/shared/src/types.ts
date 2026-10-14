@@ -315,6 +315,8 @@ export interface Content {
   /** Set by hand once the content is live elsewhere; a published content is frozen. */
   publishedAt: ISODate | null;
   publishedUrl: string | null;
+  /** Set by an admin on approved content that shows how the brand sounds (docs/49). */
+  goldenAt: ISODate | null;
   currentVersionId: string | null;
   lastJobId: string | null;
   createdAt: ISODate;

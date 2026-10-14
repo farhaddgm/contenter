@@ -43,6 +43,7 @@ import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
 import { MetricsCard } from './metrics-card';
 import { ChecklistCard } from './checklist-card';
+import { GoldenCard } from '@/features/golden/components/golden-card';
 import { QualityCard } from './quality-card';
 import { ReadabilityCard } from './readability-card';
 import { SimilarityCard } from './similarity-card';
@@ -609,6 +610,13 @@ export function ContentView({ contentId }: { contentId: string }) {
                 contentId={content.id}
                 issues={content.termIssues ?? []}
                 canFix={editable && !generating && !frozen}
+              />
+            )}
+            {version.id === content.currentVersionId && (
+              <GoldenCard
+                contentId={content.id}
+                goldenAt={content.goldenAt}
+                approved={content.status === 'APPROVED' || !!content.publishedAt}
               />
             )}
             {version.id === content.currentVersionId && (

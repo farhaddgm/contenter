@@ -1,6 +1,7 @@
 /** Back-office API hooks: users, prompts, settings, audit, dashboard. */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  GoldenSettings,
   SimilaritySettings,
   ReadabilitySettings,
   AiSettings,
@@ -269,6 +270,25 @@ export function useUpdateSimilaritySettings() {
       void qc.invalidateQueries({ queryKey: ['settings', 'similarity'] });
       // the similarity of every open content is judged with these scores
       void qc.invalidateQueries({ queryKey: ['contents'] });
+    },
+  });
+}
+
+// ---------- golden example limits (docs/49) ----------
+export function useGoldenSettings() {
+  return useQuery({
+    queryKey: ['settings', 'golden'],
+    queryFn: () => api.get<GoldenSettings>('/admin/settings/golden'),
+  });
+}
+
+export function useUpdateGoldenSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: GoldenSettings) => api.put<GoldenSettings>('/admin/settings/golden', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'golden'] });
+      void qc.invalidateQueries({ queryKey: ['businesses'] });
     },
   });
 }

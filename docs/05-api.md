@@ -144,6 +144,9 @@
 | GET / PUT | `/businesses/:id/checklists` | چک‌لیست انتشار کسب‌وکار / جایگزینی کامل ([45-publish-checklist.md](45-publish-checklist.md)) |
 | PUT | `/contents/:id/checklist/:itemId` | **۲۰۴** `{ checked }` — تیک بند چک‌لیست یک محتوا |
 | GET | `/dashboard/productivity?days&topicId&businessId` | **بهره‌وری**: تأیید بدون ویرایش، میانهٔ زمان تا تأیید، هزینه به‌ازای هر محتوا ([44-productivity-dashboard.md](44-productivity-dashboard.md)) |
+| PUT | `/contents/:id/golden` | ADMIN: `{ golden }` علامت نمونهٔ طلایی (فقط محتوای تأییدشده/منتشرشده) ([49-golden-examples.md](49-golden-examples.md)) |
+| GET | `/businesses/:id/golden` | نمونه‌های طلایی کسب‌وکار با حدود تنظیم‌شده |
+| GET / PUT | `/admin/settings/golden` | تعداد نمونه (۰–۳) و نویسهٔ هر نمونه در پرامپت |
 | GET / PUT | `/admin/settings/similarity` | آستانهٔ «شبیه» و «تقریباً کپی» (۰–۱)؛ فیلد `similarity` در `GET /contents/:id` ([48-similarity.md](48-similarity.md)) |
 | GET / PUT | `/admin/settings/readability` | عبارت‌های رسمی اضافه و سقف میانگین طول جمله برای شاخص خوانایی؛ فیلد `readability` در `GET /contents/:id` ([47-readability.md](47-readability.md)) |
 | GET | `/ai-feedback/mine?targetType&topicId` | رأی‌های 👍/👎 خود کاربر روی خروجی‌های AI یک موضوع ([46-ai-feedback.md](46-ai-feedback.md)) |

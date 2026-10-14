@@ -46,7 +46,11 @@ export class GenerateContentRunner implements AiRunner {
       include: { topic: true, idea: true },
     });
     const [business, principles, profile, brandDocs] = await Promise.all([
-      this.ctx.business(content.topicId),
+      this.ctx.business(content.topicId, {
+        platform: content.platform ?? content.topic.platform,
+        format: content.format,
+        excludeIds: [content.id],
+      }),
       this.ctx.principles(content.topicId),
       this.ctx.activeProfile(content.topicId),
       this.ctx.brandDocs(content.topicId),
@@ -259,7 +263,12 @@ export class RepurposeContentRunner implements AiRunner {
     const { notes } = (job.input ?? {}) as { notes?: string };
 
     const [business, principles, profile, brandDocs] = await Promise.all([
-      this.ctx.business(content.topicId),
+      this.ctx.business(content.topicId, {
+        platform: targetPlatform,
+        format: content.format,
+        // the source is what is being adapted: it is never also an example
+        excludeIds: [content.id, source.id],
+      }),
       this.ctx.principles(content.topicId),
       this.ctx.activeProfile(content.topicId),
       this.ctx.brandDocs(content.topicId),

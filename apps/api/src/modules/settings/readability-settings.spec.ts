@@ -68,3 +68,21 @@ describe('SettingsService similarity', () => {
     );
   });
 });
+
+describe('SettingsService golden', () => {
+  it('has defaults, ignores a damaged value and audits a change', async () => {
+    expect(await setup(undefined).svc.getGolden()).toEqual({ maxExamples: 2, maxChars: 1500 });
+    expect(await setup({ maxExamples: 9 }).svc.getGolden()).toEqual({
+      maxExamples: 2,
+      maxChars: 1500,
+    });
+    expect(await setup({ maxExamples: 0, maxChars: 800 }).svc.getGolden()).toEqual({
+      maxExamples: 0,
+      maxChars: 800,
+    });
+    const { svc, upsert, log } = setup({ maxExamples: 1, maxChars: 900 });
+    await svc.updateGolden({ maxExamples: 1, maxChars: 900 }, 'u1');
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'golden' }));
+  });
+});

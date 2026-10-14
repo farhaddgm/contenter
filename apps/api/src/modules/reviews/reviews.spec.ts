@@ -243,6 +243,8 @@ describe('ReviewsService.resetAfterEdit', () => {
         submittedById: null,
         submittedAt: null,
         scheduledAt: null,
+        // the text is no longer the one that was approved as an example
+        goldenAt: null,
       },
     });
     expect(create).toHaveBeenCalledWith({

@@ -2,10 +2,12 @@ import { Body, Controller, Get, Global, Inject, Injectable, Module, Put } from '
 import { Prisma } from '@prisma/client';
 import {
   AiSettingsSchema,
+  DEFAULT_GOLDEN_SETTINGS,
   DEFAULT_READABILITY_SETTINGS,
   DEFAULT_SIMILARITY_SETTINGS,
   DEFAULT_WORKFLOW,
   normalizeModelRef,
+  GoldenSettingsSchema,
   ReadabilitySettingsSchema,
   SimilaritySettingsSchema,
   WorkflowSettingsSchema,
@@ -13,6 +15,7 @@ import {
   type AiJobType,
   type AiSettings,
   type AiSettingsResponse,
+  type GoldenSettings,
   type ReadabilitySettings,
   type SimilaritySettings,
   type WorkflowSettings,
@@ -28,6 +31,7 @@ const AI_KEY = 'ai';
 const WORKFLOW_KEY = 'workflow';
 const READABILITY_KEY = 'readability';
 const SIMILARITY_KEY = 'similarity';
+const GOLDEN_KEY = 'golden';
 
 const DEFAULT_EFFORT: Record<AiJobType, AiEffort> = {
   ANALYZE_SAMPLE: 'high',
@@ -160,6 +164,29 @@ export class SettingsService {
     return this.getSimilarity();
   }
 
+  /** How many golden examples ride in a draft's prompt and how long each may be (docs/49). */
+  async getGolden(): Promise<GoldenSettings> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: GOLDEN_KEY } });
+    const parsed = GoldenSettingsSchema.safeParse(row?.value);
+    return parsed.success ? parsed.data : { ...DEFAULT_GOLDEN_SETTINGS };
+  }
+
+  async updateGolden(body: GoldenSettings, userId: string) {
+    await this.prisma.systemSetting.upsert({
+      where: { key: GOLDEN_KEY },
+      create: { key: GOLDEN_KEY, value: body as unknown as Prisma.InputJsonValue },
+      update: { value: body as unknown as Prisma.InputJsonValue },
+    });
+    this.audit.log({
+      userId,
+      action: 'settings.update',
+      entityType: 'SystemSetting',
+      entityId: GOLDEN_KEY,
+      meta: body as unknown as Record<string, unknown>,
+    });
+    return this.getGolden();
+  }
+
   /** `model` is a `provider:model` reference, resolved by AiProviderRegistry. */
   async modelFor(task: AiJobType): Promise<{ model: string; effort: AiEffort }> {
     const s = await this.getAi();
@@ -232,6 +259,19 @@ export class SettingsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.settings.updateSimilarity(body, user.id);
+  }
+
+  @Get('golden')
+  getGolden() {
+    return this.settings.getGolden();
+  }
+
+  @Put('golden')
+  updateGolden(
+    @Body(new ZodValidationPipe(GoldenSettingsSchema)) body: GoldenSettings,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.settings.updateGolden(body, user.id);
   }
 
   private async withStatus(settings: AiSettings): Promise<AiSettingsResponse> {

@@ -958,6 +958,8 @@ model Content {
   /// Set by hand once the content is live elsewhere; a published content is frozen
   publishedAt      DateTime?
   publishedUrl     String?
+  /// An admin marked this approved content as an example of the brand's voice (docs/49-golden-examples.md); cleared when the text changes
+  goldenAt         DateTime?
   /// The `scheduledAt` the "time to publish" reminder was already sent for (docs/25-notifications.md)
   dueNotifiedFor   DateTime?
   currentVersionId String?       @unique

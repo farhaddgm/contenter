@@ -212,6 +212,8 @@ export class ReviewsService {
         submittedAt: null,
         // the plan was for the approved text, which is gone
         scheduledAt: null,
+        // an example must be approved text, and this text is no longer the approved one
+        goldenAt: null,
       },
     });
     await db.contentReview.create({

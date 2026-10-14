@@ -1,6 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import {
+  DEFAULT_GOLDEN_SETTINGS,
+  pickGoldenExamples,
+  type ContentFormat,
+  type Platform,
+} from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { SettingsService } from '../settings/settings.module';
+import type { ExampleForPrompt } from './context';
+
+/** What a draft is being written for, so the closest golden examples are chosen. */
+export interface ExampleTarget {
+  platform: Platform;
+  format: ContentFormat;
+  /** The content itself and its source: never an example for themselves. */
+  excludeIds?: string[];
+}
 
 /**
  * What `formatBusiness` needs: the sections (with review state), active key facts and
@@ -32,7 +48,10 @@ export const BUSINESS_PROMPT_INCLUDE = {
  */
 @Injectable()
 export class ContextLoader {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings?: SettingsService,
+  ) {}
 
   /** Active topic principles followed by active global principles. */
   principles(topicId: string) {
@@ -60,7 +79,7 @@ export class ContextLoader {
    * without analyzed sample contents (skipped, or none yet) also gets the business's reference
    * documents, so content rests on documents instead of samples (docs/19-optional-samples.md).
    */
-  async business(topicId: string) {
+  async business(topicId: string, target?: ExampleTarget) {
     const topic = await this.prisma.topic.findUniqueOrThrow({
       where: { id: topicId },
       select: { businessId: true, samplesSkippedAt: true },
@@ -71,7 +90,59 @@ export class ContextLoader {
     const analyzed = topic.samplesSkippedAt
       ? 0
       : await this.prisma.sampleContent.count({ where: { topicId, analysisStatus: 'DONE' } });
-    return { ...business, documents: analyzed > 0 ? [] : await this.documents(topic.businessId) };
+    return {
+      ...business,
+      documents: analyzed > 0 ? [] : await this.documents(topic.businessId),
+      // only a draft being written gets examples; ideas, profiles and the like do not
+      ...(target ? { examples: await this.goldenExamples(topic.businessId, target) } : {}),
+    };
+  }
+
+  /**
+   * Up to K golden examples of the business for a draft (docs/49-golden-examples.md): approved or
+   * published, with a current text, the closest platform/format first, within the admin's limits.
+   * A marked content that was edited, un-approved or deleted is never here.
+   */
+  async goldenExamples(businessId: string, target: ExampleTarget): Promise<ExampleForPrompt[]> {
+    const { maxExamples, maxChars } = (await this.settings?.getGolden()) ?? DEFAULT_GOLDEN_SETTINGS;
+    if (maxExamples <= 0) return [];
+    const rows = await this.prisma.content.findMany({
+      where: {
+        goldenAt: { not: null },
+        topic: { businessId },
+        currentVersionId: { not: null },
+        OR: [{ status: 'APPROVED' }, { publishedAt: { not: null } }],
+        ...(target.excludeIds?.length ? { id: { notIn: target.excludeIds } } : {}),
+      },
+      orderBy: { goldenAt: 'desc' },
+      take: 30,
+      select: {
+        id: true,
+        platform: true,
+        format: true,
+        goldenAt: true,
+        topic: { select: { platform: true } },
+        currentVersion: { select: { title: true, body: true, cta: true } },
+      },
+    });
+    const usable = rows.flatMap((r) =>
+      r.currentVersion && r.goldenAt
+        ? [{ ...r, platform: r.platform ?? r.topic.platform, goldenAt: r.goldenAt, v: r.currentVersion }]
+        : [],
+    );
+    return pickGoldenExamples(usable, target, maxExamples).map((r) => {
+      const text = `${r.v.title}\n${r.v.body}\n${r.v.cta}`;
+      const over = text.length > maxChars;
+      // the body gives way first; title and call to action stay whole
+      const room = Math.max(200, maxChars - r.v.title.length - r.v.cta.length);
+      return {
+        platform: r.platform,
+        format: r.format,
+        title: r.v.title,
+        body: over ? `${r.v.body.slice(0, room)}\n[truncated]` : r.v.body,
+        cta: r.v.cta,
+      };
+    });
   }
 
   /** Readable, active reference documents of a business (same rule as `usableWhere`). */
