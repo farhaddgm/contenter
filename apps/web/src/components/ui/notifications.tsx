@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { useT } from '@/i18n';
 import { useNotifications, type NotificationType } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
 
@@ -10,6 +11,7 @@ const icons: Record<NotificationType, React.ReactNode> = {
 };
 
 export function Notifications() {
+  const t = useT();
   const { notifications, dismiss } = useNotifications();
   return (
     <div
@@ -19,9 +21,9 @@ export function Notifications() {
       {notifications.map((n) => (
         <div
           key={n.id}
-          role="status"
+          role={n.type === 'error' ? 'alert' : 'status'}
           className={cn(
-            'pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border bg-card p-3.5 shadow-lg',
+            'pointer-events-auto flex w-full max-w-sm animate-pop-in items-start gap-3 rounded-xl border bg-card p-3.5 shadow-pop',
             '[&_svg]:size-5 [&_svg]:shrink-0',
           )}
         >
@@ -34,7 +36,8 @@ export function Notifications() {
           </div>
           <button
             onClick={() => dismiss(n.id)}
-            className="text-muted-foreground hover:text-foreground"
+            aria-label={t('common.close')}
+            className="rounded-md p-0.5 text-muted-foreground hover:text-foreground"
           >
             <X className="!size-4" />
           </button>

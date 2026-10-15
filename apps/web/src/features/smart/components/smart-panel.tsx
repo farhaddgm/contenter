@@ -28,12 +28,12 @@ export function SmartPanel() {
       <button
         onClick={() => setMinimized(false)}
         className={cn(
-          'fixed bottom-4 z-[60] flex items-center gap-2 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-2xl transition hover:scale-105',
+          'fixed bottom-4 z-[60] flex items-center gap-2 rounded-full bg-sidebar px-4 py-3 text-sm font-bold text-white shadow-pop ring-2 ring-brand transition hover:scale-105',
           edge,
         )}
         aria-label={t('smart.expand')}
       >
-        <Sparkles className="size-4" />
+        <Sparkles className="size-4 text-brand" />
         {t('smart.name')}
         {openErrors > 0 && (
           <span className="rounded-full bg-white/25 px-1.5 text-[11px]">{openErrors}</span>
@@ -52,18 +52,18 @@ export function SmartPanel() {
     <section
       aria-label={t('smart.name')}
       className={cn(
-        'fixed bottom-4 z-[60] flex h-[min(620px,calc(100vh-6rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl',
+        'fixed bottom-4 z-[60] flex h-[min(620px,calc(100dvh-6rem))] w-[min(400px,calc(100vw-2rem))] animate-pop-in flex-col overflow-hidden rounded-2xl border bg-card shadow-pop',
         edge,
       )}
     >
-      <header className="flex items-center justify-between gap-2 bg-gradient-to-br from-indigo-500 to-purple-600 px-4 py-2.5 text-white">
+      <header className="flex items-center justify-between gap-2 bg-sidebar px-4 py-3 text-white">
         <span className="flex items-center gap-2 font-semibold">
-          <Sparkles className="size-4" /> {t('smart.name')}
+          <Sparkles className="size-4 text-brand" /> {t('smart.name')}
         </span>
         <div className="flex items-center gap-1">
           <button
             onClick={toggleSide}
-            className="rounded-md p-1.5 hover:bg-white/15"
+            className="rounded-lg p-2 hover:bg-white/15"
             title={t('smart.switchSide')}
             aria-label={t('smart.switchSide')}
           >
@@ -71,7 +71,7 @@ export function SmartPanel() {
           </button>
           <button
             onClick={() => setMinimized(true)}
-            className="rounded-md p-1.5 hover:bg-white/15"
+            className="rounded-lg p-2 hover:bg-white/15"
             title={t('smart.minimize')}
             aria-label={t('smart.minimize')}
           >

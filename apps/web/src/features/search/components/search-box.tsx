@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Search } from 'lucide-react';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
@@ -34,20 +34,36 @@ export function SearchBox() {
   };
 
   return (
-    <form onSubmit={submit} role="search" className="relative hidden w-56 sm:block lg:w-72">
-      <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        ref={ref}
-        dir="auto"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={t('search.placeholder')}
+    <>
+      <form
+        onSubmit={submit}
+        role="search"
+        className="relative hidden min-w-0 max-w-md flex-1 sm:block"
+      >
+        <Search className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          ref={ref}
+          dir="auto"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={t('search.placeholder')}
+          aria-label={t('search.title')}
+          className="h-10 w-full truncate rounded-full border border-input bg-card ps-10 pe-10 text-sm transition-[border-color,box-shadow] placeholder:text-muted-foreground/75 hover:border-ring/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/25"
+        />
+        <kbd
+          className="pointer-events-none absolute end-3 top-1/2 hidden -translate-y-1/2 rounded-md border bg-muted px-1.5 text-[10px] font-semibold text-muted-foreground lg:block"
+          aria-hidden="true"
+        >
+          /
+        </kbd>
+      </form>
+      <Link
+        to={paths.app.search.getHref()}
         aria-label={t('search.title')}
-        className="h-9 w-full rounded-full border border-input bg-card ps-9 pe-8 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-      />
-      <kbd className="pointer-events-none absolute end-2.5 top-1/2 hidden -translate-y-1/2 rounded border px-1.5 text-[10px] text-muted-foreground lg:block">
-        /
-      </kbd>
-    </form>
+        className="ms-auto flex size-10 items-center justify-center rounded-full border bg-card text-muted-foreground transition hover:border-ring/60 hover:text-foreground sm:hidden"
+      >
+        <Search className="size-4" />
+      </Link>
+    </>
   );
 }

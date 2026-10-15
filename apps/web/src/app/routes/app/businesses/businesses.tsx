@@ -148,7 +148,7 @@ export default function BusinessesRoute() {
               <Link
                 key={b.id}
                 to={paths.app.business.getHref(b.id)}
-                className="group flex flex-col rounded-lg border bg-card p-5 shadow-xs transition hover:border-primary/40 hover:shadow-md"
+                className="group flex flex-col rounded-xl border bg-card p-5 shadow-card transition hover:-translate-y-0.5 hover:border-primary/40"
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <h3 className="line-clamp-2 font-semibold group-hover:text-primary">{b.name}</h3>
@@ -188,14 +188,16 @@ export default function BusinessesRoute() {
               </Link>
             ))}
           </div>
-          <Card className="mt-4">
-            <Pagination
-              page={data.page}
-              totalPages={data.totalPages}
-              total={data.total}
-              onPageChange={setPage}
-            />
-          </Card>
+          {data.totalPages > 1 && (
+            <Card className="mt-4">
+              <Pagination
+                page={data.page}
+                totalPages={data.totalPages}
+                total={data.total}
+                onPageChange={setPage}
+              />
+            </Card>
+          )}
         </>
       )}
 

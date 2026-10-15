@@ -66,7 +66,7 @@ export function TagPicker({
             <Popover.Content
               align="start"
               sideOffset={6}
-              className="z-50 w-64 rounded-lg border bg-card p-2 text-sm shadow-lg"
+              className="z-50 w-64 rounded-xl border bg-card p-2 text-sm shadow-pop"
             >
               <Input
                 autoFocus

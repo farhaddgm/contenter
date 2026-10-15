@@ -304,7 +304,7 @@ export default function BusinessRoute() {
                 </div>
                 <nav
                   aria-label={t('businesses.toc')}
-                  className="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border bg-card px-4 py-3 text-xs"
+                  className="flex flex-wrap gap-x-4 gap-y-2 rounded-xl border bg-card px-4 py-3 text-xs"
                 >
                   {BUSINESS_SECTION_GROUPS.map(({ group, keys }) => (
                     <div key={group} className="flex flex-wrap items-center gap-1.5">

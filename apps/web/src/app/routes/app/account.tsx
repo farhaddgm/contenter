@@ -35,28 +35,30 @@ export default function AccountRoute() {
         <Card>
           <CardHeader title={t('account.profile')} />
           <CardBody>
-            <dl className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.name')}</dt>
-                <dd>{user.name}</dd>
+            <dl className="space-y-4 text-sm">
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.name')}</dt>
+                <dd className="font-semibold">{user.name}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.email')}</dt>
-                <dd dir="ltr">{user.email}</dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.email')}</dt>
+                <dd dir="ltr" className="text-start font-semibold">
+                  {user.email}
+                </dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.role')}</dt>
-                <dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.role')}</dt>
+                <dd className="font-semibold">
                   <Badge tone="primary">{t(`enums.role.${user.role}`)}</Badge>
                 </dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.loginMethod')}</dt>
-                <dd>{t(`enums.loginMethod.${user.loginMethod}`)}</dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.loginMethod')}</dt>
+                <dd className="font-semibold">{t(`enums.loginMethod.${user.loginMethod}`)}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.lastLogin')}</dt>
-                <dd>{formatDate(user.lastLoginAt)}</dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.lastLogin')}</dt>
+                <dd className="font-semibold">{formatDate(user.lastLoginAt)}</dd>
               </div>
             </dl>
           </CardBody>
