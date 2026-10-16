@@ -3,9 +3,7 @@ import { Api, expect, t, test } from './helpers';
 test('the budget card shows this month and keeps a changed cap', async ({ page, request }) => {
   const api = await Api.login(request);
   await page.goto('/app/admin/settings');
-  const card = page
-    .locator('div.rounded-lg', { has: page.getByRole('heading', { name: t.settings.budget.title }) })
-    .last();
+  const card = page.getByTestId('budget-card');
   await expect(card).toBeVisible();
   await expect(card.getByText(/^ماه \d+\/\d+$/)).toBeVisible();
 
@@ -17,12 +15,7 @@ test('the budget card shows this month and keeps a changed cap', async ({ page, 
   const saved = await api.get('/admin/settings/budget');
   expect(saved.settings.monthlyUsd).toBe(37);
   await page.reload();
-  await expect(
-    page
-      .locator('div.rounded-lg', { has: page.getByRole('heading', { name: t.settings.budget.title }) })
-      .last()
-      .getByLabel(t.settings.budget.cap),
-  ).toHaveValue('37');
+  await expect(page.getByTestId('budget-card').getByLabel(t.settings.budget.cap)).toHaveValue('37');
 
   // leave the shared database as it was found
   await api.send('put', '/admin/settings/budget', { ...saved.settings, monthlyUsd: 20 });

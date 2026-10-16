@@ -46,7 +46,7 @@ export function BudgetCard() {
   const t = useT();
   const { data } = useBudget();
   return (
-    <Card>
+    <Card data-testid="budget-card">
       <CardHeader
         title={
           <span className="flex items-center gap-2">
