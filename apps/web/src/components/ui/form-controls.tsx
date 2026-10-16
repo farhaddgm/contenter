@@ -10,11 +10,11 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 const controlBase =
-  'w-full rounded-md border border-input bg-card px-3 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive';
+  'w-full rounded-control border border-input bg-card px-3 text-sm text-foreground transition-[border-color,box-shadow] placeholder:text-muted-foreground/75 hover:border-ring/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/20';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => (
-    <input ref={ref} className={cn(controlBase, 'h-9', className)} {...props} />
+    <input ref={ref} className={cn(controlBase, 'h-10', className)} {...props} />
   ),
 );
 Input.displayName = 'Input';
@@ -26,7 +26,7 @@ export const Textarea = forwardRef<
   <textarea
     ref={ref}
     rows={rows}
-    className={cn(controlBase, 'py-2 leading-7', className)}
+    className={cn(controlBase, 'py-2.5 leading-7', className)}
     {...props}
   />
 ));
@@ -42,7 +42,11 @@ export const Select = forwardRef<
   SelectHTMLAttributes<HTMLSelectElement> & { options: SelectOption[]; placeholder?: string }
 >(({ className, options, placeholder, ...props }, ref) => (
   <div className="relative">
-    <select ref={ref} className={cn(controlBase, 'h-9 appearance-none pe-9', className)} {...props}>
+    <select
+      ref={ref}
+      className={cn(controlBase, 'h-10 cursor-pointer appearance-none pe-9', className)}
+      {...props}
+    >
       {placeholder !== undefined && <option value="">{placeholder}</option>}
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -65,7 +69,10 @@ export function Label({
   className?: string;
 }) {
   return (
-    <label htmlFor={htmlFor} className={cn('text-sm font-medium leading-none', className)}>
+    <label
+      htmlFor={htmlFor}
+      className={cn('text-[13px] font-semibold leading-none text-foreground', className)}
+    >
       {children}
     </label>
   );
@@ -89,7 +96,7 @@ export function Field({
 }) {
   const id = useId();
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('space-y-2', className)}>
       {label && (
         <Label htmlFor={id}>
           {label}
@@ -100,7 +107,7 @@ export function Field({
       )}
       {children(id)}
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs font-medium text-destructive">
           {error}
         </p>
       ) : hint ? (
@@ -135,13 +142,13 @@ export function Switch({
         disabled={disabled}
         onClick={() => onCheckedChange(!checked)}
         className={cn(
-          'relative h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'relative h-6 w-10 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed',
           checked ? 'bg-primary' : 'bg-input',
         )}
       >
         <span
           className={cn(
-            'absolute top-0.5 size-4 rounded-full bg-white shadow transition-all',
+            'absolute top-0.5 size-5 rounded-full bg-white shadow transition-all',
             checked ? 'start-[1.125rem]' : 'start-0.5',
           )}
         />

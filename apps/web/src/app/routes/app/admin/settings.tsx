@@ -217,6 +217,11 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
         </div>
         <Card>
           <CardHeader title={t('jobs.title')} description={t('settings.effortHint')} />
+          <div className="hidden gap-3 border-b bg-muted/60 px-5 py-2.5 text-xs font-bold text-muted-foreground sm:grid sm:grid-cols-[1fr_18rem_8rem]">
+            <span>{t('settings.jobKind')}</span>
+            <span>{t('settings.modelFor')}</span>
+            <span>{t('settings.effort')}</span>
+          </div>
           <div className="divide-y">
             {AiJobType.map((type) => (
               <div
@@ -226,13 +231,14 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
                 <p className="font-medium">{t(`enums.jobType.${type}`)}</p>
                 <Select
                   dir="ltr"
+                  aria-label={`${t(`enums.jobType.${type}`)} — ${t('settings.modelFor')}`}
                   value={form.models[type] ?? ''}
                   onChange={(e) => setModel(type, e.target.value)}
                   placeholder={`${t('settings.inheritDefault')}`}
                   options={modelOptions}
                 />
                 <Select
-                  dir="ltr"
+                  aria-label={`${t(`enums.jobType.${type}`)} — ${t('settings.effort')}`}
                   value={form.effort[type] ?? 'high'}
                   onChange={(e) =>
                     setForm({
@@ -243,7 +249,7 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
                       },
                     })
                   }
-                  options={AiEffort.map((e) => ({ value: e, label: e }))}
+                  options={AiEffort.map((e) => ({ value: e, label: t(`enums.effort.${e}`) }))}
                 />
               </div>
             ))}

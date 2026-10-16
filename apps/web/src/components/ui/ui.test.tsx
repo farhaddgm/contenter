@@ -5,6 +5,8 @@ import { translate } from '@/i18n';
 import { Badge } from './badge';
 import { Button } from './button';
 import { EmptyState } from './table';
+import { PageHeader } from './misc';
+import { useSmart } from '@/features/smart/store';
 import { Switch } from './form-controls';
 
 describe('i18n', () => {
@@ -26,6 +28,27 @@ describe('UI components', () => {
   it('Badge renders its content', () => {
     render(<Badge tone="success">OK</Badge>);
     expect(screen.getByText('OK')).toBeInTheDocument();
+  });
+
+  it('Badge can show a status dot', () => {
+    const { container } = render(
+      <Badge tone="success" dot>
+        OK
+      </Badge>,
+    );
+    expect(container.querySelector('[aria-hidden]')).toBeInTheDocument();
+  });
+
+  it('PageHeader renders the primary action last in reading order (row-reverse)', () => {
+    render(<PageHeader title="T" actions={<button>Primary</button>} />);
+    expect(screen.getByRole('heading', { name: 'T' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Primary' }).parentElement).toHaveClass(
+      'flex-row-reverse',
+    );
+  });
+
+  it('the Smart panel starts as a small pill, not an open window', () => {
+    expect(useSmart.getInitialState().minimized).toBe(true);
   });
 
   it('EmptyState renders title, description and action', () => {

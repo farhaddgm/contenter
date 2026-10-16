@@ -104,7 +104,7 @@ export default function TopicsRoute() {
               <Link
                 key={topic.id}
                 to={paths.app.topic.getHref(topic.id)}
-                className="group rounded-lg border bg-card p-5 shadow-xs transition hover:border-primary/40 hover:shadow-md"
+                className="group rounded-xl border bg-card p-5 shadow-card transition hover:-translate-y-0.5 hover:border-primary/40"
               >
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
@@ -145,14 +145,16 @@ export default function TopicsRoute() {
               </Link>
             ))}
           </div>
-          <Card className="mt-4">
-            <Pagination
-              page={data.page}
-              totalPages={data.totalPages}
-              total={data.total}
-              onPageChange={setPage}
-            />
-          </Card>
+          {data.totalPages > 1 && (
+            <Card className="mt-4">
+              <Pagination
+                page={data.page}
+                totalPages={data.totalPages}
+                total={data.total}
+                onPageChange={setPage}
+              />
+            </Card>
+          )}
         </>
       )}
 

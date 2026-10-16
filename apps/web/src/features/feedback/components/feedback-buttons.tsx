@@ -110,7 +110,7 @@ function ReasonForm({
   const [reason, setReason] = useState<FeedbackReason | ''>(initialReason ?? '');
   const [note, setNote] = useState(initialNote);
   return (
-    <div className="w-64 space-y-2 rounded-md border bg-card p-3 text-start shadow-sm">
+    <div className="w-64 space-y-2 rounded-xl border bg-card p-3 text-start shadow-pop">
       <Select
         aria-label={t('feedback.reason')}
         value={reason}

@@ -43,7 +43,8 @@ export const useSmart = create<SmartState>()(
     (set, get) => ({
       enabled: true,
       side: 'left',
-      minimized: false,
+      // starts as a small pill so it never covers the page on first visit
+      minimized: true,
       tab: 'walker',
       walkerTopicId: null,
       walkerStep: 'select_topic',

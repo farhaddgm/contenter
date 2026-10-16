@@ -20,7 +20,7 @@ export function SmartToasts() {
         <div
           key={toast.id}
           role="alert"
-          className="pointer-events-auto flex items-start gap-3 rounded-lg border border-destructive/40 bg-card p-3.5 shadow-xl"
+          className="pointer-events-auto flex items-start gap-3 rounded-xl border border-destructive/40 bg-card p-3.5 shadow-pop"
         >
           <AlertOctagon className="mt-0.5 size-5 shrink-0 text-destructive" />
           <div className="min-w-0 flex-1">

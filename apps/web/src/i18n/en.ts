@@ -68,6 +68,12 @@ export const en: DeepStrings<Dictionary> = {
     dark: 'Dark',
     system: 'System',
     language: 'Language',
+    menu: 'Menu',
+    openMenu: 'Open menu',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+    skip: 'Skip to content',
+    appearance: 'Appearance',
   },
   auth: {
     loginTitle: 'Sign in to Contenter',
@@ -269,6 +275,7 @@ export const en: DeepStrings<Dictionary> = {
       NEWSLETTER: 'Newsletter',
       CAPTION: 'Caption',
     },
+    effort: { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' },
     jobType: {
       ANALYZE_SAMPLE: 'Analyze sample',
       BUILD_PROFILE: 'Build profile',
@@ -1363,6 +1370,7 @@ export const en: DeepStrings<Dictionary> = {
     defaultModel: 'Default model',
     modelFor: 'Model',
     effort: 'Effort',
+    jobKind: 'Job type',
     inheritDefault: 'Default model',
     maxSamples: 'Max samples per profile',
     effortHint: 'Higher effort means higher quality and cost.',

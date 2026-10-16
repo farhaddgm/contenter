@@ -8,6 +8,11 @@ import { useT } from '@/i18n';
 import { cn } from '@/utils/cn';
 import { Button } from './button';
 
+/**
+ * Page title block. Actions are authored primary-first; `flex-row-reverse` makes the primary action
+ * the last one in reading order (Bee Researcher rule), in both RTL and LTR. On phones the actions
+ * take their own full-width row.
+ */
 export function PageHeader({
   title,
   description,
@@ -20,14 +25,22 @@ export function PageHeader({
   breadcrumb?: ReactNode;
 }) {
   return (
-    <div className="mb-6 space-y-2">
+    <div className="mb-7 space-y-3">
       {breadcrumb && <div className="text-sm text-muted-foreground">{breadcrumb}</div>}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-          {description && <p className="max-w-3xl text-sm text-muted-foreground">{description}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0 flex-1 basis-80 space-y-1.5">
+          <h1 className="text-balance text-2xl font-extrabold leading-snug tracking-tight sm:text-[1.65rem]">
+            {title}
+          </h1>
+          {description && (
+            <p className="max-w-3xl text-sm leading-7 text-muted-foreground">{description}</p>
+          )}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        {actions && (
+          <div className="flex max-w-full flex-row-reverse flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-start">
+            {actions}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -72,7 +85,7 @@ export function JsonView({ value }: { value: unknown }) {
   return (
     <pre
       dir="ltr"
-      className="max-h-96 overflow-auto rounded-md bg-muted p-3 text-start text-xs leading-5"
+      className="max-h-96 overflow-auto rounded-control bg-muted p-3 text-start text-xs leading-5"
     >
       {JSON.stringify(value, null, 2)}
     </pre>
@@ -86,7 +99,7 @@ export function TabLinks({
   tabs: { to: string; label: ReactNode; end?: boolean; badge?: ReactNode }[];
 }) {
   return (
-    <nav className="mb-6 flex gap-1 overflow-x-auto border-b">
+    <nav className="mb-6 flex gap-1 overflow-x-auto border-b [scrollbar-width:none]">
       {tabs.map((tab) => (
         <NavLink
           key={tab.to}
@@ -94,10 +107,10 @@ export function TabLinks({
           end={tab.end}
           className={({ isActive }) =>
             cn(
-              '-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+              '-mb-px flex items-center gap-2 whitespace-nowrap rounded-t-control border-b-[3px] px-3.5 py-3 text-sm font-semibold transition-colors',
               isActive
                 ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+                : 'border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground',
             )
           }
         >
@@ -120,16 +133,17 @@ export function Segmented<T extends string>({
   options: { value: T; label: ReactNode }[];
 }) {
   return (
-    <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+    <div role="group" className="inline-flex rounded-control border bg-muted p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
+          aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+            'min-h-8 rounded-lg px-3 py-1 text-[13px] font-semibold transition-colors',
             value === o.value
-              ? 'bg-card text-foreground shadow-xs'
+              ? 'bg-card text-primary shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
@@ -148,7 +162,7 @@ export const Dropdown = {
       <DM.Content
         align={align}
         sideOffset={6}
-        className="z-50 min-w-44 rounded-lg border bg-card p-1 text-sm shadow-lg"
+        className="z-50 min-w-48 animate-pop-in rounded-xl border bg-card p-1.5 text-sm shadow-pop"
       >
         {children}
       </DM.Content>
@@ -168,8 +182,8 @@ export const Dropdown = {
     <DM.Item
       onSelect={onSelect}
       className={cn(
-        'flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 outline-none data-[highlighted]:bg-muted [&_svg]:size-4',
-        destructive && 'text-destructive',
+        'flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 font-medium outline-none data-[highlighted]:bg-muted [&_svg]:size-4 [&_svg]:text-muted-foreground',
+        destructive && 'text-destructive [&_svg]:text-destructive',
       )}
     >
       {icon}
@@ -177,7 +191,9 @@ export const Dropdown = {
     </DM.Item>
   ),
   Label: ({ children }: { children: ReactNode }) => (
-    <DM.Label className="px-2.5 py-1.5 text-xs text-muted-foreground">{children}</DM.Label>
+    <DM.Label className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+      {children}
+    </DM.Label>
   ),
   Separator: () => <DM.Separator className="my-1 h-px bg-border" />,
 };

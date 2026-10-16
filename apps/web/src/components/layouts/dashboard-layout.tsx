@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { Dialog as D } from 'radix-ui';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router';
 import {
   Activity,
@@ -15,12 +16,15 @@ import {
   KeyRound,
   LogOut,
   Menu,
+  PanelRightClose,
+  PanelRightOpen,
   Monitor,
   Moon,
   ScrollText,
   Settings,
   ShieldCheck,
   Sun,
+  Check,
   UserCircle,
   Users,
   X,
@@ -70,59 +74,109 @@ const adminNav: NavItem[] = [
   { to: paths.app.admin.audit.getHref(), label: 'nav.audit', icon: <ScrollText /> },
 ];
 
-function Logo() {
+function Logo({ collapsed }: { collapsed?: boolean }) {
   const t = useT();
   return (
-    <Link to={paths.app.dashboard.getHref()} className="flex items-center gap-2.5 px-2">
-      <img src="/logo.svg" alt="" className="size-8" />
-      <div className="leading-tight">
-        <p className="font-bold text-white">{t('app.name')}</p>
-        <p className="text-[11px] text-sidebar-muted">{t('app.tagline')}</p>
-      </div>
+    <Link
+      to={paths.app.dashboard.getHref()}
+      className="flex items-center gap-3 rounded-xl px-2 py-1 outline-offset-4"
+      title={collapsed ? t('app.name') : undefined}
+    >
+      <img src="/logo.svg" alt="" className="size-10 shrink-0 rounded-xl shadow-md" />
+      {!collapsed && (
+        <div className="min-w-0 leading-tight">
+          <p className="text-lg font-extrabold text-white" dir="ltr">
+            {t('app.name')}
+          </p>
+          <p className="truncate text-[11px] text-sidebar-muted">{t('app.tagline')}</p>
+        </div>
+      )}
     </Link>
   );
 }
 
-function NavSection({ title, items }: { title: string; items: NavItem[] }) {
+function NavSection({
+  title,
+  items,
+  collapsed,
+}: {
+  title: string;
+  items: NavItem[];
+  collapsed?: boolean;
+}) {
   const t = useT();
   return (
-    <div className="space-y-1">
-      <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
-        {title}
-      </p>
+    <div className="space-y-1" role="group" aria-label={title}>
+      {collapsed ? (
+        <div className="mx-3 mb-2 h-px bg-white/10" />
+      ) : (
+        <p className="px-3 pb-1.5 text-[11px] font-bold tracking-wide text-sidebar-muted">
+          {title}
+        </p>
+      )}
       {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           end={item.end}
+          title={collapsed ? t(item.label) : undefined}
+          aria-label={collapsed ? t(item.label) : undefined}
           className={({ isActive }) =>
             cn(
-              'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors [&_svg]:size-[18px]',
+              'group relative flex items-center gap-3 rounded-[0.6875rem] px-3 py-2.5 text-sm font-medium transition-colors [&_svg]:size-[18px] [&_svg]:shrink-0',
+              collapsed && 'justify-center px-0',
               isActive
-                ? 'bg-sidebar-active text-white shadow-inner'
-                : 'text-sidebar-foreground hover:bg-white/5 hover:text-white',
+                ? 'bg-sidebar-active font-bold text-white before:absolute before:inset-y-2 before:start-0 before:w-1 before:rounded-full before:bg-brand'
+                : 'text-sidebar-foreground hover:bg-white/8 hover:text-white',
             )
           }
         >
           {item.icon}
-          {t(item.label)}
+          {!collapsed && <span className="truncate">{t(item.label)}</span>}
         </NavLink>
       ))}
     </div>
   );
 }
 
-function Sidebar() {
+function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const t = useT();
   const { can } = useAuthorization();
+  const { setSidebarCollapsed } = useUi();
   return (
-    <div className="flex h-full flex-col gap-6 bg-sidebar px-3 py-5">
-      <Logo />
-      <nav className="flex-1 space-y-6 overflow-y-auto">
-        <NavSection title={t('nav.content')} items={contentNav} />
-        {can('backoffice:access') && <NavSection title={t('nav.backoffice')} items={adminNav} />}
-        {can('backoffice:access') && <NavSection title={t('smart.name')} items={smartNav} />}
+    <div
+      className={cn(
+        'flex h-full flex-col gap-6 bg-sidebar py-5',
+        collapsed ? 'items-stretch px-2' : 'px-3',
+      )}
+    >
+      <Logo collapsed={collapsed} />
+      <nav
+        aria-label={t('app.name')}
+        className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden"
+      >
+        <NavSection title={t('nav.content')} items={contentNav} collapsed={collapsed} />
+        {can('backoffice:access') && (
+          <NavSection title={t('nav.backoffice')} items={adminNav} collapsed={collapsed} />
+        )}
+        {can('backoffice:access') && (
+          <NavSection title={t('smart.name')} items={smartNav} collapsed={collapsed} />
+        )}
       </nav>
+      <button
+        type="button"
+        onClick={() => setSidebarCollapsed(!collapsed)}
+        title={collapsed ? t('nav.expand') : t('nav.collapse')}
+        aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
+        className="hidden items-center gap-3 rounded-[0.6875rem] border-t border-white/10 px-3 py-2.5 text-xs font-medium text-sidebar-muted transition-colors hover:bg-white/8 hover:text-white lg:flex [&_svg]:size-[18px]"
+      >
+        {collapsed ? (
+          <PanelRightOpen className="mx-auto ltr:scale-x-[-1]" />
+        ) : (
+          <PanelRightClose className="ltr:scale-x-[-1]" />
+        )}
+        {!collapsed && t('nav.collapse')}
+      </button>
     </div>
   );
 }
@@ -136,13 +190,15 @@ function UserMenu() {
   if (!user) return null;
   return (
     <Dropdown.Root>
-      <Dropdown.Trigger className="flex items-center gap-2 rounded-full p-1 pe-3 text-sm transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-sm font-semibold text-white">
+      <Dropdown.Trigger className="flex items-center gap-2.5 rounded-full border bg-card p-1 pe-3.5 text-sm shadow-xs transition hover:border-ring/60">
+        <span className="flex size-8 items-center justify-center rounded-full bg-brand text-sm font-extrabold text-brand-foreground">
           {user.name.slice(0, 1)}
         </span>
         <span className="hidden text-start sm:block">
-          <span className="block font-medium leading-tight">{user.name}</span>
-          <span className="block text-xs text-muted-foreground">
+          <span className="block max-w-32 truncate text-[13px] font-bold leading-tight">
+            {user.name}
+          </span>
+          <span className="block text-[11px] leading-tight text-muted-foreground">
             {t(`enums.role.${user.role}`)}
           </span>
         </span>
@@ -162,9 +218,10 @@ function UserMenu() {
           ] as const
         ).map(([value, icon]) => (
           <Dropdown.Item key={value} icon={icon} onSelect={() => setTheme(value)}>
-            <span className={cn(theme === value && 'font-semibold text-primary')}>
+            <span className={cn('flex-1', theme === value && 'font-bold text-primary')}>
               {t(`nav.${value}`)}
             </span>
+            {theme === value && <Check className="text-primary" />}
           </Dropdown.Item>
         ))}
         <Dropdown.Separator />
@@ -190,48 +247,75 @@ function UserMenu() {
 }
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
-  const { sidebarOpen, setSidebarOpen } = useUi();
+  const t = useT();
+  const { sidebarOpen, setSidebarOpen, sidebarCollapsed } = useUi();
   const location = useLocation();
 
   useEffect(() => setSidebarOpen(false), [location.pathname, setSidebarOpen]);
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="min-h-screen w-full">
+      <a
+        href="#main"
+        className="sr-only z-[70] rounded-control bg-primary px-4 py-2 font-semibold text-primary-foreground focus:not-sr-only focus:fixed focus:start-3 focus:top-3"
+      >
+        {t('nav.skip')}
+      </a>
       {/* desktop sidebar */}
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 lg:block">
-        <Sidebar />
+      <aside
+        className={cn(
+          'fixed inset-y-0 start-0 z-30 hidden transition-[width] duration-200 lg:block',
+          sidebarCollapsed ? 'w-[4.5rem]' : 'w-64',
+        )}
+      >
+        <Sidebar collapsed={sidebarCollapsed} />
       </aside>
-      {/* mobile sidebar */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute inset-y-0 start-0 w-64 shadow-2xl">
+      {/* mobile sidebar: a modal drawer (focus trap, Esc to close) */}
+      <D.Root open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <D.Portal>
+          <D.Overlay className="fixed inset-0 z-[64] animate-fade-in bg-[#2a1a0a]/55 backdrop-blur-[2px] lg:hidden" />
+          <D.Content
+            aria-describedby={undefined}
+            className="fixed inset-y-0 start-0 z-[65] w-72 max-w-[85vw] animate-slide-in shadow-pop outline-none ltr:[--slide-dir:-1] rtl:[--slide-dir:1] lg:hidden"
+          >
+            <D.Title className="sr-only">{t('nav.menu')}</D.Title>
             <Sidebar />
-            <button
-              className="absolute end-3 top-5 rounded-md p-1 text-sidebar-foreground hover:bg-white/10"
-              onClick={() => setSidebarOpen(false)}
+            <D.Close
+              aria-label={t('common.close')}
+              className="absolute end-3 top-5 rounded-control p-1.5 text-sidebar-foreground hover:bg-white/10"
             >
               <X className="size-5" />
-            </button>
-          </aside>
-        </div>
-      )}
-      <div className="flex min-w-0 flex-1 flex-col lg:ps-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
+            </D.Close>
+          </D.Content>
+        </D.Portal>
+      </D.Root>
+      <div
+        className={cn(
+          'flex min-h-screen min-w-0 flex-col transition-[padding] duration-200',
+          sidebarCollapsed ? 'lg:ps-[4.5rem]' : 'lg:ps-64',
+        )}
+      >
+        <header className="sticky top-0 z-20 flex h-[4.5rem] items-center gap-3 border-b bg-background/85 px-4 backdrop-blur-md sm:px-6 lg:px-8">
           <button
-            className="rounded-md p-2 hover:bg-muted lg:hidden"
+            type="button"
+            className="flex size-10 items-center justify-center rounded-control border bg-card text-foreground transition hover:bg-muted lg:hidden"
             onClick={() => setSidebarOpen(true)}
-            aria-label="menu"
+            aria-label={t('nav.openMenu')}
           >
             <Menu className="size-5" />
           </button>
-          <div className="flex-1" />
           <SearchBox />
-          <NotificationBell />
-          <SmartToggle />
-          <UserMenu />
+          <div className="flex shrink-0 items-center gap-1.5 sm:ms-auto sm:gap-2.5">
+            <NotificationBell />
+            <SmartToggle />
+            <UserMenu />
+          </div>
         </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-[96rem] min-w-0 flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8"
+        >
           {children}
         </main>
         <SmartRoot />
