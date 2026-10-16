@@ -2,7 +2,7 @@ import { Switch } from '@/components/ui/form-controls';
 import { useT } from '@/i18n';
 
 /**
- * Economy mode (docs/44-reliability-and-cost.md): the model call goes to the vendor's batch
+ * Economy mode (docs/60-reliability-and-cost.md): the model call goes to the vendor's batch
  * API — about half the price, but the result may take up to 24 hours.
  */
 export function EconomyToggle({

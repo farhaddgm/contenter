@@ -18,7 +18,7 @@ export interface DocumentWithId extends DocumentForPrompt {
 
 /**
  * Picks the passages of a business's references that fit a task, by meaning, when the references
- * are too big to send whole (docs/44-reliability-and-cost.md). Everything is code except the
+ * are too big to send whole (docs/60-reliability-and-cost.md). Everything is code except the
  * embedding of the question and of the chunks, which is a model call made by the queue worker
  * (the question here, the chunks in `EmbedReferenceRunner`). Cosine similarity is computed in
  * code over vectors stored as plain arrays, so no database extension is needed.

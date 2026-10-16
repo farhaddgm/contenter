@@ -9,7 +9,7 @@ import type { AiRunner, RunnerResult } from './runner';
 const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
 /**
- * Cuts a business reference into chunks (code) and stores an embedding of each (docs/44). The
+ * Cuts a business reference into chunks (code) and stores an embedding of each (docs/60). The
  * model only turns text into numbers; which chunks a task gets is decided by code in
  * `SemanticRetriever`. Running it again on an unchanged reference does nothing and costs nothing.
  */

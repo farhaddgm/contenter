@@ -21,7 +21,7 @@ const EnvSchema = z.object({
   QUEUE_DRIVER: z.enum(['bullmq', 'inline']).default('bullmq'),
   /**
    * Pick the passages of big business references that fit a task, by meaning, instead of sending
-   * an equal slice of each (docs/44). `auto`: on when an embeddings vendor is configured.
+   * an equal slice of each (docs/60). `auto`: on when an embeddings vendor is configured.
    */
   SEMANTIC_RETRIEVAL: z.enum(['auto', 'on', 'off']).default('auto'),
   /** Embedding model as `provider:model`; only OpenAI offers embeddings. */

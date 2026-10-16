@@ -41,7 +41,7 @@ const toNumber = (v: string): number | null => {
   return v.trim() === '' || !Number.isFinite(n) || n < 0 ? null : n;
 };
 
-/** Monthly AI budget (docs/44-reliability-and-cost.md): cap, warning level, hard stop, usage. */
+/** Monthly AI budget (docs/60-reliability-and-cost.md): cap, warning level, hard stop, usage. */
 export function BudgetCard() {
   const t = useT();
   const { data } = useBudget();

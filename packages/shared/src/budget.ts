@@ -1,5 +1,5 @@
 /**
- * Monthly AI budget (docs/44-reliability-and-cost.md). Spending is the sum of `AiJob.costUsd`
+ * Monthly AI budget (docs/60-reliability-and-cost.md). Spending is the sum of `AiJob.costUsd`
  * of the jobs that finished in the month. Everything here is pure; the API reads the jobs.
  *
  * The default month is the Persian (Jalali) month, because that is how the owner thinks about

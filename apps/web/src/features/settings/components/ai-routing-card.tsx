@@ -7,7 +7,7 @@ import { Field, Select, type SelectOption } from '@/components/ui/form-controls'
 import { useT } from '@/i18n';
 
 /**
- * Fallback model and cost routing (docs/44-reliability-and-cost.md). Both only edit the settings
+ * Fallback model and cost routing (docs/60-reliability-and-cost.md). Both only edit the settings
  * form; nothing is saved until the page's Save button is pressed.
  */
 export function AiRoutingCard({

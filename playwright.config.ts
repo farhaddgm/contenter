@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Browser tests of the main flows (docs/44-reliability-and-cost.md, "E2E"). They run against the
+ * Browser tests of the main flows (docs/60-reliability-and-cost.md, "E2E"). They run against the
  * real API (built, mock AI, inline queue) and the web dev server on a real Postgres that already
  * has the migrations and the seed. See e2e/README.md.
  *

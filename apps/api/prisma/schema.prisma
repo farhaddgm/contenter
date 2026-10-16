@@ -333,7 +333,7 @@ model BusinessReference {
 }
 
 /// A piece of a reference's text with its embedding, for picking the passages that fit a task
-/// when the references are too big to send whole (docs/44). Vectors are plain double arrays: the
+/// when the references are too big to send whole (docs/60). Vectors are plain double arrays: the
 /// cosine is computed in code, so no Postgres extension is needed.
 model ReferenceChunk {
   id          String   @id @default(cuid())
@@ -1324,7 +1324,7 @@ enum AiJobType {
   BUSINESS_AUDIT
   REPURPOSE_CONTENT
   LEARN_FROM_EDITS
-  /// Splits a business reference into chunks and embeds them (docs/44)
+  /// Splits a business reference into chunks and embeds them (docs/60)
   EMBED_REFERENCE
 }
 
@@ -1334,7 +1334,7 @@ enum AiJobStatus {
   SUCCEEDED
   FAILED
   CANCELED
-  /// Economy mode: the model call is with the vendor's batch queue (docs/44)
+  /// Economy mode: the model call is with the vendor's batch queue (docs/60)
   WAITING
 }
 
@@ -1357,7 +1357,7 @@ model AiJob {
   promptKey       String?
   promptVersion   Int?
   createdById     String?
-  /// Run through the vendor's batch API: about half the price, result within 24 hours (docs/44)
+  /// Run through the vendor's batch API: about half the price, result within 24 hours (docs/60)
   economy         Boolean     @default(false)
   startedAt       DateTime?
   finishedAt      DateTime?
@@ -1381,7 +1381,7 @@ enum AiBatchStatus {
 }
 
 /// One model call of an economy-mode job, waiting for or holding its batch result. A job is run
-/// again when its calls are done and replays earlier calls from here by `seq` (docs/44).
+/// again when its calls are done and replays earlier calls from here by `seq` (docs/60).
 model AiBatchCall {
   id        String        @id @default(cuid())
   jobId     String

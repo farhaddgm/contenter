@@ -39,7 +39,7 @@ export class AiProviderRegistry {
   }
 
   /**
-   * The embeddings vendor and model for semantic retrieval (docs/44), or null when it is off or
+   * The embeddings vendor and model for semantic retrieval (docs/60), or null when it is off or
    * no configured vendor offers embeddings (then the whole text is shared equally, as before).
    */
   embedder(): { provider: AiProvider & EmbeddingProvider; model: string; ref: string } | null {

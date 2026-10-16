@@ -1,5 +1,5 @@
 /**
- * Model routing by cost (docs/44-reliability-and-cost.md): heavy tasks get a strong model, light
+ * Model routing by cost (docs/60-reliability-and-cost.md): heavy tasks get a strong model, light
  * ones a cheap model. Pure suggestion; the admin applies it from Settings and can still change
  * every task by hand.
  */
@@ -43,7 +43,7 @@ export function suggestRouting(strong: string, light: string): Record<string, st
 }
 
 /**
- * Tasks that may run in economy mode (the vendor's batch API, docs/44): one model call, no web
+ * Tasks that may run in economy mode (the vendor's batch API, docs/60): one model call, no web
  * search, nobody waiting at the screen. Research steps cannot be batched, so the business tasks
  * that research stay out.
  */

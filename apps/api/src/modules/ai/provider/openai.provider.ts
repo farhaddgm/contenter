@@ -295,7 +295,7 @@ export class OpenAiProvider implements AiProvider, BatchProvider, EmbeddingProvi
     };
   }
 
-  // ───────────── batch mode (docs/44) ─────────────
+  // ───────────── batch mode (docs/60) ─────────────
 
   async buildBatchParams(req: StructuredRequest<unknown>): Promise<Record<string, unknown>> {
     return this.structuredBody(req, req.imageUrls ?? [], req.effort) as Record<string, unknown>;

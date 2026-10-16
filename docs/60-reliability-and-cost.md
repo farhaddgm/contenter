@@ -90,9 +90,9 @@
 
 ## ۶. مهاجرت‌ها و تنظیمات
 
-- `20261014090000_ai_alert_events`: سه مقدار `NotificationEvent`.
-- `20261014100000_ai_economy_batch`: مقدار `WAITING` برای `AiJobStatus`، ستون `AiJob.economy` و جدول `AiBatchCall`.
-- `20261014110000_reference_chunks`: مقدار `EMBED_REFERENCE` برای `AiJobType` و جدول `ReferenceChunk`.
+- `20261016090000_ai_alert_events`: سه مقدار `NotificationEvent`.
+- `20261016100000_ai_economy_batch`: مقدار `WAITING` برای `AiJobStatus`، ستون `AiJob.economy` و جدول `AiBatchCall`.
+- `20261016110000_reference_chunks`: مقدار `EMBED_REFERENCE` برای `AiJobType` و جدول `ReferenceChunk`.
 - همه افزایشی‌اند. متغیرهای تازه: `SEMANTIC_RETRIEVAL`، `EMBEDDING_MODEL` (اختیاری).
 
 ## ۷. آنچه راستی‌آزمایی نشد

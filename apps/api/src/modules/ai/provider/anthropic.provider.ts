@@ -145,7 +145,7 @@ export class AnthropicProvider implements AiProvider, BatchProvider {
     return finishStructured(message, req.schema);
   }
 
-  // ───────────── batch mode (docs/44) ─────────────
+  // ───────────── batch mode (docs/60) ─────────────
 
   async buildBatchParams(req: StructuredRequest<unknown>): Promise<Record<string, unknown>> {
     return this.structuredParams(req, req.imageUrls ?? []) as unknown as Record<string, unknown>;

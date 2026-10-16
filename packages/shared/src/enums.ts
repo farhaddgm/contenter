@@ -159,7 +159,7 @@ export const AiJobStatus = [
   'SUCCEEDED',
   'FAILED',
   'CANCELED',
-  /** Economy mode: waiting for the vendor's batch result (docs/44). */
+  /** Economy mode: waiting for the vendor's batch result (docs/60). */
   'WAITING',
 ] as const;
 export type AiJobStatus = (typeof AiJobStatus)[number];

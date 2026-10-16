@@ -316,7 +316,7 @@ export class ReferencesService {
    * how many are readable. Used by the service to reject a job that would have nothing to read.
    */
   /**
-   * (Re)builds the semantic index of the business's readable references (docs/44): one
+   * (Re)builds the semantic index of the business's readable references (docs/60): one
    * EMBED_REFERENCE job each, skipped when a job is already working on it or the text did not
    * change. `available` is false when no embeddings vendor is configured.
    */

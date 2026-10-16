@@ -32,7 +32,7 @@ const round = (n: number) => Math.round(n * 10_000) / 10_000;
 const money = (n: number) => `$${n.toFixed(2)}`;
 
 /**
- * Monthly AI budget (docs/44-reliability-and-cost.md): one cap for everything and optional caps
+ * Monthly AI budget (docs/60-reliability-and-cost.md): one cap for everything and optional caps
  * per business. By default it only warns the admins; with `hardStop` a job asked after the cap
  * is used up is not run. Spending = `costUsd` of the jobs that finished in the month.
  */

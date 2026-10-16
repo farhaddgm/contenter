@@ -17,7 +17,7 @@ export const NotificationEvent = [
   'CONTENT_DUE',
   /** A system event, not about a content: the weekly restore check of the backups failed (docs/13). */
   'BACKUP_VERIFY_FAILED',
-  /** System events about AI cost and availability (docs/44): for admins, carry their detail in `note`. */
+  /** System events about AI cost and availability (docs/60): for admins, carry their detail in `note`. */
   'AI_FALLBACK_USED',
   'AI_BUDGET_WARNING',
   'AI_BUDGET_EXCEEDED',

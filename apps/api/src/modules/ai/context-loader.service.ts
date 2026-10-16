@@ -8,7 +8,7 @@ import {
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.module';
-import { MAX_DOCUMENTS_TEXT, type ExampleForPrompt } from './context';
+import { MAX_DOCUMENTS_TEXT, type DocumentForPrompt, type ExampleForPrompt } from './context';
 import { SemanticRetriever } from './semantic/semantic.service';
 
 /** What a draft is being written for, so the closest golden examples are chosen. */
@@ -82,7 +82,7 @@ export class ContextLoader {
    * documents, so content rests on documents instead of samples (docs/19-optional-samples.md).
    * When those documents are too big to send whole, the passages closest in meaning to the topic
    * (and to `extraQuery`, e.g. the brief) are chosen instead of an equal slice of each
-   * (docs/44-reliability-and-cost.md).
+   * (docs/60-reliability-and-cost.md).
    */
   async business(topicId: string, target?: ExampleTarget) {
     const topic = await this.prisma.topic.findUniqueOrThrow({
@@ -101,12 +101,12 @@ export class ContextLoader {
     const analyzed = topic.samplesSkippedAt
       ? 0
       : await this.prisma.sampleContent.count({ where: { topicId, analysisStatus: 'DONE' } });
-    // big reference documents are cut to the passages closest to the topic (docs/44)
-    let documents: Awaited<ReturnType<ContextLoader['documents']>> = [];
+    // big reference documents are cut to the passages closest to the topic (docs/60)
+    let documents: DocumentForPrompt[] = [];
     if (analyzed === 0) {
-      documents = await this.documents(topic.businessId);
+      const all = await this.documents(topic.businessId);
       const query = [topic.title, topic.description, topic.audience].filter(Boolean).join('\n');
-      documents = (await this.semantic?.select(documents, query, MAX_DOCUMENTS_TEXT)) ?? documents;
+      documents = (await this.semantic?.select(all, query, MAX_DOCUMENTS_TEXT)) ?? all;
     }
     return {
       ...business,

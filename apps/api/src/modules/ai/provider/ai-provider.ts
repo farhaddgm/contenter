@@ -8,7 +8,7 @@ export interface AiUsage {
   cacheWriteTokens: number;
   /** Server-side web searches run by the vendor (billed per search). */
   webSearches?: number;
-  /** Answered through the vendor's batch API, billed at about half price (docs/44). */
+  /** Answered through the vendor's batch API, billed at about half price (docs/60). */
   batch?: boolean;
 }
 
@@ -120,7 +120,7 @@ export type BatchPoll =
 
 /**
  * Optional capability of a provider: structured calls through the vendor's batch API (about half
- * the price, an answer within 24 hours). Used by economy-mode jobs (docs/44). A request is
+ * the price, an answer within 24 hours). Used by economy-mode jobs (docs/60). A request is
  * turned into plain JSON when the call is made (`buildBatchParams`), submitted later together
  * with others (`submitBatch`), and the raw answer is read back with the task's schema
  * (`parseBatchResult`).
@@ -134,7 +134,7 @@ export interface BatchProvider {
   parseBatchResult<T>(raw: unknown, schema: ZodType<T>): StructuredResult<T>;
 }
 
-/** Optional capability: turning texts into vectors (docs/44). Only OpenAI offers it. */
+/** Optional capability: turning texts into vectors (docs/60). Only OpenAI offers it. */
 export interface EmbeddingProvider {
   embed(texts: string[], model: string): Promise<{ vectors: number[][]; usage: AiUsage }>;
 }

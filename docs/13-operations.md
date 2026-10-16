@@ -104,7 +104,7 @@ df -h /
 | تنظیم | توضیح |
 |---|---|
 | `OPENAI_API_KEY` | کلید OpenAI (فعلاً همهٔ کارهای AI با OpenAI انجام می‌شود) |
-| `SEMANTIC_RETRIEVAL` | `auto` (پیش‌فرض: با کلید OpenAI روشن)، `on` یا `off`؛ انتخاب معنایی بخش‌های مراجع بزرگ ([44](44-reliability-and-cost.md)) |
+| `SEMANTIC_RETRIEVAL` | `auto` (پیش‌فرض: با کلید OpenAI روشن)، `on` یا `off`؛ انتخاب معنایی بخش‌های مراجع بزرگ ([60](60-reliability-and-cost.md)) |
 | `EMBEDDING_MODEL` | مدل تعبیه، `provider:model`؛ پیش‌فرض `openai:text-embedding-3-small` |
 | `ANTHROPIC_API_KEY` | کلید Claude؛ بعد از گذاشتن، در سایت ← تنظیمات مدل‌ها را به Claude تغییر دهید |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ورود با جیمیل ([11-google-login.md](11-google-login.md)) |

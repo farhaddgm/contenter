@@ -214,7 +214,7 @@ export function useAuditLogs(params: { page: number; q?: string; entityType?: st
   });
 }
 
-// ---------- monthly AI budget (docs/44) ----------
+// ---------- monthly AI budget (docs/60) ----------
 export function useBudget() {
   return useQuery({
     queryKey: ['settings', 'budget'],

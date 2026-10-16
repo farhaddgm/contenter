@@ -182,7 +182,7 @@
 | GET | `/admin/prompts` | کلیدها و نسخهٔ فعال هرکدام |
 | GET / POST | `/admin/prompts/:key/versions` | نسخه‌ها / ایجاد نسخهٔ جدید |
 | PUT | `/admin/prompts/:key/versions/:v/activate` | فعال‌سازی |
-| GET / PUT | `/admin/settings/ai` | مدل، effort، سقف نمونه و `fallbackModel` (مدل پشتیبان، [44](44-reliability-and-cost.md)) |
-| GET / PUT | `/admin/settings/budget` | بودجهٔ ماهانهٔ AI: `{ settings, usage }` (سقف، هشدار، توقف سخت، سقف هر کسب‌وکار؛ [44](44-reliability-and-cost.md)) |
+| GET / PUT | `/admin/settings/ai` | مدل، effort، سقف نمونه و `fallbackModel` (مدل پشتیبان، [60](60-reliability-and-cost.md)) |
+| GET / PUT | `/admin/settings/budget` | بودجهٔ ماهانهٔ AI: `{ settings, usage }` (سقف، هشدار، توقف سخت، سقف هر کسب‌وکار؛ [60](60-reliability-and-cost.md)) |
 | POST | `/businesses/:id/references/reindex` | **۲۰۲** — نمایه‌سازی معنایی مراجع را (دوباره) صف می‌کند ← `{ references, queued }` |
 | GET | `/admin/audit-logs?q&entityType&page` | لاگ ممیزی |

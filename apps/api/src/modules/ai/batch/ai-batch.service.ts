@@ -15,7 +15,7 @@ const MAX_PER_BATCH = 200;
 
 /**
  * Keeps the calls of economy-mode jobs: stores each prepared request, sends the waiting ones to
- * the vendor's batch API, collects the answers and wakes the jobs up (docs/44). Calls that the
+ * the vendor's batch API, collects the answers and wakes the jobs up (docs/60). Calls that the
  * vendor cannot deliver (rejected, expired, taking too long) are marked FAILED; the job then
  * runs that call live at the normal price, so economy mode can delay a result but not lose it.
  * Runs where the worker runs.

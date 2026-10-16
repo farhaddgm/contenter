@@ -891,7 +891,7 @@ export class BusinessesController {
     return this.refs.list(id);
   }
 
-  /** Rebuilds the semantic index of the references (docs/44); the work runs as AI jobs. */
+  /** Rebuilds the semantic index of the references (docs/60); the work runs as AI jobs. */
   @BusinessScoped('business')
   @Post(':id/references/reindex')
   @HttpCode(202)

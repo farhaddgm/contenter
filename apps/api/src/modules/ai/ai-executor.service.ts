@@ -138,7 +138,7 @@ export class AiExecutor {
   }
 
   /**
-   * Economy mode (docs/44): the call goes to the vendor's batch API. The first run stores the
+   * Economy mode (docs/60): the call goes to the vendor's batch API. The first run stores the
    * request and defers the job; the run after the batch answered finds the answer by position and
    * returns it as if it were live. A batch that failed lets this call (and the rest of the run)
    * go live at the normal price. Returns null when the call should run live.

@@ -219,7 +219,7 @@ export type DocumentForPrompt = {
   title: string;
   url: string;
   content: string;
-  /** Passages chosen for this task by meaning (docs/44); already within the budget. */
+  /** Passages chosen for this task by meaning (docs/60); already within the budget. */
   selected?: boolean;
 };
 

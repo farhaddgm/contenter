@@ -379,7 +379,7 @@ export const GenerateContentSchema = z
     format: z.enum(ContentFormat).optional(),
     /** How many drafts to write side by side (docs/51-draft-variants.md). */
     variants: z.number().int().min(1).max(3).optional().default(1),
-    /** Economy mode: about half the price, the result comes within 24 hours (docs/44). */
+    /** Economy mode: about half the price, the result comes within 24 hours (docs/60). */
     economy: z.boolean().optional(),
   })
   .refine((v) => !!v.ideaId || (v.brief ?? '').length >= 10, {
@@ -533,7 +533,7 @@ export const RepurposeContentSchema = z
       .max(MAX_REPURPOSE_TARGETS),
     /** Direction for the writer, e.g. "shorter, more formal". */
     notes: z.string().trim().max(2000).optional().default(''),
-    /** Economy mode: about half the price, the result comes within 24 hours (docs/44). */
+    /** Economy mode: about half the price, the result comes within 24 hours (docs/60). */
     economy: z.boolean().optional(),
   })
   .refine(
@@ -566,7 +566,7 @@ export const AiSettingsSchema = z.object({
   maxSamplesPerProfile: z.number().int().min(1).max(50),
   /**
    * Model used when the chosen one's vendor is out of credit, rejects the key or is down
-   * (docs/44-reliability-and-cost.md). `provider:model`; empty/absent = no fallback.
+   * (docs/60-reliability-and-cost.md). `provider:model`; empty/absent = no fallback.
    */
   fallbackModel: z
     .union([z.string().trim().min(3).max(120).regex(MODEL_REF_PATTERN), z.literal('')])

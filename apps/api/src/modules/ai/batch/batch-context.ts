@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 /**
- * State of one run of an economy-mode job (docs/44-reliability-and-cost.md).
+ * State of one run of an economy-mode job (docs/60-reliability-and-cost.md).
  *
  * A runner calls the model through `AiExecutor.execute`. In economy mode that call does not
  * answer at once: the request is stored and sent to the vendor's batch API, and the run stops
