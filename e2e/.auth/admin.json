@@ -1,0 +1,25 @@
+{
+  "cookies": [
+    {
+      "name": "contenter_rt",
+      "value": "NIR8YXOeqKP5Je1XsixRROFsg6qBMpOSK7fyolafhxg1kM0NTDZI0Th9KPnpWgIF",
+      "domain": "127.0.0.1",
+      "path": "/api/auth",
+      "expires": 1794543765.958848,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:5173",
+      "localStorage": [
+        {
+          "name": "contenter-ui",
+          "value": "{\"state\":{\"theme\":\"system\",\"lang\":\"fa\"},\"version\":0}"
+        }
+      ]
+    }
+  ]
+}

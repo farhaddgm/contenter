@@ -241,6 +241,7 @@ export class ContentsService {
         topicId,
         input: { ...data, ...(angle ? { variantAngle: angle } : {}) },
         userId: user.id,
+        economy: data.economy,
       });
       await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
       made.push({ contentId: content.id, jobId: job.id, angle });
@@ -372,6 +373,7 @@ export class ContentsService {
         topicId: source.topicId,
         input: { platform: target.platform, format, notes: data.notes, sourceContentId: source.id },
         userId: user.id,
+        economy: data.economy,
       });
       await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
       items.push({ contentId: content.id, jobId: job.id, platform: target.platform, format });

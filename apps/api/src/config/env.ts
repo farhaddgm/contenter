@@ -19,6 +19,13 @@ const EnvSchema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   DATABASE_URL: z.string().min(1),
   QUEUE_DRIVER: z.enum(['bullmq', 'inline']).default('bullmq'),
+  /**
+   * Pick the passages of big business references that fit a task, by meaning, instead of sending
+   * an equal slice of each (docs/60). `auto`: on when an embeddings vendor is configured.
+   */
+  SEMANTIC_RETRIEVAL: z.enum(['auto', 'on', 'off']).default('auto'),
+  /** Embedding model as `provider:model`; only OpenAI offers embeddings. */
+  EMBEDDING_MODEL: z.string().default('openai:text-embedding-3-small'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).default(4),
   JWT_ACCESS_SECRET: z.string().min(16),

@@ -306,6 +306,7 @@ export const en: DeepStrings<Dictionary> = {
       BUSINESS_AUDIT: 'Audit business profile',
       REPURPOSE_CONTENT: 'Repurpose for another platform',
       LEARN_FROM_EDITS: 'Learn from edits',
+      EMBED_REFERENCE: 'Index a reference for semantic search',
     },
     jobStatus: {
       QUEUED: 'Queued',
@@ -313,6 +314,7 @@ export const en: DeepStrings<Dictionary> = {
       SUCCEEDED: 'Succeeded',
       FAILED: 'Failed',
       CANCELED: 'Canceled',
+      WAITING: 'Waiting for the batch result',
     },
   },
   productivity: {
@@ -865,6 +867,11 @@ export const en: DeepStrings<Dictionary> = {
     cta: 'Call to action',
     notes: 'Production notes',
     selfCheck: 'AI self-check',
+    economy: {
+      label: 'Economy mode',
+      on: "The request goes to the vendor's batch API: about half the price, but the result may take up to 24 hours. If the batch does not deliver, the job runs at the normal price.",
+      off: 'The result is made right now, at the normal price.',
+    },
     termIssues: 'Brand glossary issues',
     termIssuesHint:
       'This version was checked against the business glossary (no AI). Fix it with a revision or a manual edit.',
@@ -1045,6 +1052,9 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_REPLIED: 'A new reply in a conversation',
       CONTENT_DUE: 'It is time to publish a content',
       BACKUP_VERIFY_FAILED: 'The backup restore check failed',
+      AI_FALLBACK_USED: 'The fallback AI model was used',
+      AI_BUDGET_WARNING: 'The monthly AI budget is nearly used up',
+      AI_BUDGET_EXCEEDED: 'The monthly AI budget is used up',
     },
     eventHints: {
       REVIEW_SUBMITTED: 'For the editors and admins who can review.',
@@ -1056,6 +1066,9 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_REPLIED: 'For those who commented in the same thread.',
       CONTENT_DUE: 'For the creator, the sender and the approver of a scheduled approved content.',
       BACKUP_VERIFY_FAILED: 'For admins: the weekly backup restore check (docs/13) failed.',
+      AI_FALLBACK_USED: 'For admins: the main model was unavailable (credit, key or outage) and the fallback took over.',
+      AI_BUDGET_WARNING: 'For admins: AI spending this month reached the warning level.',
+      AI_BUDGET_EXCEEDED: 'For admins: the monthly AI cap is used up.',
     },
     preferences: {
       title: 'My notifications',
@@ -1401,6 +1414,56 @@ export const en: DeepStrings<Dictionary> = {
     unavailable: 'no key',
     missingKeyWarning:
       'Some selected models belong to a provider without an API key; those jobs will fail.',
+    reliability: {
+      title: 'Fallback model and cost routing',
+      subtitle:
+        "If the main model's credit or key runs out, jobs continue on the fallback model. Routing gives heavy tasks a strong model and light tasks a cheap one.",
+      fallback: 'Fallback model',
+      fallbackHint:
+        "Used only when the main model's vendor is unavailable (credit used up, key refused, outage). A failure of the model itself (such as invalid output) is not repeated on another model.",
+      noFallback: 'No fallback model',
+      fallbackNoKey:
+        'The fallback vendor has no API key on the server; it will not work until one is set.',
+      sameVendor:
+        "The fallback is from the same vendor as the default model. It will not help when that vendor's credit runs out; prefer another vendor.",
+      routing: 'Routing suggestion',
+      routingHint:
+        'Heavy tasks (drafting, building profiles and businesses, revising and auditing, learning from edits) get the strong model; platform rewrites, ideas, sample analysis and chat get the cheap one. This only fills the form; press Save to apply.',
+      strong: 'Strong model',
+      light: 'Cheap model',
+      apply: 'Fill the model table',
+    },
+    budget: {
+      title: 'Monthly AI budget',
+      subtitle:
+        'Spending of all AI jobs in a month. By default it only warns; with the hard stop, new jobs do not run once the cap is used up.',
+      thisMonth: 'Month {{label}}',
+      cap: 'Monthly cap (USD)',
+      capHint: 'Empty = no cap. Default 20 USD, about one monthly ChatGPT subscription.',
+      noCap: 'No cap',
+      warnAt: 'Warn at this share of the cap (%)',
+      calendar: 'Month follows',
+      persian: 'Persian calendar (from day 1 of the Persian month)',
+      gregory: 'Gregorian calendar',
+      hardStop: 'Hard stop when the cap is used up',
+      hardStopOn:
+        'After the cap is used up, a new AI job does not run and the job says why. Queued jobs finish.',
+      hardStopOff:
+        'Warn only: admins are told at the warning level and when the cap is used up; jobs continue.',
+      blockedNow:
+        'The cap is used up and the hard stop is on: new jobs do not run until you raise the cap or the month changes.',
+      level: {
+        none: 'No cap is set.',
+        ok: 'Within budget.',
+        warning: 'You reached the warning level.',
+        exceeded: 'The cap is used up.',
+      },
+      byTask: 'Biggest spenders by task',
+      byBusiness: 'Cap per business (optional)',
+      noBusiness: 'No spending yet and no business cap set.',
+      businessCap: 'Business cap',
+      addBusiness: 'Add a cap for a business…',
+    },
   },
   audit: {
     title: 'Audit log',

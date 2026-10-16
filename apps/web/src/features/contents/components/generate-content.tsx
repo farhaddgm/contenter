@@ -12,6 +12,7 @@ import { formatNumber } from '@/utils/format';
 import { useIdeas } from '@/features/ideas/api/ideas';
 import { useGenerateContent } from '../api/contents';
 import { useVariantLimit } from '../api/variants';
+import { EconomyToggle } from './economy-toggle';
 
 /** Starts a GENERATE_CONTENT job from an idea or a free brief, then opens the content page. */
 export function GenerateContentDialog({
@@ -36,6 +37,7 @@ export function GenerateContentDialog({
   const [variants, setVariants] = useState(1);
   const limit = useVariantLimit(topicId);
   const maxVariants = limit.data?.maxVariants ?? 1;
+  const [economy, setEconomy] = useState(false);
   const ideas = useIdeas(topicId, { page: 1, pageSize: 100 });
 
   const usable = ideas.data?.items.filter((i) => i.status !== 'REJECTED') ?? [];
@@ -48,6 +50,7 @@ export function GenerateContentDialog({
         brief: mode === 'brief' ? brief.trim() : '',
         format: (format || undefined) as (typeof ContentFormat)[number] | undefined,
         variants: Math.min(variants, maxVariants),
+        economy: economy || undefined,
       },
       {
         onSuccess: (r) => {
@@ -142,6 +145,7 @@ export function GenerateContentDialog({
             )}
           </Field>
         )}
+        <EconomyToggle checked={economy} onChange={setEconomy} />
       </div>
     </Dialog>
   );

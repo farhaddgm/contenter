@@ -28,6 +28,8 @@ import { VariantSettingsCard } from '@/features/settings/components/variants-car
 import { GoldenSettingsCard } from '@/features/settings/components/golden-card';
 import { SimilaritySettingsCard } from '@/features/settings/components/similarity-card';
 import { ReadabilitySettingsCard } from '@/features/settings/components/readability-card';
+import { AiRoutingCard } from '@/features/settings/components/ai-routing-card';
+import { BudgetCard } from '@/features/settings/components/budget-card';
 import { WorkflowCard } from '@/features/settings/components/workflow-card';
 import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
@@ -54,6 +56,7 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
     models: data.models,
     effort: data.effort,
     maxSamplesPerProfile: data.maxSamplesPerProfile,
+    fallbackModel: data.fallbackModel ?? '',
   });
 
   const [customModels, setCustomModels] = useState<string[]>([]);
@@ -214,6 +217,13 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
               </Field>
             </CardBody>
           </Card>
+          <AiRoutingCard
+            form={form}
+            setForm={setForm}
+            modelOptions={modelOptions}
+            configured={configured}
+            mock={data.mock}
+          />
         </div>
         <Card>
           <CardHeader title={t('jobs.title')} description={t('settings.effortHint')} />
@@ -261,6 +271,9 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
           <GoogleAccessCard />
         </div>
       )}
+      <div className="mt-6">
+        <BudgetCard />
+      </div>
       <div className="mt-6">
         <WorkflowCard />
         <ReadabilitySettingsCard />

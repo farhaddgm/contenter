@@ -1,5 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { SamplesCoreModule } from '../samples/samples-core.module';
+import { AiAlertsService } from './ai-alerts.service';
+import { AiBatchService } from './batch/ai-batch.service';
+import { BudgetController, BudgetService } from './budget.service';
 import { AiExecutor } from './ai-executor.service';
 import { AiJobsService } from './ai-jobs.service';
 import { ContextLoader } from './context-loader.service';
@@ -22,9 +25,11 @@ import {
   RepurposeContentRunner,
   ReviseContentRunner,
 } from './runners/content.runners';
+import { EmbedReferenceRunner } from './runners/embed-reference.runner';
 import { IdeateRunner } from './runners/ideate.runner';
 import { LearnFromEditsRunner } from './runners/learn-from-edits.runner';
 import { AI_RUNNERS } from './runners/runner';
+import { SemanticRetriever } from './semantic/semantic.service';
 import { SmartChatRunner } from './runners/smart-chat.runner';
 
 const RUNNERS = [
@@ -35,6 +40,7 @@ const RUNNERS = [
   ReviseContentRunner,
   RepurposeContentRunner,
   LearnFromEditsRunner,
+  EmbedReferenceRunner,
   SmartChatRunner,
   BusinessDiscoverRunner,
   BusinessBuildRunner,
@@ -47,8 +53,13 @@ const RUNNERS = [
 @Global()
 @Module({
   imports: [SamplesCoreModule],
+  controllers: [BudgetController],
   providers: [
     AiProviderRegistry,
+    AiAlertsService,
+    AiBatchService,
+    BudgetService,
+    SemanticRetriever,
     PromptService,
     AiExecutor,
     ContextLoader,
@@ -56,6 +67,14 @@ const RUNNERS = [
     ...RUNNERS,
     { provide: AI_RUNNERS, inject: RUNNERS, useFactory: (...runners) => runners },
   ],
-  exports: [AiJobsService, PromptService, ContextLoader, AiProviderRegistry],
+  exports: [
+    AiJobsService,
+    PromptService,
+    ContextLoader,
+    AiProviderRegistry,
+    AiAlertsService,
+    BudgetService,
+    SemanticRetriever,
+  ],
 })
 export class AiModule {}

@@ -149,10 +149,19 @@ export const AiJobType = [
   'BUSINESS_AUDIT',
   'REPURPOSE_CONTENT',
   'LEARN_FROM_EDITS',
+  'EMBED_REFERENCE',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 
-export const AiJobStatus = ['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELED'] as const;
+export const AiJobStatus = [
+  'QUEUED',
+  'RUNNING',
+  'SUCCEEDED',
+  'FAILED',
+  'CANCELED',
+  /** Economy mode: waiting for the vendor's batch result (docs/60). */
+  'WAITING',
+] as const;
 export type AiJobStatus = (typeof AiJobStatus)[number];
 
 export const AiEffort = ['low', 'medium', 'high', 'xhigh', 'max'] as const;

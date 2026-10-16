@@ -327,8 +327,31 @@ model BusinessReference {
   business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   googleAccount GoogleDriveAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)
   createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  chunks        ReferenceChunk[]
 
   @@index([businessId, createdAt])
+}
+
+/// A piece of a reference's text with its embedding, for picking the passages that fit a task
+/// when the references are too big to send whole (docs/60). Vectors are plain double arrays: the
+/// cosine is computed in code, so no Postgres extension is needed.
+model ReferenceChunk {
+  id          String   @id @default(cuid())
+  referenceId String
+  businessId  String
+  idx         Int
+  text        String
+  embedding   Float[]
+  /// The embedding model (`provider:model`); chunks of another model are not mixed in
+  model       String
+  /// Hash of the reference's text the chunks were cut from; a change makes them stale
+  contentHash String
+  createdAt   DateTime @default(now())
+
+  reference BusinessReference @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+
+  @@unique([referenceId, idx])
+  @@index([businessId])
 }
 
 /// Google account connected (OAuth, drive.readonly) to read private Google Docs/Drive files.
@@ -1222,6 +1245,9 @@ enum NotificationEvent {
   COMMENT_REPLIED
   CONTENT_DUE
   BACKUP_VERIFY_FAILED
+  AI_FALLBACK_USED
+  AI_BUDGET_WARNING
+  AI_BUDGET_EXCEEDED
 }
 
 enum DeliveryChannel {
@@ -1298,6 +1324,8 @@ enum AiJobType {
   BUSINESS_AUDIT
   REPURPOSE_CONTENT
   LEARN_FROM_EDITS
+  /// Splits a business reference into chunks and embeds them (docs/60)
+  EMBED_REFERENCE
 }
 
 enum AiJobStatus {
@@ -1306,6 +1334,8 @@ enum AiJobStatus {
   SUCCEEDED
   FAILED
   CANCELED
+  /// Economy mode: the model call is with the vendor's batch queue (docs/60)
+  WAITING
 }
 
 model AiJob {
@@ -1327,17 +1357,54 @@ model AiJob {
   promptKey       String?
   promptVersion   Int?
   createdById     String?
+  /// Run through the vendor's batch API: about half the price, result within 24 hours (docs/60)
+  economy         Boolean     @default(false)
   startedAt       DateTime?
   finishedAt      DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy  User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  batchCalls AiBatchCall[]
 
   @@index([status, createdAt])
   @@index([type, createdAt])
   @@index([targetType, targetId])
   @@index([topicId])
+}
+
+enum AiBatchStatus {
+  PENDING
+  SUBMITTED
+  DONE
+  FAILED
+}
+
+/// One model call of an economy-mode job, waiting for or holding its batch result. A job is run
+/// again when its calls are done and replays earlier calls from here by `seq` (docs/60).
+model AiBatchCall {
+  id        String        @id @default(cuid())
+  jobId     String
+  /// Order of the call inside the job's run: 0, 1, ...
+  seq       Int
+  /// `provider:model` the call was prepared for
+  model     String
+  /// The vendor request body, prepared by the provider (plain JSON)
+  params    Json
+  status    AiBatchStatus @default(PENDING)
+  /// The vendor's batch id once submitted
+  batchRef  String?
+  /// The vendor's raw answer for this call
+  result    Json?
+  error     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  job AiJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, seq])
+  @@index([status, createdAt])
+  @@index([batchRef])
 }
 
 model PromptTemplate {

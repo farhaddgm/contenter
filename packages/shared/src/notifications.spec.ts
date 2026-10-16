@@ -23,6 +23,31 @@ describe('notificationMessage — system events', () => {
   });
 });
 
+const SYSTEM_EVENTS: string[] = [
+  'BACKUP_VERIFY_FAILED',
+  'AI_FALLBACK_USED',
+  'AI_BUDGET_WARNING',
+  'AI_BUDGET_EXCEEDED',
+];
+
+describe('AI alert events', () => {
+  it('say what happened in both languages and carry the detail as the body', () => {
+    for (const event of ['AI_FALLBACK_USED', 'AI_BUDGET_WARNING', 'AI_BUDGET_EXCEEDED'] as const) {
+      const fa = notificationMessage(event, { note: 'detail' });
+      const en = notificationMessage(event, { note: 'detail' }, 'en');
+      expect(fa.title.length).toBeGreaterThan(10);
+      expect(en.title).toMatch(/AI/);
+      expect(fa.body).toBe('detail');
+    }
+  });
+
+  it('reach the admins in the app, and by e-mail when the money is gone or the model switched', () => {
+    expect(NOTIFICATION_DEFAULTS.AI_BUDGET_EXCEEDED.email).toBe(true);
+    expect(NOTIFICATION_DEFAULTS.AI_FALLBACK_USED.email).toBe(true);
+    expect(NOTIFICATION_DEFAULTS.AI_BUDGET_WARNING.inApp).toBe(true);
+  });
+});
+
 describe('notificationMessage', () => {
   const params = { actorName: 'سارا', contentTitle: 'سه اشتباه رایج', note: 'لحن را رسمی‌تر کنید' };
 
@@ -45,7 +70,7 @@ describe('notificationMessage', () => {
   });
 
   it('writes a title for every event, in both languages', () => {
-    for (const event of NotificationEvent.filter((e) => e !== 'BACKUP_VERIFY_FAILED')) {
+    for (const event of NotificationEvent.filter((e) => !SYSTEM_EVENTS.includes(e))) {
       for (const lang of ['fa', 'en'] as const) {
         const { title } = notificationMessage(event, params, lang);
         expect(title).toContain('سه اشتباه رایج');

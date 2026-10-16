@@ -8,7 +8,8 @@ import {
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.module';
-import type { ExampleForPrompt } from './context';
+import { MAX_DOCUMENTS_TEXT, type DocumentForPrompt, type ExampleForPrompt } from './context';
+import { SemanticRetriever } from './semantic/semantic.service';
 
 /** What a draft is being written for, so the closest golden examples are chosen. */
 export interface ExampleTarget {
@@ -51,6 +52,7 @@ export class ContextLoader {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings?: SettingsService,
+    private readonly semantic?: SemanticRetriever,
   ) {}
 
   /** Active topic principles followed by active global principles. */
@@ -78,11 +80,20 @@ export class ContextLoader {
    * The business linked to the topic with its sections (the whole profile), or null. A topic
    * without analyzed sample contents (skipped, or none yet) also gets the business's reference
    * documents, so content rests on documents instead of samples (docs/19-optional-samples.md).
+   * When those documents are too big to send whole, the passages closest in meaning to the topic
+   * (and to `extraQuery`, e.g. the brief) are chosen instead of an equal slice of each
+   * (docs/60-reliability-and-cost.md).
    */
   async business(topicId: string, target?: ExampleTarget) {
     const topic = await this.prisma.topic.findUniqueOrThrow({
       where: { id: topicId },
-      select: { businessId: true, samplesSkippedAt: true },
+      select: {
+        businessId: true,
+        samplesSkippedAt: true,
+        title: true,
+        description: true,
+        audience: true,
+      },
     });
     if (!topic.businessId) return null;
     const business = await this.businessById(topic.businessId);
@@ -90,9 +101,16 @@ export class ContextLoader {
     const analyzed = topic.samplesSkippedAt
       ? 0
       : await this.prisma.sampleContent.count({ where: { topicId, analysisStatus: 'DONE' } });
+    // big reference documents are cut to the passages closest to the topic (docs/60)
+    let documents: DocumentForPrompt[] = [];
+    if (analyzed === 0) {
+      const all = await this.documents(topic.businessId);
+      const query = [topic.title, topic.description, topic.audience].filter(Boolean).join('\n');
+      documents = (await this.semantic?.select(all, query, MAX_DOCUMENTS_TEXT)) ?? all;
+    }
     return {
       ...business,
-      documents: analyzed > 0 ? [] : await this.documents(topic.businessId),
+      documents,
       // only a draft being written gets examples; ideas, profiles and the like do not
       ...(target ? { examples: await this.goldenExamples(topic.businessId, target) } : {}),
     };
@@ -150,7 +168,7 @@ export class ContextLoader {
     return this.prisma.businessReference.findMany({
       where: { businessId, status: 'READY', isActive: true, content: { not: '' } },
       orderBy: { createdAt: 'asc' },
-      select: { title: true, url: true, content: true },
+      select: { id: true, title: true, url: true, content: true },
     });
   }
 

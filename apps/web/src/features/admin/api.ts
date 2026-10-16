@@ -8,6 +8,8 @@ import type {
   AiSettings,
   AiSettingsResponse,
   AuditLog,
+  BudgetResponse,
+  BudgetSettings,
   ChangePasswordInput,
   CreateGoogleAccessInput,
   CreatePromptVersionInput,
@@ -209,6 +211,22 @@ export function useAuditLogs(params: { page: number; q?: string; entityType?: st
     queryKey: ['audit', params],
     queryFn: () => api.get<Paginated<AuditLog>>('/admin/audit-logs', params),
     placeholderData: keepPreviousData,
+  });
+}
+
+// ---------- monthly AI budget (docs/60) ----------
+export function useBudget() {
+  return useQuery({
+    queryKey: ['settings', 'budget'],
+    queryFn: () => api.get<BudgetResponse>('/admin/settings/budget'),
+  });
+}
+
+export function useUpdateBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: BudgetSettings) => api.put<BudgetResponse>('/admin/settings/budget', data),
+    onSuccess: (data) => qc.setQueryData(['settings', 'budget'], data),
   });
 }
 
