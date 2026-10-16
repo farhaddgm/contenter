@@ -1,14 +1,18 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/utils/cn';
+import { InfoTip } from './info-tip';
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('rounded-lg border bg-card text-card-foreground shadow-xs', className)}
+      className={cn('rounded-xl border bg-card text-card-foreground shadow-card', className)}
       {...props}
     />
   );
 }
+
+/** Longest card description that is still printed under the title. */
+export const CARD_DESCRIPTION_INLINE_MAX = 90;
 
 export function CardHeader({
   title,
@@ -21,24 +25,31 @@ export function CardHeader({
   actions?: ReactNode;
   className?: string;
 }) {
+  // short subtitles stay visible; long explanations move into the "i" popup next to the title
+  const tip = typeof description === 'string' && description.length > CARD_DESCRIPTION_INLINE_MAX;
   return (
     <div
       className={cn(
-        'flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4',
+        'flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4 sm:px-6',
         className,
       )}
     >
       <div className="min-w-0 space-y-1">
-        <h3 className="font-semibold leading-none">{title}</h3>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        <h3 className="flex items-center gap-2 text-base font-bold leading-snug">
+          {title}
+          {tip && <InfoTip>{description}</InfoTip>}
+        </h3>
+        {description && !tip && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>
+      )}
     </div>
   );
 }
 
 export function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('p-5', className)} {...props} />;
+  return <div className={cn('p-5 sm:p-6', className)} {...props} />;
 }
 
 export function StatCard({
@@ -55,18 +66,18 @@ export function StatCard({
   tone?: 'primary' | 'success' | 'warning' | 'muted';
 }) {
   const tones = {
-    primary: 'bg-primary/10 text-primary',
-    success: 'bg-success/10 text-success',
+    primary: 'bg-accent text-accent-foreground',
+    success: 'bg-success/12 text-success',
     warning: 'bg-warning/15 text-warning',
     muted: 'bg-muted text-muted-foreground',
   };
   return (
-    <Card className="p-4">
-      <div className="flex items-center gap-3">
+    <Card className="p-4 sm:p-5">
+      <div className="flex items-center gap-3.5">
         {icon && (
           <div
             className={cn(
-              'flex size-10 items-center justify-center rounded-lg [&_svg]:size-5',
+              'flex size-11 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5',
               tones[tone],
             )}
           >
@@ -74,8 +85,8 @@ export function StatCard({
           </div>
         )}
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="mt-0.5 text-xl font-bold tabular-nums">{value}</p>
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="mt-0.5 text-2xl font-extrabold tabular-nums">{value}</p>
         </div>
       </div>
       {hint && <p className="mt-2 text-xs text-muted-foreground">{hint}</p>}

@@ -115,11 +115,14 @@
 | GET | `/search?q&topicId&limit` | جست‌وجوی سراسری در محتواها، ایده‌ها و موضوع‌ها |
 | POST | `/contents/:id/repurpose` | **۲۰۲** — `{ targets: [{ platform, format? }], notes? }` ← کار `REPURPOSE_CONTENT` برای هر هدف ([23-repurposing.md](23-repurposing.md)) |
 | POST | `/topics/:id/contents/generate` | **۲۰۲** — `{ ideaId? , brief?, format? }` ← `{ jobId, contentId }` |
-| GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه |
+| GET | `/contents/:id` | همراه نسخهٔ فعلی و تاریخچه، `termIssues` و `quality` ([41-quality-gate.md](41-quality-gate.md)) |
 | PATCH | `/contents/:id` | `{ title?, campaignId? }` — `status` دیگر پذیرفته نمی‌شود (۴۰۰)؛ برای تغییر وضعیت ↓ |
 | POST | `/contents/:id/review/:action` | گام گردش تأیید: `submit`، `approve`، `finalize`، `request_changes`، `reject`، `withdraw`، `reopen` — [21-review-workflow.md](21-review-workflow.md) |
 | GET / POST | `/contents/:id/comments` | کامنت‌ها (رشته‌ها با پاسخ) / نظر تازه |
 | PATCH / DELETE | `/comments/:id` | ویرایش، «حل شد» یا حذف نظر |
+| GET / POST | `/contents/:id/metrics` | خوانش‌های آمار عملکرد (`{ items, summary }`) / ثبت یا جایگزینی خوانش یک روز؛ فقط محتوای منتشرشده ([42-performance-metrics.md](42-performance-metrics.md)) |
+| POST | `/contents/:id/metrics/bulk` | `{ rows }` تا ۳۶۶ روز؛ همه یا هیچ |
+| PATCH / DELETE | `/content-metrics/:id` | تغییر بخشی از عددها / حذف یک خوانش |
 | PUT | `/contents/:id/schedule` | `{ scheduledAt }` — برنامه‌ریزی انتشار ([22-calendar-publishing.md](22-calendar-publishing.md)) |
 | POST / DELETE | `/contents/:id/published` | ثبت انتشار `{ publishedAt?, url? }` / لغو آن |
 | GET | `/calendar?from&to&topicId&campaignId&tagId` | تقویم: `{ items, ready }` |
@@ -136,7 +139,34 @@
 |---|---|---|
 | GET | `/jobs/:id` | وضعیت یک کار (برای poll) |
 | GET | `/dashboard` | آمار |
-| GET | `/health` | سلامت DB و Redis (عمومی) |
+| GET / POST | `/topics/:id/edit-learning` ، `/topics/:id/edit-learning/analyze` | آمار ویرایش‌ها و پیشنهادها / **۲۰۲** صف‌کردن تحلیل ([30-learn-from-edits.md](30-learn-from-edits.md)) |
+| POST | `/learning-suggestions/:id/accept` ، `/dismiss` | پذیرفتن (ساخت اصل، `{ text?, kind? }`) / رد پیشنهاد |
+| GET / PUT | `/businesses/:id/checklists` | چک‌لیست انتشار کسب‌وکار / جایگزینی کامل ([45-publish-checklist.md](45-publish-checklist.md)) |
+| PUT | `/contents/:id/checklist/:itemId` | **۲۰۴** `{ checked }` — تیک بند چک‌لیست یک محتوا |
+| GET | `/dashboard/productivity?days&topicId&businessId` | **بهره‌وری**: تأیید بدون ویرایش، میانهٔ زمان تا تأیید، هزینه به‌ازای هر محتوا ([44-productivity-dashboard.md](44-productivity-dashboard.md)) |
+| POST | `/topics/:id/contents/generate` | بدنه: `{ ideaId? \| brief, format?, variants? (۱–۳) }`؛ با `variants > 1` چند پیش‌نویس با `variantGroupId` یکسان ([51-draft-variants.md](51-draft-variants.md)) |
+| GET | `/contents/:id` | فیلدهای محاسبه‌شده با کد: `quality`، `readability`، `similarity`، `styleFit` ([53-style-fit.md](53-style-fit.md))، `checklist`، `termIssues` |
+| POST | `/contents/export` | بدنه: `{ ids \| filter, format: markdown\|csv\|docx\|zip, onlyApproved? }` ← فایل؛ فقط نسخهٔ جاری، تا ۲۰۰ محتوا، `visibleTopics` ([55-bulk-export.md](55-bulk-export.md)) |
+| GET / POST / DELETE | `/api-keys[/:id]` | کلیدهای API شخصی خود کاربر (همهٔ نقش‌ها؛ فقط با توکن ورود): فهرست / ساخت (کل کلید یک بار) / لغو `204` ([52-api-keys.md](52-api-keys.md)) |
+| GET | `/v1/topics` ، `/v1/contents` ، `/v1/contents/:id` | **با کلید** `contents:read` |
+| POST | `/v1/topics/:id/contents/generate` | **با کلید** `contents:write`: `{ contentId, jobId }` |
+| GET | `/v1/calendar?from&to` | **با کلید** `calendar:read` |
+| GET | `/contents/:id/variants` | پیش‌نویس‌های هم‌گروه با عددهای مقایسه |
+| POST | `/contents/:id/variants/pick` | انتخاب این پیش‌نویس؛ بقیهٔ پیش‌نویس‌ها `REJECTED` می‌شوند |
+| GET | `/topics/:id/variant-limit` | سقف تعداد پیش‌نویس هم‌زمان |
+| GET / PUT | `/admin/settings/variants` | سقف پیش‌نویس هم‌زمان (۱–۳) |
+| GET / PUT | `/businesses/:id/pillars` | ستون‌های محتوایی کسب‌وکار / جایگزینی کامل ([50-coverage-map.md](50-coverage-map.md)) |
+| GET | `/businesses/:id/coverage?days&by&staleDays` | **نقشهٔ پوشش**: ستون × پلتفرم یا دورهٔ ۳۰ روزه، سهم و فاصله از هدف |
+| GET | `/topics/:id/pillars` | ستون‌هایی که محتوای این موضوع می‌تواند داشته باشد |
+| PUT | `/contents/:id/golden` | ADMIN: `{ golden }` علامت نمونهٔ طلایی (فقط محتوای تأییدشده/منتشرشده) ([49-golden-examples.md](49-golden-examples.md)) |
+| GET | `/businesses/:id/golden` | نمونه‌های طلایی کسب‌وکار با حدود تنظیم‌شده |
+| GET / PUT | `/admin/settings/golden` | تعداد نمونه (۰–۳) و نویسهٔ هر نمونه در پرامپت |
+| GET / PUT | `/admin/settings/similarity` | آستانهٔ «شبیه» و «تقریباً کپی» (۰–۱)؛ فیلد `similarity` در `GET /contents/:id` ([48-similarity.md](48-similarity.md)) |
+| GET / PUT | `/admin/settings/readability` | عبارت‌های رسمی اضافه و سقف میانگین طول جمله برای شاخص خوانایی؛ فیلد `readability` در `GET /contents/:id` ([47-readability.md](47-readability.md)) |
+| GET | `/ai-feedback/mine?targetType&topicId` | رأی‌های 👍/👎 خود کاربر روی خروجی‌های AI یک موضوع ([46-ai-feedback.md](46-ai-feedback.md)) |
+| PUT / DELETE | `/ai-feedback/:targetType/:targetId` | ثبت/تغییر `{ rating, reason?, note? }` / پس‌گرفتن (`204`)؛ همهٔ نقش‌ها |
+| GET | `/admin/ai-feedback/summary?days` | خلاصهٔ رأی‌ها به‌تفکیک پرامپت و مدل (ADMIN) |
+| GET | `/health` | سلامت DB و Redis (عمومی)؛ به‌علاوه `restoreCheck` (`ok` / `failed` / `never`) و `lastRestoreVerifiedAt` از بررسی هفتگی بازیابی پشتیبان ([13-operations.md](13-operations.md)) |
 
 ## اسمارت
 مرجع کامل endpointهای `/smart/*` در [10-smart.md](10-smart.md#api) آمده است. پاسخ‌های 5xx یک فیلد `errorId` دارند که به رکورد خطایاب اشاره می‌کند.
@@ -152,5 +182,7 @@
 | GET | `/admin/prompts` | کلیدها و نسخهٔ فعال هرکدام |
 | GET / POST | `/admin/prompts/:key/versions` | نسخه‌ها / ایجاد نسخهٔ جدید |
 | PUT | `/admin/prompts/:key/versions/:v/activate` | فعال‌سازی |
-| GET / PUT | `/admin/settings/ai` | مدل، effort و سقف نمونه |
+| GET / PUT | `/admin/settings/ai` | مدل، effort، سقف نمونه و `fallbackModel` (مدل پشتیبان، [60](60-reliability-and-cost.md)) |
+| GET / PUT | `/admin/settings/budget` | بودجهٔ ماهانهٔ AI: `{ settings, usage }` (سقف، هشدار، توقف سخت، سقف هر کسب‌وکار؛ [60](60-reliability-and-cost.md)) |
+| POST | `/businesses/:id/references/reindex` | **۲۰۲** — نمایه‌سازی معنایی مراجع را (دوباره) صف می‌کند ← `{ references, queued }` |
 | GET | `/admin/audit-logs?q&entityType&page` | لاگ ممیزی |

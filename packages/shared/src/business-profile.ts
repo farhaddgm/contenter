@@ -128,7 +128,7 @@ export function normalizeTermText(input: string): string {
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Occurrences of `needle` as a whole word/phrase in the (already normalized) text. */
-function countPhrase(normalizedText: string, needle: string): number {
+export function countPhrase(normalizedText: string, needle: string): number {
   const n = normalizeTermText(needle);
   if (!n) return 0;
   const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegex(n)}(?![\\p{L}\\p{N}])`, 'gu');

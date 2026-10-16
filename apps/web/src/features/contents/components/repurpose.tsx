@@ -19,6 +19,7 @@ import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
 import { useRepurpose } from '../api/contents';
+import { EconomyToggle } from './economy-toggle';
 
 type Picked = Partial<Record<Platform, ContentFormat>>;
 
@@ -28,6 +29,7 @@ export function RepurposeDialog({ content, onClose }: { content: Content; onClos
   const repurpose = useRepurpose(content.id);
   const [picked, setPicked] = useState<Picked>({});
   const [notes, setNotes] = useState('');
+  const [economy, setEconomy] = useState(false);
   const own = content.topic ? effectivePlatform(content, content.topic) : null;
   const platforms = Object.keys(picked) as Platform[];
 
@@ -60,6 +62,7 @@ export function RepurposeDialog({ content, onClose }: { content: Content; onClos
                 {
                   targets: platforms.map((platform) => ({ platform, format: picked[platform] })),
                   notes,
+                  economy: economy || undefined,
                 },
                 {
                   onSuccess: (r) => {
@@ -134,6 +137,7 @@ export function RepurposeDialog({ content, onClose }: { content: Content; onClos
             />
           )}
         </Field>
+        <EconomyToggle checked={economy} onChange={setEconomy} />
       </div>
     </Dialog>
   );

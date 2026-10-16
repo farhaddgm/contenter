@@ -2,6 +2,7 @@ import { BellRing, MailWarning } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Switch } from '@/components/ui/form-controls';
 import { Spinner } from '@/components/ui/spinner';
+import { InfoTip } from '@/components/ui/info-tip';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { useNotificationPreferences, useSetNotificationPreference } from '../api/inbox';
@@ -56,9 +57,9 @@ export function NotificationPreferencesCard() {
                   {data.preferences.map((p) => (
                     <tr key={p.event} className="border-b last:border-0">
                       <td className="py-2.5">
-                        <p className="font-medium">{t(`inbox.events.${p.event}`)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {t(`inbox.eventHints.${p.event}`)}
+                        <p className="flex items-center gap-1.5 font-medium">
+                          {t(`inbox.events.${p.event}`)}
+                          <InfoTip>{t(`inbox.eventHints.${p.event}`)}</InfoTip>
                         </p>
                       </td>
                       <td className="px-3 text-center">

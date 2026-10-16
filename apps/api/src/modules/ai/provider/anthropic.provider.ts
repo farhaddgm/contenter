@@ -1,12 +1,18 @@
 import { Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import type { ZodType } from 'zod';
 import {
   researchSources,
   NonRetryableAiError,
+  ProviderOverloadedError,
+  ProviderUnavailableError,
   sumUsage,
   type AiProvider,
   type AiUsage,
+  type BatchItemResult,
+  type BatchPoll,
+  type BatchProvider,
   type ResearchRequest,
   type ResearchResult,
   type StructuredRequest,
@@ -44,7 +50,7 @@ function usageOf(u: Anthropic.Beta.BetaUsage): AiUsage {
  * - The stable system prompt is cached.
  * - Optional server-side refusal fallback.
  */
-export class AnthropicProvider implements AiProvider {
+export class AnthropicProvider implements AiProvider, BatchProvider {
   readonly name = 'anthropic';
   private readonly logger = new Logger(AnthropicProvider.name);
   private readonly client: Anthropic;
@@ -74,8 +80,9 @@ export class AnthropicProvider implements AiProvider {
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     if (!this.hasCredentials) {
-      throw new NonRetryableAiError(
+      throw new ProviderUnavailableError(
         'ANTHROPIC_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
+        'auth',
       );
     }
     try {
@@ -86,20 +93,12 @@ export class AnthropicProvider implements AiProvider {
         this.logger.warn(`Retrying ${req.task} without images: ${err.message}`);
         return this.call(req, []);
       }
-      if (
-        err instanceof Anthropic.BadRequestError ||
-        err instanceof Anthropic.AuthenticationError
-      ) {
-        throw new NonRetryableAiError(err.message);
-      }
-      throw err;
+      throw permanentOrRaw(err);
     }
   }
 
-  private async call<T>(
-    req: StructuredRequest<T>,
-    imageUrls: string[],
-  ): Promise<StructuredResult<T>> {
+  /** The request of a structured call, without the transport; also the body of a batch item. */
+  private structuredParams<T>(req: StructuredRequest<T>, imageUrls: string[]) {
     const content: Anthropic.Beta.BetaContentBlockParam[] = [
       ...imageUrls.map((url): Anthropic.Beta.BetaImageBlockParam => {
         // Uploaded brand assets arrive as data: URLs; fetched samples as public URLs.
@@ -118,7 +117,7 @@ export class AnthropicProvider implements AiProvider {
       { type: 'text', text: req.user },
     ];
 
-    const params = {
+    return {
       model: req.model,
       max_tokens: req.maxTokens ?? 32_000,
       thinking: { type: 'adaptive' as const },
@@ -127,6 +126,15 @@ export class AnthropicProvider implements AiProvider {
         { type: 'text' as const, text: req.system, cache_control: { type: 'ephemeral' as const } },
       ],
       messages: [{ role: 'user' as const, content }],
+    };
+  }
+
+  private async call<T>(
+    req: StructuredRequest<T>,
+    imageUrls: string[],
+  ): Promise<StructuredResult<T>> {
+    const params = {
+      ...this.structuredParams(req, imageUrls),
       ...(this.refusalFallback ? { betas: [REFUSAL_FALLBACK_BETA], fallbacks: 'default' } : {}),
     };
 
@@ -134,32 +142,64 @@ export class AnthropicProvider implements AiProvider {
       .stream(params as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming)
       .finalMessage();
 
-    if (message.stop_reason === 'refusal') {
-      throw new NonRetryableAiError(
-        `Model declined the request${message.stop_details?.category ? ` (${message.stop_details.category})` : ''}`,
-      );
-    }
-    if (message.stop_reason === 'max_tokens') {
-      throw new NonRetryableAiError('Output was truncated (max_tokens reached)');
-    }
+    return finishStructured(message, req.schema);
+  }
 
-    const text = message.content
-      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
+  // ───────────── batch mode (docs/60) ─────────────
 
-    let json: unknown;
+  async buildBatchParams(req: StructuredRequest<unknown>): Promise<Record<string, unknown>> {
+    return this.structuredParams(req, req.imageUrls ?? []) as unknown as Record<string, unknown>;
+  }
+
+  /** One Message Batch: answers within 24 hours at half the price. */
+  async submitBatch(
+    items: { customId: string; params: Record<string, unknown> }[],
+  ): Promise<{ batchRef: string }> {
+    if (!this.hasCredentials) {
+      throw new ProviderUnavailableError('ANTHROPIC_API_KEY is not set.', 'auth');
+    }
     try {
-      json = JSON.parse(text);
-    } catch {
-      throw new NonRetryableAiError('Model returned invalid JSON');
+      const batch = await this.client.beta.messages.batches.create({
+        requests: items.map((i) => ({
+          custom_id: i.customId,
+          params: i.params as unknown as Anthropic.Beta.Messages.MessageCreateParamsNonStreaming,
+        })),
+      });
+      return { batchRef: batch.id };
+    } catch (err) {
+      throw permanentOrRaw(err);
     }
-    const parsed = req.schema.safeParse(json);
-    if (!parsed.success) {
-      throw new NonRetryableAiError(`Model output failed validation: ${parsed.error.message}`);
-    }
+  }
 
-    return { data: parsed.data, model: message.model, usage: usageOf(message.usage) };
+  async pollBatch(batchRef: string): Promise<BatchPoll> {
+    if (!this.hasCredentials) {
+      throw new ProviderUnavailableError('ANTHROPIC_API_KEY is not set.', 'auth');
+    }
+    try {
+      const batch = await this.client.beta.messages.batches.retrieve(batchRef);
+      if (batch.processing_status !== 'ended') return { state: 'running' };
+      const results: Record<string, BatchItemResult> = {};
+      for await (const entry of await this.client.beta.messages.batches.results(batchRef)) {
+        const r = entry.result;
+        results[entry.custom_id] =
+          r.type === 'succeeded'
+            ? { ok: true, raw: r.message }
+            : {
+                ok: false,
+                error:
+                  r.type === 'errored'
+                    ? (r.error?.error?.message ?? 'The request failed')
+                    : `The request was ${r.type}`,
+              };
+      }
+      return { state: 'done', results };
+    } catch (err) {
+      throw permanentOrRaw(err);
+    }
+  }
+
+  parseBatchResult<T>(raw: unknown, schema: ZodType<T>): StructuredResult<T> {
+    return finishStructured(raw as Anthropic.Beta.BetaMessage, schema);
   }
 
   /**
@@ -168,8 +208,9 @@ export class AnthropicProvider implements AiProvider {
    */
   async research(req: ResearchRequest): Promise<ResearchResult> {
     if (!this.hasCredentials) {
-      throw new NonRetryableAiError(
+      throw new ProviderUnavailableError(
         'ANTHROPIC_API_KEY is not set. Add it to apps/api/.env and restart the API, or pick a model from another provider in Settings.',
+        'auth',
       );
     }
     const messages: Anthropic.Beta.BetaMessageParam[] = [
@@ -225,19 +266,75 @@ export class AnthropicProvider implements AiProvider {
         messages.push({ role: 'assistant', content: message.content });
       }
     } catch (err) {
-      if (
-        err instanceof Anthropic.BadRequestError ||
-        err instanceof Anthropic.AuthenticationError
-      ) {
-        throw new NonRetryableAiError(err.message);
-      }
-      throw err;
+      throw permanentOrRaw(err);
     }
 
     const { text, sources } = collectResearch(blocks);
     if (!text.trim()) throw new NonRetryableAiError('Web research returned no findings');
     return { text, sources, model, usage: sumUsage(...usages) };
   }
+}
+
+/** Refusal / truncation checks, JSON parse, Zod validation and usage of one structured answer. */
+function finishStructured<T>(
+  message: Anthropic.Beta.BetaMessage,
+  schema: ZodType<T>,
+): StructuredResult<T> {
+  if (message.stop_reason === 'refusal') {
+    throw new NonRetryableAiError(
+      `Model declined the request${message.stop_details?.category ? ` (${message.stop_details.category})` : ''}`,
+    );
+  }
+  if (message.stop_reason === 'max_tokens') {
+    throw new NonRetryableAiError('Output was truncated (max_tokens reached)');
+  }
+
+  const text = message.content
+    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('');
+
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new NonRetryableAiError('Model returned invalid JSON');
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    throw new NonRetryableAiError(`Model output failed validation: ${parsed.error.message}`);
+  }
+
+  return { data: parsed.data, model: message.model, usage: usageOf(message.usage) };
+}
+
+/**
+ * Failures that retrying will not fix become NonRetryableAiError or ProviderUnavailableError
+ * (credit, key, permission); overload and network trouble become ProviderOverloadedError. Other
+ * errors are rethrown unchanged.
+ */
+export function permanentOrRaw(err: unknown): unknown {
+  if (err instanceof Anthropic.BadRequestError) {
+    // an empty balance is reported as a 400 "credit balance is too low"
+    return /credit balance|billing|purchase credits/i.test(err.message)
+      ? new ProviderUnavailableError(err.message, 'quota')
+      : new NonRetryableAiError(err.message);
+  }
+  if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+    return new ProviderUnavailableError(err.message, 'auth');
+  }
+  if (err instanceof Anthropic.NotFoundError) return new NonRetryableAiError(err.message);
+  if (
+    err instanceof Anthropic.RateLimitError ||
+    err instanceof Anthropic.InternalServerError ||
+    err instanceof Anthropic.APIConnectionError
+  ) {
+    return new ProviderOverloadedError(
+      err.message,
+      err instanceof Anthropic.APIConnectionError ? 'network' : 'overloaded',
+    );
+  }
+  return err;
 }
 
 /**

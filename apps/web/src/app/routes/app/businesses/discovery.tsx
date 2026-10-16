@@ -4,7 +4,7 @@ import {
   AlertTriangle,
   Building2,
   CheckCircle2,
-  ChevronLeft,
+  ArrowRight,
   ExternalLink,
   Search,
   Wand2,
@@ -70,7 +70,7 @@ export default function DiscoveryRoute() {
             to={paths.app.businesses.getHref()}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
-            <ChevronLeft className="size-4 ltr:hidden" />
+            <ArrowRight className="size-4 ltr:rotate-180" />
             {t('businesses.title')}
           </Link>
         }

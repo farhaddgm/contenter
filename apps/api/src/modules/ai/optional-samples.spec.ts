@@ -7,6 +7,7 @@ import {
   type BusinessForPrompt,
 } from './context';
 import { ContextLoader } from './context-loader.service';
+import type { SemanticRetriever } from './semantic/semantic.service';
 
 const business: BusinessForPrompt = {
   name: 'Acme',
@@ -84,7 +85,8 @@ function loader(opts: { skipped: boolean; analyzed: number; refs: number }) {
       },
     },
   } as unknown as PrismaService;
-  return { ctx: new ContextLoader(prisma), refWhere };
+  const semantic = { select: async () => null } as unknown as SemanticRetriever;
+  return { ctx: new ContextLoader(prisma, undefined, semantic), refWhere };
 }
 
 describe('ContextLoader.business — documents as grounding', () => {
@@ -116,6 +118,8 @@ describe('ContextLoader.business — documents as grounding', () => {
     const prisma = {
       topic: { findUniqueOrThrow: async () => ({ businessId: null, samplesSkippedAt: null }) },
     } as unknown as PrismaService;
-    expect(await new ContextLoader(prisma).business('t1')).toBeNull();
+    expect(
+      await new ContextLoader(prisma, undefined, { select: async () => null } as unknown as SemanticRetriever).business('t1'),
+    ).toBeNull();
   });
 });

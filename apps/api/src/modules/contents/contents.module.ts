@@ -15,11 +15,16 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
+  analyzeReadability,
+  checkContentQuality,
   checkTerms,
   ContentListQuerySchema,
   defaultFormatFor,
+  variantAnglesFor,
+  effectivePlatform,
   RepurposeContentSchema,
   EditContentVersionSchema,
   GenerateContentSchema,
@@ -39,10 +44,16 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { SettingsService } from '../settings/settings.module';
+import { StyleFitService } from '../style-fit/style-fit.module';
+import { CoverageService } from '../pillars/coverage.module';
+import { SimilarityService } from '../similarity/similarity.module';
+import { ChecklistsService } from '../checklists/checklists.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { ReviewsService } from '../reviews/reviews.service';
 import { TAG_SELECT } from '../tags/tag-select';
 import { buildContentOrderBy, buildContentWhere } from './content-filters';
+import { MetricsController, MetricsService } from './metrics.service';
 
 const PUBLISHED_FROZEN = 'The content is published; unpublish it before changing it';
 
@@ -62,6 +73,11 @@ export class ContentsService {
     private readonly audit: AuditService,
     private readonly access: AccessService,
     private readonly reviews: ReviewsService,
+    private readonly checklists: ChecklistsService,
+    private readonly settings: SettingsService,
+    private readonly similarity: SimilarityService,
+    private readonly coverage: CoverageService,
+    private readonly styleFit: StyleFitService,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
@@ -101,9 +117,10 @@ export class ContentsService {
   }
 
   /**
-   * Content with its versions plus the brand terminology check of the current version (the
-   * linked business's USE/AVOID terms matched by code, `checkTerms`, never by the model) and the
-   * review workflow: what the caller may do now and the history.
+   * Content with its versions plus the checks done by code, never by the model: the brand
+   * terminology check of the current version (`checkTerms`), the pre-publish quality gate
+   * (`checkContentQuality`: platform limits, key-fact numbers, Persian typography, docs/41), and
+   * the review workflow: what the caller may do now and the history.
    */
   async detail(id: string, user: AuthUser) {
     const base = await this.get(id);
@@ -113,14 +130,70 @@ export class ContentsService {
     ]);
     const c = { ...base, review, reviews };
     const v = c.currentVersion;
-    if (!v) return { ...c, termIssues: [] };
+    if (!v)
+      return {
+        ...c,
+        termIssues: [],
+        quality: null,
+        readability: null,
+        similarity: null,
+        styleFit: null,
+        checklist: await this.checklists.forContent(id),
+      };
     const topic = await this.prisma.topic.findUnique({
       where: { id: c.topicId },
-      select: { business: { select: { terms: { where: { isActive: true } } } } },
+      select: {
+        business: {
+          select: {
+            terms: { where: { isActive: true } },
+            facts: { where: { isActive: true } },
+          },
+        },
+        businessId: true,
+      },
     });
     const terms = topic?.business?.terms ?? [];
     const text = [v.title, v.body, v.hashtags.join(' '), v.cta].join('\n');
-    return { ...c, termIssues: terms.length ? checkTerms(text, terms) : [] };
+    const platform = effectivePlatform(c, c.topic);
+    const quality = checkContentQuality({
+      title: v.title,
+      body: v.body,
+      hashtags: v.hashtags,
+      cta: v.cta,
+      platform,
+      format: c.format,
+      terms,
+      facts: topic?.business?.facts ?? [],
+    });
+    return {
+      ...c,
+      termIssues: terms.length ? checkTerms(text, terms) : [],
+      quality,
+      similarity: await this.similarity.forContent(user, {
+        id: c.id,
+        topicId: c.topicId,
+        businessId: topic?.businessId ?? null,
+        ideaId: c.ideaId,
+        sourceContentId: c.sourceContentId,
+        variantGroupId: c.variantGroupId,
+        title: v.title,
+        body: v.body,
+      }),
+      styleFit: await this.styleFit.forContent(user, {
+        topicId: c.topicId,
+        businessId: topic?.businessId ?? null,
+        body: v.body,
+        hashtags: v.hashtags,
+        cta: v.cta,
+      }),
+      readability: analyzeReadability({
+        body: v.body,
+        cta: v.cta,
+        platform,
+        settings: await this.settings.getReadability(),
+      }),
+      checklist: await this.checklists.forContent(id, quality),
+    };
   }
 
   /** Creates the content shell (status GENERATING) and queues the AI draft. */
@@ -135,29 +208,46 @@ export class ContentsService {
       : null;
     if (data.ideaId && !idea) throw new BadRequestException('Idea does not belong to this topic');
 
-    const content = await this.prisma.content.create({
-      data: {
+    // Several drafts: N empty shells that share a group, one job each, each with its own fixed angle
+    // (docs/51-draft-variants.md). One draft is the old, single path.
+    const { maxVariants } = await this.settings.getVariants();
+    if (data.variants > maxVariants) {
+      throw new BadRequestException(`At most ${maxVariants} drafts can be written at once`);
+    }
+    const angles = data.variants > 1 ? variantAnglesFor(data.variants) : [];
+    const variantGroupId = angles.length ? randomUUID() : null;
+    const made: { contentId: string; jobId: string; angle: string | null }[] = [];
+    for (let i = 0; i < Math.max(1, angles.length); i++) {
+      const angle = angles[i] ?? null;
+      const content = await this.prisma.content.create({
+        data: {
+          topicId,
+          ideaId: idea?.id ?? null,
+          title: idea?.title ?? data.brief!.slice(0, 120),
+          brief: data.brief ?? '',
+          format: data.format ?? idea?.format ?? 'POST',
+          status: 'GENERATING',
+          createdById: user.id,
+          variantGroupId,
+          variantAngle: angle,
+          // a content written from a tagged idea starts with the idea's tags
+          ...(idea?.tags.length ? { tags: { connect: idea.tags } } : {}),
+        },
+      });
+      const job = await this.jobs.enqueue({
+        type: 'GENERATE_CONTENT',
+        targetType: 'Content',
+        targetId: content.id,
         topicId,
-        ideaId: idea?.id ?? null,
-        title: idea?.title ?? data.brief!.slice(0, 120),
-        brief: data.brief ?? '',
-        format: data.format ?? idea?.format ?? 'POST',
-        status: 'GENERATING',
-        createdById: user.id,
-        // a content written from a tagged idea starts with the idea's tags
-        ...(idea?.tags.length ? { tags: { connect: idea.tags } } : {}),
-      },
-    });
-    const job = await this.jobs.enqueue({
-      type: 'GENERATE_CONTENT',
-      targetType: 'Content',
-      targetId: content.id,
-      topicId,
-      input: data,
-      userId: user.id,
-    });
-    await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
-    return { jobId: job.id, contentId: content.id };
+        input: { ...data, ...(angle ? { variantAngle: angle } : {}) },
+        userId: user.id,
+        economy: data.economy,
+      });
+      await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
+      made.push({ contentId: content.id, jobId: job.id, angle });
+    }
+    // `jobId` / `contentId` stay the first draft's, as before; `variants` lists them all
+    return { jobId: made[0]!.jobId, contentId: made[0]!.contentId, variants: made };
   }
 
   async revise(id: string, input: ReviseContentInput, user: AuthUser) {
@@ -283,6 +373,7 @@ export class ContentsService {
         topicId: source.topicId,
         input: { platform: target.platform, format, notes: data.notes, sourceContentId: source.id },
         userId: user.id,
+        economy: data.economy,
       });
       await this.prisma.content.update({ where: { id: content.id }, data: { lastJobId: job.id } });
       items.push({ contentId: content.id, jobId: job.id, platform: target.platform, format });
@@ -312,6 +403,13 @@ export class ContentsService {
         select: { id: true },
       });
       if (!campaign) throw new BadRequestException('Campaign does not belong to this topic');
+    }
+    if (input.pillarId) {
+      const content = await this.prisma.content.findUnique({
+        where: { id },
+        select: { topicId: true },
+      });
+      await this.coverage.assertForTopic(content?.topicId ?? '', input.pillarId);
     }
     await this.prisma.content.update({ where: { id }, data: input });
     this.audit.log({
@@ -427,7 +525,8 @@ export class ContentsController {
 
 @Module({
   imports: [ReviewsModule],
-  controllers: [ContentsController],
-  providers: [ContentsService],
+  controllers: [ContentsController, MetricsController],
+  providers: [ContentsService, MetricsService],
+  exports: [ContentsService],
 })
 export class ContentsModule {}

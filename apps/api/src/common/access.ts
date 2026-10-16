@@ -35,7 +35,9 @@ export type TopicVia =
   | 'principle'
   | 'tag'
   | 'campaign'
-  | 'comment';
+  | 'comment'
+  | 'learningSuggestion'
+  | 'metric';
 export type BusinessVia =
   | 'business'
   | 'businessReference'
@@ -162,12 +164,21 @@ export class AccessService {
         return topic(await p.tag.findUnique({ where: { id }, ...sel }));
       case 'campaign':
         return topic(await p.campaign.findUnique({ where: { id }, ...sel }));
+      case 'learningSuggestion':
+        return topic(await p.learningSuggestion.findUnique({ where: { id }, ...sel }));
       case 'comment': {
         const c = await p.contentComment.findUnique({
           where: { id },
           select: { content: { select: { topicId: true } } },
         });
         return topic(c?.content ?? null);
+      }
+      case 'metric': {
+        const m = await p.contentMetric.findUnique({
+          where: { id },
+          select: { content: { select: { topicId: true } } },
+        });
+        return topic(m?.content ?? null);
       }
       case 'business':
         return { kind: 'business', id };

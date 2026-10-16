@@ -1,8 +1,9 @@
+import { FeedbackButtons } from '@/features/feedback/components/feedback-buttons';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import {
   CheckCircle2,
-  ChevronLeft,
+  ArrowRight,
   History,
   Layers,
   MessageSquareText,
@@ -40,6 +41,15 @@ import { useCampaigns } from '@/features/campaigns/api/campaigns';
 import { SchedulePanel } from '@/features/calendar/components/schedule-panel';
 import { useSetContentTags } from '@/features/tags/api/tags';
 import { CommentsCard } from './comments-card';
+import { MetricsCard } from './metrics-card';
+import { ChecklistCard } from './checklist-card';
+import { useTopicPillars } from '@/features/pillars/api/coverage';
+import { GoldenCard } from '@/features/golden/components/golden-card';
+import { ExportMenu } from '@/features/export/components/export-menu';
+import { QualityCard } from './quality-card';
+import { StyleFitCard } from './style-fit-card';
+import { ReadabilityCard } from './readability-card';
+import { SimilarityCard } from './similarity-card';
 import { RepurposeDialog, RepurposedCard } from './repurpose';
 import { ReviewActionButtons, ReviewTimelineCard } from './review-panel';
 import { TagPicker } from '@/features/tags/components/tag-picker';
@@ -346,6 +356,7 @@ function OrganizeCard({ content, editable }: { content: Content; editable: boole
   const setTags = useSetContentTags(content.id);
   const update = useUpdateContent(content.id);
   const { data: campaigns = [] } = useCampaigns(content.topicId);
+  const { data: pillars = [] } = useTopicPillars(content.topicId);
   // archived campaigns stay selectable only for a content that is already in one
   const options = campaigns
     .filter((c) => c.status === 'ACTIVE' || c.id === content.campaignId)
@@ -365,6 +376,20 @@ function OrganizeCard({ content, editable }: { content: Content; editable: boole
             />
           )}
         </Field>
+        {pillars.length > 0 && (
+          <Field label={t('coverage.pillar')}>
+            {(id) => (
+              <Select
+                id={id}
+                disabled={!editable}
+                placeholder={t('coverage.unlabeled')}
+                value={content.pillarId ?? ''}
+                options={pillars.map((p) => ({ value: p.id, label: p.name }))}
+                onChange={(e) => update.mutate({ pillarId: e.target.value || null }, { onError })}
+              />
+            )}
+          </Field>
+        )}
         <Field label={t('campaigns.one')}>
           {(id) => (
             <Select
@@ -419,7 +444,7 @@ export function ContentView({ contentId }: { contentId: string }) {
             to={paths.app.topic.getHref(content.topicId, 'contents')}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
-            <ChevronLeft className="size-4 ltr:hidden" />
+            <ArrowRight className="size-4 ltr:rotate-180" />
             {content.topic?.title}
           </Link>
         }
@@ -439,51 +464,61 @@ export function ContentView({ contentId }: { contentId: string }) {
               </Badge>
             )}
             {content.idea && <span className="text-xs">💡 {content.idea.title}</span>}
+            {content.variantGroupId && (
+              <Link
+                to={paths.app.contentCompare.getHref(content.id)}
+                className="text-xs text-primary hover:underline"
+              >
+                {t('variants.compareLink')}
+              </Link>
+            )}
           </span>
         }
         actions={
-          editable &&
-          version && (
-            <>
-              <Button
-                variant="outline"
-                icon={<MessageSquareText />}
-                onClick={reviseDialog.open}
-                disabled={generating || frozen}
-              >
-                {t('contents.revise')}
-              </Button>
-              <Button
-                variant="outline"
-                icon={<Pencil />}
-                onClick={editDrawer.open}
-                disabled={generating || frozen}
-              >
-                {t('contents.editManually')}
-              </Button>
-              <Button
-                variant="outline"
-                icon={<Layers />}
-                onClick={repurposeDialog.open}
-                disabled={generating}
-              >
-                {t('repurpose.action')}
-              </Button>
-              {!generating && <ReviewActionButtons content={content} />}
-              <ConfirmationDialog
-                trigger={
-                  <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
-                    <Trash2 />
-                  </Button>
-                }
-                onConfirm={() =>
-                  remove
-                    .mutateAsync(content.id)
-                    .then(() => navigate(paths.app.topic.getHref(content.topicId, 'contents')))
-                }
-              />
-            </>
-          )
+          <>
+            {version && <ExportMenu scope={{ ids: [content.id] }} />}
+            {editable && version && (
+              <>
+                <Button
+                  variant="outline"
+                  icon={<MessageSquareText />}
+                  onClick={reviseDialog.open}
+                  disabled={generating || frozen}
+                >
+                  {t('contents.revise')}
+                </Button>
+                <Button
+                  variant="outline"
+                  icon={<Pencil />}
+                  onClick={editDrawer.open}
+                  disabled={generating || frozen}
+                >
+                  {t('contents.editManually')}
+                </Button>
+                <Button
+                  variant="outline"
+                  icon={<Layers />}
+                  onClick={repurposeDialog.open}
+                  disabled={generating}
+                >
+                  {t('repurpose.action')}
+                </Button>
+                {!generating && <ReviewActionButtons content={content} />}
+                <ConfirmationDialog
+                  trigger={
+                    <Button variant="ghost" size="icon" aria-label={t('common.delete')}>
+                      <Trash2 />
+                    </Button>
+                  }
+                  onConfirm={() =>
+                    remove
+                      .mutateAsync(content.id)
+                      .then(() => navigate(paths.app.topic.getHref(content.topicId, 'contents')))
+                  }
+                />
+              </>
+            )}
+          </>
         }
       />
 
@@ -526,6 +561,13 @@ export function ContentView({ contentId }: { contentId: string }) {
                 }
                 actions={
                   <>
+                    {version.source === 'AI' && (
+                      <FeedbackButtons
+                        targetType="CONTENT_VERSION"
+                        targetId={version.id}
+                        topicId={content.topicId}
+                      />
+                    )}
                     <CopyButton text={fullText(version)} label={t('contents.copyAll')} />
                     {!isCurrent && editable && !frozen && (
                       <Button
@@ -589,6 +631,7 @@ export function ContentView({ contentId }: { contentId: string }) {
               </CardBody>
             </Card>
             <RepurposedCard content={content} />
+            <MetricsCard content={content} canEdit={editable} />
             <OrganizeCard content={content} editable={editable} />
             {version.id === content.currentVersionId && (
               <TermIssuesCard
@@ -597,7 +640,31 @@ export function ContentView({ contentId }: { contentId: string }) {
                 canFix={editable && !generating && !frozen}
               />
             )}
+            {version.id === content.currentVersionId && (
+              <GoldenCard
+                contentId={content.id}
+                goldenAt={content.goldenAt}
+                approved={content.status === 'APPROVED' || !!content.publishedAt}
+              />
+            )}
+            {version.id === content.currentVersionId && (
+              <ChecklistCard
+                contentId={content.id}
+                checklist={content.checklist}
+                editable={editable && !frozen}
+              />
+            )}
+            {version.id === content.currentVersionId && <QualityCard quality={content.quality} />}
+            {version.id === content.currentVersionId && (
+              <SimilarityCard similarity={content.similarity} />
+            )}
+            {version.id === content.currentVersionId && (
+              <ReadabilityCard readability={content.readability} />
+            )}
             <SelfCheckCard version={version} />
+            {version.id === content.currentVersionId && (
+              <StyleFitCard styleFit={content.styleFit} />
+            )}
             <Card>
               <CardHeader
                 title={

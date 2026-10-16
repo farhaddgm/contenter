@@ -1,9 +1,15 @@
 /** Back-office API hooks: users, prompts, settings, audit, dashboard. */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  VariantSettings,
+  GoldenSettings,
+  SimilaritySettings,
+  ReadabilitySettings,
   AiSettings,
   AiSettingsResponse,
   AuditLog,
+  BudgetResponse,
+  BudgetSettings,
   ChangePasswordInput,
   CreateGoogleAccessInput,
   CreatePromptVersionInput,
@@ -208,6 +214,22 @@ export function useAuditLogs(params: { page: number; q?: string; entityType?: st
   });
 }
 
+// ---------- monthly AI budget (docs/60) ----------
+export function useBudget() {
+  return useQuery({
+    queryKey: ['settings', 'budget'],
+    queryFn: () => api.get<BudgetResponse>('/admin/settings/budget'),
+  });
+}
+
+export function useUpdateBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: BudgetSettings) => api.put<BudgetResponse>('/admin/settings/budget', data),
+    onSuccess: (data) => qc.setQueryData(['settings', 'budget'], data),
+  });
+}
+
 // ---------- review workflow settings ----------
 export function useWorkflowSettings() {
   return useQuery({
@@ -225,6 +247,87 @@ export function useUpdateWorkflowSettings() {
       void qc.invalidateQueries({ queryKey: ['settings', 'workflow'] });
       // the review info of every open content carries the setting
       void qc.invalidateQueries({ queryKey: ['contents'] });
+    },
+  });
+}
+
+// ---------- readability settings (docs/47) ----------
+export function useReadabilitySettings() {
+  return useQuery({
+    queryKey: ['settings', 'readability'],
+    queryFn: () => api.get<ReadabilitySettings>('/admin/settings/readability'),
+  });
+}
+
+export function useUpdateReadabilitySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ReadabilitySettings) =>
+      api.put<ReadabilitySettings>('/admin/settings/readability', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'readability'] });
+      // the readability of every open content is computed with these settings
+      void qc.invalidateQueries({ queryKey: ['contents'] });
+    },
+  });
+}
+
+// ---------- similarity settings (docs/48) ----------
+export function useSimilaritySettings() {
+  return useQuery({
+    queryKey: ['settings', 'similarity'],
+    queryFn: () => api.get<SimilaritySettings>('/admin/settings/similarity'),
+  });
+}
+
+export function useUpdateSimilaritySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SimilaritySettings) =>
+      api.put<SimilaritySettings>('/admin/settings/similarity', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'similarity'] });
+      // the similarity of every open content is judged with these scores
+      void qc.invalidateQueries({ queryKey: ['contents'] });
+    },
+  });
+}
+
+// ---------- golden example limits (docs/49) ----------
+export function useGoldenSettings() {
+  return useQuery({
+    queryKey: ['settings', 'golden'],
+    queryFn: () => api.get<GoldenSettings>('/admin/settings/golden'),
+  });
+}
+
+export function useUpdateGoldenSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: GoldenSettings) => api.put<GoldenSettings>('/admin/settings/golden', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'golden'] });
+      void qc.invalidateQueries({ queryKey: ['businesses'] });
+    },
+  });
+}
+
+// ---------- simultaneous drafts cap (docs/51) ----------
+export function useVariantSettings() {
+  return useQuery({
+    queryKey: ['settings', 'variants'],
+    queryFn: () => api.get<VariantSettings>('/admin/settings/variants'),
+  });
+}
+
+export function useUpdateVariantSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: VariantSettings) =>
+      api.put<VariantSettings>('/admin/settings/variants', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'variants'] });
+      void qc.invalidateQueries({ queryKey: ['topics'] });
     },
   });
 }

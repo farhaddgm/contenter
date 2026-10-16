@@ -1,10 +1,20 @@
-import { Controller, Get, Injectable, Module } from '@nestjs/common';
+import { Controller, Get, Injectable, Module, Query } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { AiJobType, DashboardStats } from '@contenter/shared';
+import {
+  ProductivityQuerySchema,
+  type AiJobType,
+  type DashboardStats,
+  type ProductivityQuery,
+  type ProductivityStats,
+} from '@contenter/shared';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Public, type AuthUser } from '../../common/auth.decorators';
 import { AccessService } from '../../common/access';
 import { QueueService } from '../../infra/queue/queue.service';
+import { BackupStatusService } from '../ops/backup-status.service';
+import { OpsMetricsService } from '../ops/ops-metrics.service';
+import { buildProductivity } from './productivity';
 
 const DAYS = 14;
 
@@ -115,6 +125,93 @@ export class DashboardService {
       recentJobs: recentJobs as unknown as DashboardStats['recentJobs'],
     };
   }
+  /**
+   * How productive the team and the AI were (docs/44-productivity-dashboard.md). Counted from
+   * existing rows; limited to the topics the caller can reach, and further to one topic or business.
+   */
+  async productivity(user: AuthUser, query: ProductivityQuery): Promise<ProductivityStats> {
+    const since = new Date(Date.now() - query.days * 86_400_000);
+    const visible = this.access.visibleTopics(user);
+    const narrowed = Boolean(query.topicId || query.businessId);
+    const topicIds =
+      visible || narrowed
+        ? (
+            await this.prisma.topic.findMany({
+              where: {
+                AND: [
+                  visible ?? {},
+                  query.topicId ? { id: query.topicId } : {},
+                  query.businessId ? { businessId: query.businessId } : {},
+                ],
+              },
+              select: { id: true },
+            })
+          ).map((t) => t.id)
+        : null;
+    const inTopics = topicIds ? { topicId: { in: topicIds } } : {};
+    // a non-admin also sees the jobs they started that belong to no topic (as on the dashboard)
+    const jobScope: Prisma.AiJobWhereInput = topicIds
+      ? narrowed || user.role === 'ADMIN'
+        ? { topicId: { in: topicIds } }
+        : { OR: [{ topicId: { in: topicIds } }, { createdById: user.id }] }
+      : {};
+    const jobWhere: Prisma.AiJobWhereInput = { createdAt: { gte: since }, ...jobScope };
+
+    const [contents, jobs, failed, retried] = await Promise.all([
+      this.prisma.content.findMany({
+        where: {
+          status: 'APPROVED',
+          ...inTopics,
+          reviews: { some: { decision: 'APPROVED', createdAt: { gte: since } } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 5000,
+        select: {
+          createdAt: true,
+          currentVersion: { select: { source: true } },
+          versions: { where: { source: 'AI' }, take: 1, select: { id: true } },
+          reviews: {
+            where: { decision: { in: ['SUBMITTED', 'APPROVED'] } },
+            select: { decision: true, createdAt: true },
+          },
+        },
+      }),
+      this.prisma.aiJob.groupBy({
+        by: ['type'],
+        where: jobWhere,
+        _count: { _all: true },
+        _sum: { costUsd: true },
+      }),
+      this.prisma.aiJob.groupBy({
+        by: ['type'],
+        where: { ...jobWhere, status: 'FAILED' },
+        _count: { _all: true },
+      }),
+      this.prisma.aiJob.groupBy({
+        by: ['type'],
+        where: { ...jobWhere, attempts: { gt: 1 } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    return buildProductivity({
+      days: query.days,
+      since,
+      contents: contents.map((c) => ({
+        createdAt: c.createdAt,
+        reviews: c.reviews as { decision: 'SUBMITTED' | 'APPROVED'; createdAt: Date }[],
+        // the approved text was written by a person, over an AI draft
+        editedByHuman: c.currentVersion?.source === 'ADMIN' && c.versions.length > 0,
+      })),
+      jobs: jobs.map((j) => ({
+        type: j.type as AiJobType,
+        total: j._count._all,
+        failed: failed.find((f) => f.type === j.type)?._count._all ?? 0,
+        retried: retried.find((r) => r.type === j.type)?._count._all ?? 0,
+        costUsd: j._sum.costUsd ?? 0,
+      })),
+    });
+  }
 }
 
 @Controller('dashboard')
@@ -125,6 +222,14 @@ export class DashboardController {
   stats(@CurrentUser() user: AuthUser) {
     return this.dashboard.stats(user);
   }
+
+  @Get('productivity')
+  productivity(
+    @Query(new ZodValidationPipe(ProductivityQuerySchema)) query: ProductivityQuery,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.dashboard.productivity(user, query);
+  }
 }
 
 @Controller('health')
@@ -132,6 +237,8 @@ export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
+    private readonly backups: BackupStatusService,
+    private readonly ops: OpsMetricsService,
   ) {}
 
   @Public()
@@ -139,7 +246,24 @@ export class HealthController {
   async health() {
     const db = await this.prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false);
     const redis = await this.queue.ping();
-    return { status: db && redis ? 'ok' : 'degraded', db, redis, time: new Date().toISOString() };
+    // The weekly restore check (docs/13-operations.md). Informational: it never makes `status`
+    // degraded, and it is only a verdict and a date, no details.
+    const restore = db
+      ? await this.backups
+          .summary()
+          .catch(() => ({ restoreCheck: 'never' as const, lastRestoreVerifiedAt: null }))
+      : { restoreCheck: 'never' as const, lastRestoreVerifiedAt: null };
+    // deep checks (docs/54-ops-metrics.md): a live worker, a queue that moves; numbers and verdicts only
+    const deep = await this.ops.health(db, redis);
+    return {
+      status: deep.status,
+      db,
+      redis,
+      worker: deep.worker,
+      queue: deep.queue,
+      ...restore,
+      time: new Date().toISOString(),
+    };
   }
 }
 

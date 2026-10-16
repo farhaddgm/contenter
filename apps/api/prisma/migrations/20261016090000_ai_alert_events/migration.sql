@@ -1,0 +1,4 @@
+-- AlterEnum
+ALTER TYPE "NotificationEvent" ADD VALUE 'AI_FALLBACK_USED';
+ALTER TYPE "NotificationEvent" ADD VALUE 'AI_BUDGET_WARNING';
+ALTER TYPE "NotificationEvent" ADD VALUE 'AI_BUDGET_EXCEEDED';

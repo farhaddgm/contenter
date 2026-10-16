@@ -8,13 +8,14 @@ import {
 } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { InfoTip } from './info-tip';
 
 const controlBase =
-  'w-full rounded-md border border-input bg-card px-3 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive';
+  'w-full rounded-control border border-input bg-card px-3 text-sm text-foreground transition-[border-color,box-shadow] placeholder:text-muted-foreground/75 hover:border-ring/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/20';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => (
-    <input ref={ref} className={cn(controlBase, 'h-9', className)} {...props} />
+    <input ref={ref} className={cn(controlBase, 'h-10', className)} {...props} />
   ),
 );
 Input.displayName = 'Input';
@@ -26,7 +27,7 @@ export const Textarea = forwardRef<
   <textarea
     ref={ref}
     rows={rows}
-    className={cn(controlBase, 'py-2 leading-7', className)}
+    className={cn(controlBase, 'py-2.5 leading-7', className)}
     {...props}
   />
 ));
@@ -42,7 +43,11 @@ export const Select = forwardRef<
   SelectHTMLAttributes<HTMLSelectElement> & { options: SelectOption[]; placeholder?: string }
 >(({ className, options, placeholder, ...props }, ref) => (
   <div className="relative">
-    <select ref={ref} className={cn(controlBase, 'h-9 appearance-none pe-9', className)} {...props}>
+    <select
+      ref={ref}
+      className={cn(controlBase, 'h-10 cursor-pointer appearance-none pe-9', className)}
+      {...props}
+    >
       {placeholder !== undefined && <option value="">{placeholder}</option>}
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -65,13 +70,19 @@ export function Label({
   className?: string;
 }) {
   return (
-    <label htmlFor={htmlFor} className={cn('text-sm font-medium leading-none', className)}>
+    <label
+      htmlFor={htmlFor}
+      className={cn('text-[13px] font-semibold leading-none text-foreground', className)}
+    >
       {children}
     </label>
   );
 }
 
-/** Label + control + hint + error, wired for accessibility. */
+/**
+ * Label + control + error, wired for accessibility. A `hint` is shown in the "i" popup next to the
+ * label (hover / focus / tap), not under the field; without a label it falls back to plain text.
+ */
 export function Field({
   label,
   hint,
@@ -89,21 +100,24 @@ export function Field({
 }) {
   const id = useId();
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('space-y-2', className)}>
       {label && (
-        <Label htmlFor={id}>
-          {label}
-          {optional && (
-            <span className="ms-1 text-xs font-normal text-muted-foreground">({optional})</span>
-          )}
-        </Label>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor={id}>
+            {label}
+            {optional && (
+              <span className="ms-1 text-xs font-normal text-muted-foreground">({optional})</span>
+            )}
+          </Label>
+          {hint ? <InfoTip>{hint}</InfoTip> : null}
+        </div>
       )}
       {children(id)}
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs font-medium text-destructive">
           {error}
         </p>
-      ) : hint ? (
+      ) : hint && !label ? (
         <p className="text-xs leading-5 text-muted-foreground">{hint}</p>
       ) : null}
     </div>
@@ -114,39 +128,45 @@ export function Switch({
   checked,
   onCheckedChange,
   label,
+  hint,
   disabled,
 }: {
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
   label?: ReactNode;
+  /** Explanation shown in the "i" popup after the label. */
+  hint?: ReactNode;
   disabled?: boolean;
 }) {
   return (
-    <label
-      className={cn(
-        'inline-flex cursor-pointer items-center gap-2 text-sm',
-        disabled && 'opacity-50',
-      )}
-    >
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onCheckedChange(!checked)}
+    <span className="inline-flex items-center gap-1.5">
+      <label
         className={cn(
-          'relative h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          checked ? 'bg-primary' : 'bg-input',
+          'inline-flex cursor-pointer items-center gap-2 text-sm',
+          disabled && 'cursor-not-allowed opacity-50',
         )}
       >
-        <span
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          disabled={disabled}
+          onClick={() => onCheckedChange(!checked)}
           className={cn(
-            'absolute top-0.5 size-4 rounded-full bg-white shadow transition-all',
-            checked ? 'start-[1.125rem]' : 'start-0.5',
+            'relative h-6 w-10 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed',
+            checked ? 'bg-primary' : 'bg-input',
           )}
-        />
-      </button>
-      {label}
-    </label>
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 size-5 rounded-full bg-white shadow transition-all',
+              checked ? 'start-[1.125rem]' : 'start-0.5',
+            )}
+          />
+        </button>
+        {label}
+      </label>
+      {hint ? <InfoTip>{hint}</InfoTip> : null}
+    </span>
   );
 }

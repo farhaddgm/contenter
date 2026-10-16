@@ -6,7 +6,7 @@ import { useT } from '@/i18n';
 export function JobStatusBadge({ status }: { status: AiJobStatus }) {
   const t = useT();
   return (
-    <Badge tone={statusTone[status]}>
+    <Badge tone={statusTone[status]} dot={status !== 'RUNNING'}>
       {status === 'RUNNING' && <Loader2 className="animate-spin" />}
       {t(`enums.jobStatus.${status}`)}
     </Badge>

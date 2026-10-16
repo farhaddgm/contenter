@@ -377,6 +377,10 @@ export const GenerateContentSchema = z
     ideaId: z.string().optional(),
     brief: z.string().trim().max(5000).optional().default(''),
     format: z.enum(ContentFormat).optional(),
+    /** How many drafts to write side by side (docs/51-draft-variants.md). */
+    variants: z.number().int().min(1).max(3).optional().default(1),
+    /** Economy mode: about half the price, the result comes within 24 hours (docs/60). */
+    economy: z.boolean().optional(),
   })
   .refine((v) => !!v.ideaId || (v.brief ?? '').length >= 10, {
     message: 'Either ideaId or a brief (min 10 chars) is required',
@@ -458,6 +462,8 @@ export const UpdateContentSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
   /** null removes the content from its campaign. */
   campaignId: z.string().min(1).nullable().optional(),
+  /** null removes the content pillar label (docs/50-coverage-map.md). */
+  pillarId: z.string().min(1).nullable().optional(),
 });
 export type UpdateContentInput = z.infer<typeof UpdateContentSchema>;
 
@@ -527,6 +533,8 @@ export const RepurposeContentSchema = z
       .max(MAX_REPURPOSE_TARGETS),
     /** Direction for the writer, e.g. "shorter, more formal". */
     notes: z.string().trim().max(2000).optional().default(''),
+    /** Economy mode: about half the price, the result comes within 24 hours (docs/60). */
+    economy: z.boolean().optional(),
   })
   .refine(
     (v) =>
@@ -556,6 +564,13 @@ export const AiSettingsSchema = z.object({
   models: z.record(z.string(), z.string().trim().min(3).max(120).regex(MODEL_REF_PATTERN)),
   effort: z.record(z.string(), z.enum(AiEffort)),
   maxSamplesPerProfile: z.number().int().min(1).max(50),
+  /**
+   * Model used when the chosen one's vendor is out of credit, rejects the key or is down
+   * (docs/60-reliability-and-cost.md). `provider:model`; empty/absent = no fallback.
+   */
+  fallbackModel: z
+    .union([z.string().trim().min(3).max(120).regex(MODEL_REF_PATTERN), z.literal('')])
+    .optional(),
 });
 export type AiSettings = z.infer<typeof AiSettingsSchema>;
 

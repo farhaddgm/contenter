@@ -112,6 +112,7 @@ function setup(
     {} as never,
     instagram,
     crawler,
+    {} as never,
   );
   return { service, rows, instagram, crawler };
 }

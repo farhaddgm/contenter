@@ -35,11 +35,11 @@ export function NotificationBell() {
           aria-label={
             unread ? t('inbox.bellUnread', { count: formatNumber(unread) }) : t('inbox.title')
           }
-          className="relative rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative flex size-10 items-center justify-center rounded-full border bg-card text-muted-foreground transition hover:border-ring/60 hover:text-foreground"
         >
           <Bell className="size-5" />
           {unread > 0 && (
-            <span className="absolute -end-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-4 text-white">
+            <span className="absolute -end-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-4 text-white ring-2 ring-background">
               {unread > 99 ? '99+' : formatNumber(unread)}
             </span>
           )}
@@ -49,7 +49,7 @@ export function NotificationBell() {
         <Popover.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-card shadow-xl"
+          className="z-50 w-[min(24rem,calc(100vw-2rem))] animate-pop-in overflow-hidden rounded-2xl border bg-card shadow-pop"
         >
           <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
             <h2 className="text-sm font-semibold">{t('inbox.title')}</h2>

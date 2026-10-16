@@ -8,6 +8,8 @@ export interface AiUsage {
   cacheWriteTokens: number;
   /** Server-side web searches run by the vendor (billed per search). */
   webSearches?: number;
+  /** Answered through the vendor's batch API, billed at about half price (docs/60). */
+  batch?: boolean;
 }
 
 export interface ResearchRequest {
@@ -60,6 +62,36 @@ export class NonRetryableAiError extends Error {
   readonly nonRetryable = true;
 }
 
+/** Why a vendor could not serve a request at all (as opposed to rejecting this one request). */
+export type UnavailableReason = 'quota' | 'auth' | 'overloaded' | 'network';
+
+/**
+ * The vendor is out of credit or refuses our key or permission. Retrying the same call cannot
+ * help, so it is non-retryable; the executor may still switch to the fallback model.
+ */
+export class ProviderUnavailableError extends NonRetryableAiError {
+  constructor(
+    message: string,
+    readonly reason: UnavailableReason,
+  ) {
+    super(message);
+  }
+}
+
+/** The vendor is overloaded or unreachable after the SDK's own retries; the queue may retry. */
+export class ProviderOverloadedError extends Error {
+  constructor(
+    message: string,
+    readonly reason: UnavailableReason,
+  ) {
+    super(message);
+  }
+}
+
+/** True for any error that means "this vendor cannot serve us now" — the cue for the fallback. */
+export const isProviderDown = (err: unknown): err is ProviderUnavailableError | ProviderOverloadedError =>
+  err instanceof ProviderUnavailableError || err instanceof ProviderOverloadedError;
+
 /**
  * The only boundary between Contenter and an LLM vendor.
  * Implementations must return data that already passed `schema` validation.
@@ -75,9 +107,47 @@ export interface AiProvider {
   research(req: ResearchRequest): Promise<ResearchResult>;
 }
 
+// ─────────────────────────────── batch mode ───────────────────────────────
+
+/** What a vendor's batch returned for one request. */
+export type BatchItemResult = { ok: true; raw: unknown } | { ok: false; error: string };
+
+/** State of a submitted batch; `results` is keyed by the `customId` of each request. */
+export type BatchPoll =
+  | { state: 'running' }
+  | { state: 'done'; results: Record<string, BatchItemResult> }
+  | { state: 'failed'; error: string };
+
+/**
+ * Optional capability of a provider: structured calls through the vendor's batch API (about half
+ * the price, an answer within 24 hours). Used by economy-mode jobs (docs/60). A request is
+ * turned into plain JSON when the call is made (`buildBatchParams`), submitted later together
+ * with others (`submitBatch`), and the raw answer is read back with the task's schema
+ * (`parseBatchResult`).
+ */
+export interface BatchProvider {
+  buildBatchParams(req: StructuredRequest<unknown>): Promise<Record<string, unknown>>;
+  submitBatch(
+    items: { customId: string; params: Record<string, unknown> }[],
+  ): Promise<{ batchRef: string }>;
+  pollBatch(batchRef: string): Promise<BatchPoll>;
+  parseBatchResult<T>(raw: unknown, schema: ZodType<T>): StructuredResult<T>;
+}
+
+/** Optional capability: turning texts into vectors (docs/60). Only OpenAI offers it. */
+export interface EmbeddingProvider {
+  embed(texts: string[], model: string): Promise<{ vectors: number[][]; usage: AiUsage }>;
+}
+
+export const isEmbeddingProvider = (p: AiProvider): p is AiProvider & EmbeddingProvider =>
+  typeof (p as Partial<EmbeddingProvider>).embed === 'function';
+
+export const isBatchProvider = (p: AiProvider): p is AiProvider & BatchProvider =>
+  typeof (p as Partial<BatchProvider>).submitBatch === 'function';
+
 /** Adds up usage of several calls made for one job. */
 export function sumUsage(...items: AiUsage[]): AiUsage {
-  return items.reduce<AiUsage>(
+  const total = items.reduce<AiUsage>(
     (acc, u) => ({
       inputTokens: acc.inputTokens + u.inputTokens,
       outputTokens: acc.outputTokens + u.outputTokens,
@@ -87,6 +157,8 @@ export function sumUsage(...items: AiUsage[]): AiUsage {
     }),
     { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, webSearches: 0 },
   );
+  // half price only when every call of the job was a batch call
+  return items.length > 0 && items.every((u) => u.batch) ? { ...total, batch: true } : total;
 }
 
 /**

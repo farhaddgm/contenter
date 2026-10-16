@@ -1,0 +1,20 @@
+{
+  "generate_content": {
+    "hash": "b32eea664b8a251b",
+    "evaluatedAt": null,
+    "model": null,
+    "passRate": null
+  },
+  "repurpose_content": {
+    "hash": "303d49fc6d4a159d",
+    "evaluatedAt": null,
+    "model": null,
+    "passRate": null
+  },
+  "ideate": {
+    "hash": "4b7c3bf435c47ccd",
+    "evaluatedAt": null,
+    "model": null,
+    "passRate": null
+  }
+}

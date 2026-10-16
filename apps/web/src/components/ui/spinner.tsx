@@ -1,3 +1,4 @@
+import { useT } from '@/i18n';
 import { cn } from '@/utils/cn';
 
 const sizes = { sm: 'size-4', md: 'size-6', lg: 'size-10', xl: 'size-14' };
@@ -9,13 +10,14 @@ export function Spinner({
   size?: keyof typeof sizes;
   className?: string;
 }) {
+  const t = useT();
   return (
     <svg
       className={cn('animate-spin text-primary', sizes[size], className)}
       viewBox="0 0 24 24"
       fill="none"
       role="status"
-      aria-label="loading"
+      aria-label={t('common.loading')}
     >
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
       <path

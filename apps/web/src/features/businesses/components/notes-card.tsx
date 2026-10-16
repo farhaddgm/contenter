@@ -133,16 +133,12 @@ export function NotesCard({
                   onChange={setScope}
                   hasWebsite={hasWebsite}
                 />
-                <div className="space-y-1">
-                  <Switch
-                    checked={apply === 'SUGGEST'}
-                    onCheckedChange={(v) => setApply(v ? 'SUGGEST' : 'DIRECT')}
-                    label={t('businesses.notes.asSuggestions')}
-                  />
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    {t(`businesses.notes.applyHint.${apply}`)}
-                  </p>
-                </div>
+                <Switch
+                  checked={apply === 'SUGGEST'}
+                  onCheckedChange={(v) => setApply(v ? 'SUGGEST' : 'DIRECT')}
+                  label={t('businesses.notes.asSuggestions')}
+                  hint={t(`businesses.notes.applyHint.${apply}`)}
+                />
               </div>
             )}
             <div className="flex flex-wrap items-center justify-between gap-2">

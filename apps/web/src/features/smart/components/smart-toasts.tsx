@@ -13,14 +13,14 @@ export function SmartToasts() {
       aria-live="assertive"
       className={cn(
         'pointer-events-none fixed bottom-4 z-[65] flex w-full max-w-sm flex-col gap-2 px-4',
-        side === 'left' ? 'right-0' : 'left-0',
+        side === 'end' ? 'start-0' : 'end-0',
       )}
     >
       {toasts.map((toast) => (
         <div
           key={toast.id}
           role="alert"
-          className="pointer-events-auto flex items-start gap-3 rounded-lg border border-destructive/40 bg-card p-3.5 shadow-xl"
+          className="pointer-events-auto flex items-start gap-3 rounded-xl border border-destructive/40 bg-card p-3.5 shadow-pop"
         >
           <AlertOctagon className="mt-0.5 size-5 shrink-0 text-destructive" />
           <div className="min-w-0 flex-1">

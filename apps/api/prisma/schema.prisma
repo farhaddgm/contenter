@@ -67,9 +67,13 @@ model User {
   submittedContents   Content[]                 @relation("ContentSubmitter")
   contentReviews      ContentReview[]
   contentComments     ContentComment[]          @relation("CommentAuthor")
+  contentMetrics      ContentMetric[]           @relation("MetricAuthor")
   resolvedComments    ContentComment[]          @relation("CommentResolver")
   notifications       Notification[]
   notificationPrefs   NotificationPreference[]
+  checklistTicks      ContentChecklistTick[]    @relation("ChecklistTicker")
+  aiFeedback          AiFeedback[]
+  apiKeys             ApiKey[]
 }
 
 model RefreshToken {
@@ -181,6 +185,8 @@ model Business {
   terms       BusinessTerm[]
   audits      BusinessAudit[]
   members     BusinessMember[]
+  checklists  ChecklistTemplate[]
+  pillars     ContentPillar[]
 
   @@index([status, updatedAt])
 }
@@ -321,8 +327,31 @@ model BusinessReference {
   business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   googleAccount GoogleDriveAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)
   createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  chunks        ReferenceChunk[]
 
   @@index([businessId, createdAt])
+}
+
+/// A piece of a reference's text with its embedding, for picking the passages that fit a task
+/// when the references are too big to send whole (docs/60). Vectors are plain double arrays: the
+/// cosine is computed in code, so no Postgres extension is needed.
+model ReferenceChunk {
+  id          String   @id @default(cuid())
+  referenceId String
+  businessId  String
+  idx         Int
+  text        String
+  embedding   Float[]
+  /// The embedding model (`provider:model`); chunks of another model are not mixed in
+  model       String
+  /// Hash of the reference's text the chunks were cut from; a change makes them stale
+  contentHash String
+  createdAt   DateTime @default(now())
+
+  reference BusinessReference @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+
+  @@unique([referenceId, idx])
+  @@index([businessId])
 }
 
 /// Google account connected (OAuth, drive.readonly) to read private Google Docs/Drive files.
@@ -542,6 +571,11 @@ enum Platform {
   TIKTOK
   BLOG
   OTHER
+  EITAA
+  BALE
+  RUBIKA
+  APARAT
+  NEWSLETTER
 }
 
 enum TopicStatus {
@@ -572,12 +606,12 @@ model Topic {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  business      Business?         @relation(fields: [businessId], references: [id], onDelete: SetNull)
-  activeProfile ContentProfile?   @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
+  createdBy     User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  business      Business?            @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  activeProfile ContentProfile?      @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
   principles    Principle[]
   samples       SampleContent[]
-  profiles      ContentProfile[]  @relation("TopicProfiles")
+  profiles      ContentProfile[]     @relation("TopicProfiles")
   ideationRuns  IdeationRequest[]
   ideas         Idea[]
   contents      Content[]
@@ -585,6 +619,9 @@ model Topic {
   members       TopicMember[]
   tags          Tag[]
   campaigns     Campaign[]
+  editRuns      EditLearningRun[]
+  aiFeedback    AiFeedback[]
+  learnings     LearningSuggestion[]
 
   @@index([status, createdAt])
   @@index([businessId])
@@ -946,6 +983,14 @@ model Content {
   /// Set by hand once the content is live elsewhere; a published content is frozen
   publishedAt      DateTime?
   publishedUrl     String?
+  /// An admin marked this approved content as an example of the brand's voice (docs/49-golden-examples.md); cleared when the text changes
+  goldenAt         DateTime?
+  /// The content pillar of the business this piece covers (docs/50-coverage-map.md); null = unlabeled
+  pillarId         String?
+  /// Drafts written together for one idea share this id; null = a single draft (docs/51-draft-variants.md)
+  variantGroupId   String?
+  /// The fixed writing angle this draft was asked for (`VariantAngle` in packages/shared)
+  variantAngle     String?
   /// The `scheduledAt` the "time to publish" reminder was already sent for (docs/25-notifications.md)
   dueNotifiedFor   DateTime?
   currentVersionId String?       @unique
@@ -954,23 +999,28 @@ model Content {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  topic          Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  idea           Idea?            @relation(fields: [ideaId], references: [id], onDelete: SetNull)
-  profile        ContentProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  campaign       Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  currentVersion ContentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  versions       ContentVersion[] @relation("ContentVersions")
+  topic          Topic                  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  idea           Idea?                  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  profile        ContentProfile?        @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  campaign       Campaign?              @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  pillar         ContentPillar?         @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+  currentVersion ContentVersion?        @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       ContentVersion[]       @relation("ContentVersions")
   tags           Tag[]
-  submittedBy    User?            @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
-  source         Content?         @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
-  repurposed     Content[]        @relation("Repurposed")
+  submittedBy    User?                  @relation("ContentSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  source         Content?               @relation("Repurposed", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  repurposed     Content[]              @relation("Repurposed")
   reviews        ContentReview[]
   comments       ContentComment[]
+  metrics        ContentMetric[]
   notifications  Notification[]
+  checklistTicks ContentChecklistTick[]
 
   @@index([topicId, status, createdAt])
   @@index([status, updatedAt])
   @@index([campaignId])
+  @@index([pillarId])
+  @@index([variantGroupId])
   @@index([scheduledAt])
   @@index([publishedAt])
   @@index([sourceContentId])
@@ -1040,6 +1090,149 @@ model ContentVersion {
   @@unique([contentId, version])
 }
 
+// ───────────────────────── Feedback on AI output ─────────────────────────
+// See docs/46-ai-feedback.md. Mirrors packages/shared/src/feedback.ts.
+
+enum FeedbackTarget {
+  CONTENT_VERSION
+  PROFILE
+}
+
+enum FeedbackRating {
+  UP
+  DOWN
+}
+
+/// One person's 👍 / 👎 on one AI output. `jobId` is the job that made it (prompt version and model
+/// are read from there); `topicId` is kept so access and counts need no join.
+model AiFeedback {
+  id         String         @id @default(cuid())
+  userId     String
+  targetType FeedbackTarget
+  targetId   String
+  topicId    String
+  jobId      String?
+  rating     FeedbackRating
+  /// One of FeedbackReason (checked by Zod); only on a DOWN
+  reason     String?
+  note       String         @default("")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([topicId, targetType])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+// ───────────────────────── Publishing checklist ─────────────────────────
+// See docs/45-publish-checklist.md. Mirrors packages/shared/src/checklist.ts.
+
+/// The points a person confirms before a content is scheduled: one row per business and platform
+/// (platform null = every platform). `items` is ChecklistItem[]; each keeps its id when edited.
+model ChecklistTemplate {
+  id          String    @id @default(cuid())
+  businessId  String
+  platform    Platform?
+  items       Json
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+/// A person ticked one point (`itemId` of a template item) of a content. Cleared when the reviewed text changes.
+model ContentChecklistTick {
+  id          String   @id @default(cuid())
+  contentId   String
+  itemId      String
+  checkedById String?
+  createdAt   DateTime @default(now())
+
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  checkedBy User?   @relation("ChecklistTicker", fields: [checkedById], references: [id], onDelete: SetNull)
+
+  @@unique([contentId, itemId])
+}
+
+// ───────────────────────── Learning from edits ─────────────────────────
+// See docs/30-learn-from-edits.md. Mirrors packages/shared/src/edit-learning.ts.
+
+/// One analysis of the edited approved contents of a topic (one LEARN_FROM_EDITS job).
+model EditLearningRun {
+  id             String   @id @default(cuid())
+  topicId        String
+  jobId          String?
+  /// How many (AI draft, approved text) pairs the model saw
+  pairCount      Int
+  /// Mean share of words changed over those pairs, 0–1 (counted by code)
+  avgChangeRatio Float
+  createdAt      DateTime @default(now())
+
+  topic       Topic                @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  suggestions LearningSuggestion[]
+
+  @@index([topicId, createdAt])
+}
+
+/// A principle the model proposes from edits that repeat; becomes a Principle only when accepted.
+model LearningSuggestion {
+  id          String           @id @default(cuid())
+  topicId     String
+  runId       String
+  kind        PrincipleKind
+  /// One of EditCategory (checked by Zod, not an enum, so the list can grow without a migration)
+  category    String
+  text        String
+  rationale   String           @default("")
+  /// EditEvidence[] — built by code from real pairs, never copied from the model
+  evidence    Json
+  status      SuggestionStatus @default(PENDING)
+  principleId String?
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime         @default(now())
+
+  topic Topic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  run   EditLearningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, status])
+  @@index([runId])
+}
+
+/// Numbers read by hand from a platform for a published content, one reading per day
+/// (docs/32-performance-metrics.md). Counters are cumulative; the newest reading is the current state.
+model ContentMetric {
+  id          String   @id @default(cuid())
+  contentId   String
+  /// The calendar day (UTC midnight) the numbers were read.
+  measuredAt  DateTime @db.Date
+  views       Int?
+  likes       Int?
+  comments    Int?
+  shares      Int?
+  saves       Int?
+  clicks      Int?
+  conversions Int?
+  revenue     Float?
+  note        String   @default("")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("MetricAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([contentId, measuredAt])
+  @@index([measuredAt])
+}
+
 // ─────────────────────────────── Notifications ───────────────────────────────
 
 enum NotificationEvent {
@@ -1051,6 +1244,10 @@ enum NotificationEvent {
   COMMENT_ADDED
   COMMENT_REPLIED
   CONTENT_DUE
+  BACKUP_VERIFY_FAILED
+  AI_FALLBACK_USED
+  AI_BUDGET_WARNING
+  AI_BUDGET_EXCEEDED
 }
 
 enum DeliveryChannel {
@@ -1097,15 +1294,15 @@ model NotificationPreference {
 
 /// Outcome of one e-mail or webhook send, kept for a few weeks so a failing channel can be found
 model NotificationDelivery {
-  id             String            @id @default(cuid())
-  channel        DeliveryChannel
-  event          NotificationEvent
+  id        String            @id @default(cuid())
+  channel   DeliveryChannel
+  event     NotificationEvent
   /// The address, or the host of the webhook
-  target         String
-  status         DeliveryStatus
-  error          String?
-  attempts       Int               @default(1)
-  createdAt      DateTime          @default(now())
+  target    String
+  status    DeliveryStatus
+  error     String?
+  attempts  Int               @default(1)
+  createdAt DateTime          @default(now())
 
   @@index([createdAt])
 }
@@ -1126,6 +1323,9 @@ enum AiJobType {
   BUSINESS_ASSET_ANALYZE
   BUSINESS_AUDIT
   REPURPOSE_CONTENT
+  LEARN_FROM_EDITS
+  /// Splits a business reference into chunks and embeds them (docs/60)
+  EMBED_REFERENCE
 }
 
 enum AiJobStatus {
@@ -1134,6 +1334,8 @@ enum AiJobStatus {
   SUCCEEDED
   FAILED
   CANCELED
+  /// Economy mode: the model call is with the vendor's batch queue (docs/60)
+  WAITING
 }
 
 model AiJob {
@@ -1155,17 +1357,54 @@ model AiJob {
   promptKey       String?
   promptVersion   Int?
   createdById     String?
+  /// Run through the vendor's batch API: about half the price, result within 24 hours (docs/60)
+  economy         Boolean     @default(false)
   startedAt       DateTime?
   finishedAt      DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy  User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  batchCalls AiBatchCall[]
 
   @@index([status, createdAt])
   @@index([type, createdAt])
   @@index([targetType, targetId])
   @@index([topicId])
+}
+
+enum AiBatchStatus {
+  PENDING
+  SUBMITTED
+  DONE
+  FAILED
+}
+
+/// One model call of an economy-mode job, waiting for or holding its batch result. A job is run
+/// again when its calls are done and replays earlier calls from here by `seq` (docs/60).
+model AiBatchCall {
+  id        String        @id @default(cuid())
+  jobId     String
+  /// Order of the call inside the job's run: 0, 1, ...
+  seq       Int
+  /// `provider:model` the call was prepared for
+  model     String
+  /// The vendor request body, prepared by the provider (plain JSON)
+  params    Json
+  status    AiBatchStatus @default(PENDING)
+  /// The vendor's batch id once submitted
+  batchRef  String?
+  /// The vendor's raw answer for this call
+  result    Json?
+  error     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  job AiJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, seq])
+  @@index([status, createdAt])
+  @@index([batchRef])
 }
 
 model PromptTemplate {
@@ -1379,4 +1618,42 @@ model WalkerIssue {
   error        AppError?          @relation(fields: [errorId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
+}
+
+/// A theme the business wants its content to cover (docs/50-coverage-map.md). `targetShare` is the wanted
+/// percent of the labeled content; deleting a pillar leaves its contents unlabeled.
+model ContentPillar {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  targetShare Int?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contents Content[]
+
+  @@unique([businessId, name])
+  @@index([businessId, order])
+}
+
+/// A personal API key (docs/52-api-keys.md). Only a SHA-256 of the key is stored, never the key;
+/// `prefix` (first characters, unique) finds the row. The key carries its owner's identity
+/// narrowed by `scopes` (`ApiKeyScope` in packages/shared).
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  prefix     String    @unique
+  hash       String
+  scopes     String[]
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

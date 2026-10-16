@@ -12,7 +12,7 @@ import { notify } from '@/stores/notifications';
 import { translate } from '@/i18n';
 import { useUi } from '@/stores/ui';
 
-const ACTIVE: AiJobStatus[] = ['QUEUED', 'RUNNING'];
+const ACTIVE: AiJobStatus[] = ['QUEUED', 'RUNNING', 'WAITING'];
 export const isJobActive = (s?: AiJobStatus) => !!s && ACTIVE.includes(s);
 
 export const jobKeys = {

@@ -8,11 +8,13 @@ import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
 import { formatDate, formatNumber, formatRelative } from '@/utils/format';
 import { TagChips } from '@/features/tags/components/tag-chip';
+import { ExportMenu } from '@/features/export/components/export-menu';
 import { useContents } from '../api/contents';
 import {
   DEFAULT_FILTERS,
   readFilters,
   toApiParams,
+  toExportFilter,
   writeFilters,
   type ContentFilters,
 } from '../filters';
@@ -173,6 +175,14 @@ export function ContentsTable({
         onRowClick={(c) => navigate(paths.app.content.getHref(c.id))}
         empty={<EmptyState title={t('contents.empty')} />}
       />
+      {data && data.total > 0 && (
+        <div className="flex items-center justify-between gap-2 border-t px-4 py-2">
+          <span className="text-xs text-muted-foreground">
+            {t('export.matching', { n: formatNumber(data.total) })}
+          </span>
+          <ExportMenu size="sm" scope={{ filter: toExportFilter(filters, { topicId }) as never }} />
+        </div>
+      )}
       {data && (
         <Pagination
           page={data.page}

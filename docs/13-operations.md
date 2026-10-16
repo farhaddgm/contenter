@@ -104,10 +104,13 @@ df -h /
 | تنظیم | توضیح |
 |---|---|
 | `OPENAI_API_KEY` | کلید OpenAI (فعلاً همهٔ کارهای AI با OpenAI انجام می‌شود) |
+| `SEMANTIC_RETRIEVAL` | `auto` (پیش‌فرض: با کلید OpenAI روشن)، `on` یا `off`؛ انتخاب معنایی بخش‌های مراجع بزرگ ([60](60-reliability-and-cost.md)) |
+| `EMBEDDING_MODEL` | مدل تعبیه، `provider:model`؛ پیش‌فرض `openai:text-embedding-3-small` |
 | `ANTHROPIC_API_KEY` | کلید Claude؛ بعد از گذاشتن، در سایت ← تنظیمات مدل‌ها را به Claude تغییر دهید |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ورود با جیمیل ([11-google-login.md](11-google-login.md)) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | کلیدهای امنیتی ورود؛ هرگز پاک یا عوض نکنید مگر عمداً |
 | `INTEGRATION_TOKEN` | توکن خواندن کسب‌وکارها برای Docoo ([18-docoo-integration.md](18-docoo-integration.md)). خالی = خاموش؛ حداقل ۳۲ نویسه |
+| `METRICS_TOKEN` | توکن `GET /api/metrics` برای Prometheus ([54-ops-metrics.md](54-ops-metrics.md)). خالی = مسیر وجود ندارد؛ حداقل ۳۲ نویسه و جدا از بقیهٔ توکن‌ها |
 | `RESEARCHER_INTEGRATION_TOKEN` / `RESEARCHER_BUSINESS_ACCESS` / `RESEARCHER_BUSINESS_IDS` | توکن جداگانهٔ Bee Researcher و این‌که کدام کسب‌وکارها را ببیند: `selected` (فقط شناسه‌های فهرست‌شده؛ خالی = هیچ‌کدام) یا `all` ([26-researcher-integration.md](26-researcher-integration.md)). توکن خالی = خاموش؛ نباید با `INTEGRATION_TOKEN` یکی باشد |
 | `SMTP_URL` / `MAIL_FROM` | سرور SMTP برای ایمیل اعلان‌ها، مثلاً `smtps://user:pass@smtp.example.com:465` ([25-notifications.md](25-notifications.md)). خالی = ایمیل خاموش (اعلان درون‌برنامه‌ای و وب‌هوک کار می‌کنند). `APP_URL` هم باید درست باشد چون پیوند ایمیل از آن ساخته می‌شود |
 | `FETCH_PROXY_URL` / `FETCH_PROXY_HOSTS` | پراکسی خروجی برای خواندن لینک‌ها (پایین را ببینید). پیش‌فرض: خالی / `ir` |
@@ -173,7 +176,41 @@ bash scripts/backup.sh
 bash scripts/backup.sh test
 ```
 
-پیام سبز `It can be restored` یعنی همه‌چیز درست است. پشتیبان شبانه (ساعت ۳:۱۷) را `deploy.sh` در اولین انتشار خودش فعال می‌کند (`bash scripts/backup.sh install-cron`)؛ حتی بدون مقصد بیرونی هم هر شب یک پشتیبان محلی گرفته می‌شود و گزارشش در `~/contenter-backups/backup.log` است. هر چند وقت یک بار `bash scripts/backup.sh test` را اجرا کنید.
+پیام سبز `It can be restored` یعنی همه‌چیز درست است. پشتیبان شبانه (ساعت ۳:۱۷) را `deploy.sh` در اولین انتشار خودش فعال می‌کند (`bash scripts/backup.sh install-cron`)؛ حتی بدون مقصد بیرونی هم هر شب یک پشتیبان محلی گرفته می‌شود و گزارشش در `~/contenter-backups/backup.log` است. دستور `test` فقط نشان می‌دهد فایل پشتیبان باز و بسته می‌شود؛ برای اطمینان واقعی از [بررسی بازیابی](#بررسی-بازیابی-هفتگی) پایین استفاده کنید.
+
+### بررسی بازیابی (هفتگی)
+
+پشتیبانی که هیچ‌وقت بازیابی نشده، اثبات‌نشده است. دستور زیر جدیدترین پشتیبان را (اگر `BACKUP_REMOTE` تنظیم باشد از مقصد بیرونی، وگرنه از پوشهٔ محلی) **واقعاً** در یک پایگاه داده موقت بازیابی می‌کند و نتیجه را بررسی می‌کند:
+
+```bash
+bash scripts/backup.sh verify          # بیرونی (اگر تنظیم شده) وگرنه محلی
+bash scripts/backup.sh verify local    # فقط پشتیبان محلی
+```
+
+- پایگاه موقت یک کانتینر `postgres:17-alpine` **بدون شبکه** است (`--network none`، حداکثر ۱ گیگابایت حافظه) که پایان کار پاک می‌شود. به پایگاه داده زندهٔ برنامه هیچ دسترسی ندارد.
+- بررسی‌ها: فایل `db-*.sql.gz` سالم باشد و بدون خطا بازیابی شود؛ جدول‌های `User`، `Business`، `Topic`، `Content`، `AiJob`، `AuditLog` و `_prisma_migrations` وجود داشته باشند؛ دست‌کم یک کاربر داشته باشد؛ هیچ migration نیمه‌کاره نباشد؛ بایگانی فایل‌های بارگذاری‌شده خوانده شود؛ و سن پشتیبان از **۴۸ ساعت** بیشتر نباشد (اگر بیشتر بود یعنی پشتیبان شبانه از کار افتاده است).
+- نتیجه در `~/contenter-backups/verify-status.json` است (`ok`، سن پشتیبان، شمار جدول‌ها و ردیف‌ها، فهرست `problems` و `warnings`). در صورت موفقیت تاریخ در `~/contenter-backups/verify-last-ok` ثبت می‌شود. در صورت شکست، دستور با کد خروج ۱ تمام می‌شود و دلیل در `verify.log` است.
+- `deploy.sh` (یا `bash scripts/backup.sh install-cron`) علاوه بر پشتیبان شبانه، این بررسی را **هر یکشنبه ساعت ۴:۰۷** زمان‌بندی می‌کند. لاگ: `~/contenter-backups/verify.log`.
+
+تنظیمات اختیاری (در `~/.contenter-backup.env` یا هنگام اجرا): `VERIFY_MAX_AGE_HOURS` (پیش‌فرض ۴۸)، `VERIFY_PG_IMAGE` (پیش‌فرض `postgres:17-alpine`؛ همان نسخهٔ پایگاه داده اصلی).
+
+```bash
+cat ~/contenter-backups/verify-status.json
+cat ~/contenter-backups/verify-last-ok      # آخرین بررسی موفق
+tail -20 ~/contenter-backups/verify.log
+```
+
+**گزارش به برنامه و هشدار:** پس از هر بررسی، اسکریپت نتیجه را به کانتینر `api` می‌دهد (`docker compose exec -T -e APP_ROLE=api api node apps/api/dist/cli/record-backup-verify.js`؛ بدون HTTP و بدون توکن تازه). برنامه نتیجه را در تنظیمات سیستم (کلید `backupVerify`) نگه می‌دارد و در لاگ ممیزی (`backup.verify_ok` / `backup.verify_failed`) ثبت می‌کند. اگر بررسی **شکست** خورده باشد، به همهٔ مدیران فعال رویداد `BACKUP_VERIFY_FAILED` ([25-notifications.md](25-notifications.md)) می‌رسد: در برنامه (زنگ اعلان‌ها) و با ایمیل (اگر `SMTP_URL` تنظیم باشد)، و اگر وب‌هوک اعلان‌ها این رویداد را انتخاب کرده باشد، به وب‌هوک هم می‌رود. متن اعلان فهرست مشکلات است.
+
+`GET /api/health` (عمومی) دو فیلد اطلاعاتی دارد؛ وضعیت کلی (`status`) را `degraded` نمی‌کنند:
+- `restoreCheck`: `ok` (آخرین بررسی موفق)، `failed` (آخرین بررسی ناموفق) یا `never` (هنوز نتیجه‌ای گزارش نشده)
+- `lastRestoreVerifiedAt`: زمان آخرین بررسی موفق (ISO) یا `null`
+
+اگر کانتینر `api` در لحظهٔ بررسی روشن نباشد یا نسخهٔ قدیمی‌تری باشد که این دستور را ندارد، اسکریپت فقط هشدار می‌دهد؛ نتیجه همچنان در `verify-status.json` است و حکم بررسی عوض نمی‌شود.
+
+**چه چیزی را نمی‌سنجد:** درستی محتوای ردیف‌ها (فقط وجود و شمارش)، بازیابی فایل `.env`، و سالم بودن خود فایل‌های داخل بایگانی بارگذاری‌ها (فقط فهرست می‌شود). اگر خود سرور یا کرون از کار بیفتد و بررسی اصلاً اجرا نشود، هشداری نمی‌آید؛ در آن حالت `lastRestoreVerifiedAt` در `/api/health` قدیمی می‌ماند، پس گاهی آن را ببینید.
+
+**آزمون خودکار:** `scripts/test-backup-verify.sh` منطق این بررسی را روی یک Postgres واقعی می‌آزماید (چهارده سناریو: پشتیبان سالم، بدون کاربر، بدون جدول، migration نیمه‌کاره، قدیمی، dump خراب، gzip خراب، نبود پشتیبان، پایگاه موقت غیرخالی، مرز سن، و چهار حالت گزارش به برنامه با یک `docker` جعلی). در CI اجرا می‌شود: `TEST_PG_ADMIN_URL=postgresql://user:pass@localhost:5432/postgres bash scripts/test-backup-verify.sh`.
 
 ### اگر ارسال شکست خورد
 در انتشار (`deploy.sh`) فقط هشدار زرد `Off-site upload FAILED` نشان داده می‌شود و انتشار ادامه می‌یابد. تاریخ آخرین ارسال موفق در `~/contenter-backups/offsite-last-ok` است. آخر `backup.log` را برای Claude بفرستید:

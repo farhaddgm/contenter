@@ -34,6 +34,10 @@ export const paths = {
       getHref: (q?: string) => `/app/search${q ? `?q=${encodeURIComponent(q)}` : ''}`,
     },
     content: { path: 'contents/:contentId', getHref: (id: string) => `/app/contents/${id}` },
+    contentCompare: {
+      path: 'contents/:contentId/compare',
+      getHref: (id: string) => `/app/contents/${id}/compare`,
+    },
     account: { path: 'account', getHref: () => '/app/account' },
     admin: {
       users: { path: 'admin/users', getHref: () => '/app/admin/users' },

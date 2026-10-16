@@ -8,8 +8,11 @@ import { Segmented } from '@/components/ui/misc';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
+import { formatNumber } from '@/utils/format';
 import { useIdeas } from '@/features/ideas/api/ideas';
 import { useGenerateContent } from '../api/contents';
+import { useVariantLimit } from '../api/variants';
+import { EconomyToggle } from './economy-toggle';
 
 /** Starts a GENERATE_CONTENT job from an idea or a free brief, then opens the content page. */
 export function GenerateContentDialog({
@@ -31,6 +34,10 @@ export function GenerateContentDialog({
   const [ideaId, setIdeaId] = useState(idea?.id ?? '');
   const [brief, setBrief] = useState('');
   const [format, setFormat] = useState<string>(idea?.format ?? '');
+  const [variants, setVariants] = useState(1);
+  const limit = useVariantLimit(topicId);
+  const maxVariants = limit.data?.maxVariants ?? 1;
+  const [economy, setEconomy] = useState(false);
   const ideas = useIdeas(topicId, { page: 1, pageSize: 100 });
 
   const usable = ideas.data?.items.filter((i) => i.status !== 'REJECTED') ?? [];
@@ -42,12 +49,19 @@ export function GenerateContentDialog({
         ideaId: mode === 'idea' ? ideaId : undefined,
         brief: mode === 'brief' ? brief.trim() : '',
         format: (format || undefined) as (typeof ContentFormat)[number] | undefined,
+        variants: Math.min(variants, maxVariants),
+        economy: economy || undefined,
       },
       {
         onSuccess: (r) => {
           notify.info(t('contents.queued'));
           onOpenChange(false);
-          navigate(paths.app.content.getHref(r.contentId));
+          // drafts written side by side are compared on their own page
+          navigate(
+            r.variants.length > 1
+              ? paths.app.contentCompare.getHref(r.contentId)
+              : paths.app.content.getHref(r.contentId),
+          );
         },
         onError: (e) => notify.error(t('common.error'), e.message),
       },
@@ -115,6 +129,23 @@ export function GenerateContentDialog({
             />
           )}
         </Field>
+        {maxVariants > 1 && (
+          <Field label={t('variants.count')} hint={t('variants.costHint')}>
+            {(id) => (
+              <Select
+                id={id}
+                value={String(Math.min(variants, maxVariants))}
+                onChange={(e) => setVariants(Number(e.target.value))}
+                options={Array.from({ length: maxVariants }, (_, i) => ({
+                  value: String(i + 1),
+                  label:
+                    i === 0 ? t('variants.one') : t('variants.many', { n: formatNumber(i + 1) }),
+                }))}
+              />
+            )}
+          </Field>
+        )}
+        <EconomyToggle checked={economy} onChange={setEconomy} />
       </div>
     </Dialog>
   );

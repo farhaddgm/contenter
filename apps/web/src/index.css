@@ -3,52 +3,170 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Design tokens — shadcn-style semantic colors, light + dark. */
+/*
+ * Design tokens — the Bee Researcher "honey" language (docs/56-ui-redesign.md):
+ * warm cream canvas, amber primary, dark-brown sidebar, brand yellow accent,
+ * 16px cards, 10px controls, thin warm lines, soft shadows. Light + dark.
+ * Primary is #a35c05 (Bee's #b66a08 darkened) so white text on it passes WCAG AA (5.1:1).
+ */
 :root {
-  --background: oklch(0.985 0.002 264);
-  --foreground: oklch(0.21 0.02 264);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 264);
-  --muted: oklch(0.96 0.005 264);
-  --muted-foreground: oklch(0.52 0.02 264);
-  --border: oklch(0.91 0.008 264);
-  --input: oklch(0.89 0.01 264);
-  --primary: oklch(0.52 0.21 277);
-  --primary-foreground: oklch(0.99 0 0);
-  --accent: oklch(0.95 0.025 277);
-  --accent-foreground: oklch(0.38 0.17 277);
-  --destructive: oklch(0.58 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.6 0.15 155);
-  --warning: oklch(0.75 0.16 75);
-  --ring: oklch(0.6 0.19 277);
-  --sidebar: oklch(0.2 0.03 272);
-  --sidebar-foreground: oklch(0.86 0.02 272);
-  --sidebar-muted: oklch(0.62 0.03 272);
-  --sidebar-active: oklch(0.3 0.06 275);
+  color-scheme: light;
+  --background: #fffaf0;
+  --foreground: #33230b;
+  --card: #ffffff;
+  --card-foreground: #33230b;
+  --muted: #fdf3df;
+  --muted-foreground: #6b5a3e;
+  --border: #f0dfbc;
+  --input: #dcc79a;
+  --primary: #a35c05;
+  --primary-foreground: #ffffff;
+  --accent: #fff2cf;
+  --accent-foreground: #7a4503;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --success: #1a7a58;
+  --warning: #b7791f;
+  --info: #2457d6;
+  --ring: #d99a2b;
+  --brand: #edcb00;
+  --brand-foreground: #33230b;
+  --sidebar: #4a2c10;
+  --sidebar-foreground: #f0dfc0;
+  --sidebar-muted: #c9a672;
+  --sidebar-active: #6a4018;
+  --elev-card: 0 12px 34px rgb(122 75 14 / 0.07);
+  --elev-pop: 0 18px 45px rgb(74 44 16 / 0.18);
   --radius: 0.75rem;
 }
 
 .dark {
-  --background: oklch(0.16 0.015 264);
-  --foreground: oklch(0.95 0.005 264);
-  --card: oklch(0.2 0.018 264);
-  --card-foreground: oklch(0.95 0.005 264);
-  --muted: oklch(0.25 0.018 264);
-  --muted-foreground: oklch(0.7 0.02 264);
-  --border: oklch(0.3 0.02 264);
-  --input: oklch(0.34 0.02 264);
-  --primary: oklch(0.65 0.18 277);
-  --primary-foreground: oklch(0.15 0.02 264);
-  --accent: oklch(0.28 0.05 277);
-  --accent-foreground: oklch(0.88 0.08 277);
-  --destructive: oklch(0.65 0.2 25);
-  --sidebar: oklch(0.13 0.02 270);
-  --sidebar-active: oklch(0.24 0.05 275);
+  color-scheme: dark;
+  --background: #17100a;
+  --foreground: #f6ecd9;
+  --card: #231a10;
+  --card-foreground: #f6ecd9;
+  --muted: #2e2216;
+  --muted-foreground: #c9b79a;
+  --border: #43321f;
+  --input: #5a4529;
+  --primary: #f0a93a;
+  --primary-foreground: #2a1a05;
+  --accent: #3b2a14;
+  --accent-foreground: #ffd98a;
+  --destructive: #f2877c;
+  --destructive-foreground: #2a0a06;
+  --success: #5fd3a6;
+  --warning: #f0c05a;
+  --info: #8fb0ff;
+  --ring: #f0a93a;
+  --brand: #edcb00;
+  --sidebar: #120c06;
+  --sidebar-foreground: #ecdcc0;
+  --sidebar-muted: #b59b72;
+  --sidebar-active: #2c1d0e;
+  --elev-card: 0 12px 34px rgb(0 0 0 / 0.35);
+  --elev-pop: 0 18px 45px rgb(0 0 0 / 0.5);
+}
+
+/*
+ * Extra palettes, same set as Bee Researcher (Settings → Appearance). Each one only overrides colour
+ * tokens; `honey` is :root, `dark` is .dark. All foreground/background pairs are AA (≥ 4.5:1).
+ */
+[data-theme='light'] {
+  --background: #f6f8fb;
+  --foreground: #15243a;
+  --muted: #eef3fb;
+  --muted-foreground: #53657c;
+  --border: #e5eaf1;
+  --input: #cbd6e6;
+  --primary: #2457d6;
+  --accent: #eaf0ff;
+  --accent-foreground: #1d46af;
+  --ring: #6f93ee;
+  --sidebar: #10234b;
+  --sidebar-foreground: #dbe6ff;
+  --sidebar-muted: #91a8d4;
+  --sidebar-active: #203b78;
+  --elev-card: 0 12px 34px rgb(24 44 76 / 0.07);
+  --elev-pop: 0 18px 45px rgb(23 35 63 / 0.18);
+}
+[data-theme='forest'] {
+  --background: #f3faf7;
+  --foreground: #12281f;
+  --muted: #e7f3ee;
+  --muted-foreground: #4a665a;
+  --border: #d4e8df;
+  --input: #b3d1c4;
+  --primary: #19735b;
+  --accent: #dff3ea;
+  --accent-foreground: #105441;
+  --ring: #3fa584;
+  --sidebar: #123f35;
+  --sidebar-foreground: #dcefe8;
+  --sidebar-muted: #8fc2b0;
+  --sidebar-active: #1d5c4c;
+  --elev-card: 0 12px 34px rgb(18 63 53 / 0.08);
+  --elev-pop: 0 18px 45px rgb(18 63 53 / 0.2);
+}
+[data-theme='slate'] {
+  --background: #f5f7fa;
+  --foreground: #1e293b;
+  --muted: #edf1f6;
+  --muted-foreground: #566478;
+  --border: #dce2ea;
+  --input: #c3ccd9;
+  --primary: #5b6b80;
+  --accent: #e8edf3;
+  --accent-foreground: #334155;
+  --ring: #94a3b8;
+  --sidebar: #26364e;
+  --sidebar-foreground: #e4eaf3;
+  --sidebar-muted: #9fb0c9;
+  --sidebar-active: #364a68;
+  --elev-card: 0 12px 34px rgb(38 54 78 / 0.08);
+  --elev-pop: 0 18px 45px rgb(38 54 78 / 0.2);
+}
+[data-theme='blackyellow'] {
+  --background: #f7f4e8;
+  --foreground: #171717;
+  --muted: #efeacf;
+  --muted-foreground: #5c5640;
+  --border: #ded5aa;
+  --input: #c9bf8a;
+  --primary: #171717;
+  --primary-foreground: #ffe45e;
+  --accent: #fff3b0;
+  --accent-foreground: #171717;
+  --ring: #c99700;
+  --sidebar: #171717;
+  --sidebar-foreground: #fff4b8;
+  --sidebar-muted: #c9b86a;
+  --sidebar-active: #3b3200;
+  --elev-card: 0 12px 34px rgb(23 23 23 / 0.08);
+  --elev-pop: 0 18px 45px rgb(23 23 23 / 0.22);
+}
+[data-theme='red'] {
+  --background: #fff4f6;
+  --foreground: #3c1820;
+  --muted: #ffe9ed;
+  --muted-foreground: #7a4550;
+  --border: #f1cbd2;
+  --input: #e6aab5;
+  --primary: #c4384d;
+  --accent: #ffe4e8;
+  --accent-foreground: #8c2236;
+  --ring: #e0657a;
+  --sidebar: #7d1f35;
+  --sidebar-foreground: #ffe4ea;
+  --sidebar-muted: #e8a3b3;
+  --sidebar-active: #9c2c47;
+  --elev-card: 0 12px 34px rgb(125 31 53 / 0.08);
+  --elev-pop: 0 18px 45px rgb(125 31 53 / 0.2);
 }
 
 @theme inline {
-  --font-sans: 'Vazirmatn Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Vazirmatn Variable', 'Vazirmatn', ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -65,14 +183,49 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-active: var(--sidebar-active);
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-control: 0.625rem;
+  --shadow-card: var(--elev-card);
+  --shadow-pop: var(--elev-pop);
+  --animate-fade-in: fade-in 0.15s ease-out;
+  --animate-pop-in: pop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in: slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    translate: calc(var(--slide-dir, 1) * 2rem) 0;
+  }
+}
+@keyframes shimmer {
+  50% {
+    opacity: 0.55;
+  }
 }
 
 @layer base {
@@ -81,15 +234,59 @@
   }
   html {
     -webkit-font-smoothing: antialiased;
+    scrollbar-gutter: stable;
+    scroll-padding-top: 5rem;
   }
   body {
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
     font-feature-settings: 'ss01';
+    text-rendering: optimizeLegibility;
   }
   ::selection {
-    background: color-mix(in oklch, var(--primary) 25%, transparent);
+    background: color-mix(in oklch, var(--ring) 35%, transparent);
+  }
+  /* One keyboard-focus ring for everything (Bee: 3px, offset 3px). */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid color-mix(in oklch, var(--ring) 80%, transparent);
+    outline-offset: 2px;
+  }
+  /* Numbers and Latin runs inside Persian text keep their shape. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  aside,
+  header,
+  [data-no-print] {
+    display: none !important;
   }
 }
 

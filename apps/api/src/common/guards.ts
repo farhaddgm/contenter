@@ -4,13 +4,21 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { normalizeGmail, type Role } from '@contenter/shared';
+import { looksLikeApiKey, normalizeGmail, type Role } from '@contenter/shared';
 import { ENV, type Env } from '../config/env';
-import { IS_PUBLIC_KEY, ROLES_KEY, type AuthUser } from './auth.decorators';
+import {
+  API_KEY_AUTH,
+  API_KEY_SCOPE_KEY,
+  IS_PUBLIC_KEY,
+  ROLES_KEY,
+  type ApiKeyAuthenticator,
+  type AuthUser,
+} from './auth.decorators';
 import { ACCESS_SCOPE_KEY } from './access';
 
 interface AccessPayload {
@@ -25,6 +33,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly jwt: JwtService,
     @Inject(ENV) private readonly env: Env,
+    @Optional() @Inject(API_KEY_AUTH) private readonly apiKeys?: ApiKeyAuthenticator,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -38,6 +47,22 @@ export class JwtAuthGuard implements CanActivate {
     const header: string | undefined = req.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     if (!token) throw new UnauthorizedException('Missing access token');
+
+    // a personal API key (docs/52-api-keys.md): only routes that opt in with `@AllowApiKey(scope)`
+    if (looksLikeApiKey(token)) {
+      const scope = this.reflector.getAllAndOverride<string>(API_KEY_SCOPE_KEY, [
+        ctx.getHandler(),
+        ctx.getClass(),
+      ]);
+      if (!scope || !this.apiKeys) throw new ForbiddenException('API keys cannot be used on this route');
+      const auth = await this.apiKeys.authenticate(token);
+      if (!auth.scopes.includes(scope as never)) {
+        throw new ForbiddenException(`This API key lacks the "${scope}" scope`);
+      }
+      req.user = auth.user satisfies AuthUser;
+      req.apiKeyId = auth.keyId;
+      return true;
+    }
 
     try {
       const payload = await this.jwt.verifyAsync<AccessPayload>(token, {

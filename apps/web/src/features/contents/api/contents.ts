@@ -1,9 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  BulkContentMetricsInput,
   Content,
   ContentComment,
+  ContentMetric,
+  ContentMetricSummary,
   ContentStatus,
   CreateCommentInput,
+  CreateContentMetricInput,
   EditContentVersionInput,
   GenerateContentInput,
   Paginated,
@@ -47,7 +51,11 @@ export function useGenerateContent(topicId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: GenerateContentInput) =>
-      api.post<{ jobId: string; contentId: string }>(`/topics/${topicId}/contents/generate`, data),
+      api.post<{
+        jobId: string;
+        contentId: string;
+        variants: { contentId: string; jobId: string; angle: string | null }[];
+      }>(`/topics/${topicId}/contents/generate`, data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: contentKeys.all });
       void qc.invalidateQueries({ queryKey: ['ideas'] });
@@ -181,5 +189,60 @@ export function useRepurpose(id: string) {
       void qc.invalidateQueries({ queryKey: contentKeys.one(id) });
       void qc.invalidateQueries({ queryKey: ['contents', 'list'] });
     },
+  });
+}
+
+// ---------- performance readings (docs/42) ----------
+
+export const metricKeys = {
+  content: (contentId: string) => ['content-metrics', contentId] as const,
+};
+
+export interface MetricsResponse {
+  items: ContentMetric[];
+  summary: ContentMetricSummary;
+}
+
+export function useMetrics(contentId: string, enabled = true) {
+  return useQuery({
+    queryKey: metricKeys.content(contentId),
+    queryFn: () => api.get<MetricsResponse>(`/contents/${contentId}/metrics`),
+    enabled,
+  });
+}
+
+function useMetricMutation<T>(contentId: string, fn: (data: T) => Promise<MetricsResponse>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (data) => qc.setQueryData(metricKeys.content(contentId), data),
+  });
+}
+
+export function useAddMetric(contentId: string) {
+  return useMetricMutation(contentId, (data: CreateContentMetricInput) =>
+    api.post<MetricsResponse>(`/contents/${contentId}/metrics`, data),
+  );
+}
+
+export function useBulkMetrics(contentId: string) {
+  return useMetricMutation(contentId, (data: BulkContentMetricsInput) =>
+    api.post<MetricsResponse>(`/contents/${contentId}/metrics/bulk`, data),
+  );
+}
+
+export function useDeleteMetric(contentId: string) {
+  return useMetricMutation(contentId, (id: string) =>
+    api.delete<MetricsResponse>(`/content-metrics/${id}`),
+  );
+}
+
+/** Ticks or unticks one point of the publishing checklist (docs/45). */
+export function useToggleChecklistItem(contentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, checked }: { itemId: string; checked: boolean }) =>
+      api.put<void>(`/contents/${contentId}/checklist/${itemId}`, { checked }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.one(contentId) }),
   });
 }

@@ -3,7 +3,7 @@ import {
   Archive,
   ArchiveRestore,
   Building2,
-  ChevronLeft,
+  ArrowRight,
   Pencil,
   PenLine,
   Trash2,
@@ -21,6 +21,7 @@ import { formatNumber } from '@/utils/format';
 import { useDeleteTopic, useTopic, useUpdateTopic } from '@/features/topics/api/topics';
 import { TopicFormDrawer } from '@/features/topics/components/topic-form';
 import { TopicOverview } from '@/features/topics/components/topic-overview';
+import { EditLearningPanel } from '@/features/edit-learning/components/edit-learning-panel';
 import { PrinciplesList } from '@/features/principles/components/principles-list';
 import { SamplesPanel } from '@/features/samples/components/samples-panel';
 import { ProfilePanel } from '@/features/profiles/components/profile-panel';
@@ -72,7 +73,7 @@ export default function TopicRoute() {
             to={paths.app.topics.getHref()}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
-            <ChevronLeft className="size-4 ltr:hidden" />
+            <ArrowRight className="size-4 ltr:rotate-180" />
             {t('topics.title')}
           </Link>
         }
@@ -185,6 +186,7 @@ export default function TopicRoute() {
               </Link>
             </Authorization>
           </p>
+          <EditLearningPanel topicId={topic.id} />
           <BrandDocsPanel topicId={topic.id} />
         </div>
       )}

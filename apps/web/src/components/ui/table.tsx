@@ -36,15 +36,15 @@ export function Table<T extends { id: string }>({
   }
   if (!data?.length) return <>{empty ?? <EmptyState title={t('common.noData')} />}</>;
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="w-full overflow-x-auto overscroll-x-contain">
+      <table className="w-full min-w-[42rem] text-sm">
         <thead>
-          <tr className="border-b bg-muted/40">
+          <tr className="border-b bg-muted/60">
             {columns.map((c) => (
               <th
                 key={c.key}
                 className={cn(
-                  'whitespace-nowrap px-4 py-2.5 text-start text-xs font-medium text-muted-foreground',
+                  'whitespace-nowrap px-4 py-3 text-start text-xs font-bold text-muted-foreground',
                   c.className,
                 )}
               >
@@ -60,11 +60,11 @@ export function Table<T extends { id: string }>({
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={cn(
                 'border-b last:border-0 transition-colors',
-                onRowClick && 'cursor-pointer hover:bg-muted/50',
+                onRowClick ? 'cursor-pointer hover:bg-accent/40' : 'hover:bg-muted/30',
               )}
             >
               {columns.map((c) => (
-                <td key={c.key} className={cn('px-4 py-3 align-middle', c.className)}>
+                <td key={c.key} className={cn('px-4 py-3.5 align-middle', c.className)}>
                   {c.cell(row)}
                 </td>
               ))}
@@ -141,10 +141,10 @@ export function EmptyState({
         className,
       )}
     >
-      <div className="mb-1 flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground [&_svg]:size-6">
+      <div className="mb-1 flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground [&_svg]:size-6">
         {icon ?? <Inbox />}
       </div>
-      <p className="font-medium">{title}</p>
+      <p className="font-bold">{title}</p>
       {description && <p className="max-w-sm text-sm text-muted-foreground">{description}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>

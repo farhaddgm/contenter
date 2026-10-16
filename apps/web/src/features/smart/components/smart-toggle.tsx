@@ -27,17 +27,17 @@ export function SmartToggle() {
         if (!enabled) setMinimized(false);
       }}
       className={cn(
-        'relative inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-semibold transition-colors',
         enabled
-          ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
-          : 'border-input text-muted-foreground hover:bg-muted',
+          ? 'border-primary/40 bg-accent text-accent-foreground hover:bg-accent/70'
+          : 'text-muted-foreground hover:border-ring/60 hover:text-foreground',
       )}
     >
       <Sparkles className={cn('size-4', enabled && 'fill-primary/20')} />
       <span className="hidden sm:inline">{t('smart.name')}</span>
       <span
         className={cn(
-          'relative h-4 w-7 rounded-full transition-colors',
+          'relative h-4 w-7 rounded-full transition-colors max-sm:hidden',
           enabled ? 'bg-primary' : 'bg-input',
         )}
       >

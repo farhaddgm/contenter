@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { Dialog as D } from 'radix-ui';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router';
 import {
   Activity,
@@ -15,15 +16,14 @@ import {
   KeyRound,
   LogOut,
   Menu,
-  Monitor,
-  Moon,
   ScrollText,
   Settings,
   ShieldCheck,
-  Sun,
+  Check,
+  ChevronUp,
+  Palette,
   UserCircle,
   Users,
-  X,
 } from 'lucide-react';
 import { paths } from '@/config/paths';
 import { useT, type TranslationKey } from '@/i18n';
@@ -31,6 +31,8 @@ import { useAuthorization, useLogout } from '@/lib/auth';
 import { useUi } from '@/stores/ui';
 import { cn } from '@/utils/cn';
 import { Dropdown } from '@/components/ui/misc';
+import { ThemeSwatch } from '@/components/ui/theme-picker';
+import { THEMES } from '@/stores/ui';
 import { NotificationBell } from '@/features/inbox/components/notification-bell';
 import { SearchBox } from '@/features/search/components/search-box';
 import { SmartRoot } from '@/features/smart/components/smart-root';
@@ -70,64 +72,76 @@ const adminNav: NavItem[] = [
   { to: paths.app.admin.audit.getHref(), label: 'nav.audit', icon: <ScrollText /> },
 ];
 
-function Logo() {
+function SidebarBrand({ collapsed }: { collapsed?: boolean }) {
   const t = useT();
   return (
-    <Link to={paths.app.dashboard.getHref()} className="flex items-center gap-2.5 px-2">
-      <img src="/logo.svg" alt="" className="size-8" />
-      <div className="leading-tight">
-        <p className="font-bold text-white">{t('app.name')}</p>
-        <p className="text-[11px] text-sidebar-muted">{t('app.tagline')}</p>
-      </div>
-    </Link>
+    <div className="mb-1 border-b border-white/15 pb-3.5 pt-1">
+      <Link
+        to={paths.app.dashboard.getHref()}
+        title={collapsed ? t('app.name') : undefined}
+        aria-label={t('app.name')}
+        className="flex min-h-[3.25rem] items-center justify-center overflow-hidden rounded-xl outline-offset-4"
+      >
+        {collapsed ? (
+          <img src="/logo.svg" alt="" className="h-9 w-14 object-contain" />
+        ) : (
+          <img
+            src="/logo-full.svg"
+            alt={t('app.name')}
+            className="h-11 w-[13.5rem] object-contain"
+          />
+        )}
+      </Link>
+    </div>
   );
 }
 
-function NavSection({ title, items }: { title: string; items: NavItem[] }) {
+function NavSection({
+  title,
+  items,
+  collapsed,
+}: {
+  title: string;
+  items: NavItem[];
+  collapsed?: boolean;
+}) {
   const t = useT();
   return (
-    <div className="space-y-1">
-      <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
-        {title}
-      </p>
+    <div className="space-y-1" role="group" aria-label={title}>
+      {collapsed ? (
+        <div className="mx-3 my-3 h-px bg-white/12" />
+      ) : (
+        <p className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted">
+          {title}
+        </p>
+      )}
       {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           end={item.end}
+          title={collapsed ? t(item.label) : undefined}
+          aria-label={collapsed ? t(item.label) : undefined}
           className={({ isActive }) =>
             cn(
-              'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors [&_svg]:size-[18px]',
+              'flex items-center gap-3 rounded-[0.6875rem] px-3 py-2.5 text-sm font-semibold transition-colors [&_svg]:size-5 [&_svg]:shrink-0 [&_svg]:opacity-90',
+              collapsed && 'justify-center px-0',
               isActive
-                ? 'bg-sidebar-active text-white shadow-inner'
-                : 'text-sidebar-foreground hover:bg-white/5 hover:text-white',
+                ? 'bg-sidebar-active text-white'
+                : 'text-sidebar-foreground hover:bg-white/8 hover:text-white',
             )
           }
         >
           {item.icon}
-          {t(item.label)}
+          {!collapsed && <span className="truncate">{t(item.label)}</span>}
         </NavLink>
       ))}
     </div>
   );
 }
 
-function Sidebar() {
-  const t = useT();
-  const { can } = useAuthorization();
-  return (
-    <div className="flex h-full flex-col gap-6 bg-sidebar px-3 py-5">
-      <Logo />
-      <nav className="flex-1 space-y-6 overflow-y-auto">
-        <NavSection title={t('nav.content')} items={contentNav} />
-        {can('backoffice:access') && <NavSection title={t('nav.backoffice')} items={adminNav} />}
-        {can('backoffice:access') && <NavSection title={t('smart.name')} items={smartNav} />}
-      </nav>
-    </div>
-  );
-}
-
-function UserMenu() {
+/** The profile button: bottom of the sidebar, opens its menu upwards (as in Bee Researcher). */
+function AccountMenu({ collapsed }: { collapsed?: boolean }) {
   const t = useT();
   const navigate = useNavigate();
   const { user } = useAuthorization();
@@ -135,103 +149,182 @@ function UserMenu() {
   const { theme, setTheme, lang, setLang } = useUi();
   if (!user) return null;
   return (
-    <Dropdown.Root>
-      <Dropdown.Trigger className="flex items-center gap-2 rounded-full p-1 pe-3 text-sm transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-sm font-semibold text-white">
-          {user.name.slice(0, 1)}
-        </span>
-        <span className="hidden text-start sm:block">
-          <span className="block font-medium leading-tight">{user.name}</span>
-          <span className="block text-xs text-muted-foreground">
-            {t(`enums.role.${user.role}`)}
-          </span>
-        </span>
-      </Dropdown.Trigger>
-      <Dropdown.Content>
-        <Dropdown.Label>{user.email}</Dropdown.Label>
-        <Dropdown.Item icon={<UserCircle />} onSelect={() => navigate(paths.app.account.getHref())}>
-          {t('nav.account')}
-        </Dropdown.Item>
-        <Dropdown.Separator />
-        <Dropdown.Label>{t('nav.theme')}</Dropdown.Label>
-        {(
-          [
-            ['light', <Sun key="l" />],
-            ['dark', <Moon key="d" />],
-            ['system', <Monitor key="s" />],
-          ] as const
-        ).map(([value, icon]) => (
-          <Dropdown.Item key={value} icon={icon} onSelect={() => setTheme(value)}>
-            <span className={cn(theme === value && 'font-semibold text-primary')}>
-              {t(`nav.${value}`)}
-            </span>
-          </Dropdown.Item>
-        ))}
-        <Dropdown.Separator />
-        <Dropdown.Item icon={<Globe />} onSelect={() => setLang(lang === 'fa' ? 'en' : 'fa')}>
-          {lang === 'fa' ? 'English' : 'فارسی'}
-        </Dropdown.Item>
-        <Dropdown.Separator />
-        <Dropdown.Item icon={<KeyRound />} onSelect={() => navigate(paths.app.account.getHref())}>
-          {t('auth.changePassword')}
-        </Dropdown.Item>
-        <Dropdown.Item
-          icon={<LogOut />}
-          destructive
-          onSelect={() =>
-            logout.mutate(undefined, { onSettled: () => navigate(paths.auth.login.getHref()) })
-          }
+    <div className={cn('border-t border-white/15 pb-2.5 pt-4', collapsed ? 'px-0' : 'px-2')}>
+      <Dropdown.Root>
+        <Dropdown.Trigger
+          title={collapsed ? user.name : undefined}
+          aria-label={t('nav.account')}
+          className={cn(
+            'group flex w-full items-center gap-2 rounded-[0.625rem] border border-white/25 bg-white/8 text-start text-sidebar-foreground transition-colors hover:bg-white/15 data-[state=open]:bg-white/15',
+            collapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-2.5',
+          )}
         >
-          {t('nav.logout')}
-        </Dropdown.Item>
-      </Dropdown.Content>
-    </Dropdown.Root>
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className={cn(
+                'flex shrink-0 items-center justify-center rounded-full bg-brand font-extrabold text-brand-foreground',
+                collapsed ? 'size-9 text-sm' : 'size-[1.875rem] text-xs',
+              )}
+            >
+              {user.name.slice(0, 1)}
+            </span>
+            {!collapsed && (
+              <span className="grid min-w-0 gap-0.5 text-start">
+                <strong className="truncate text-xs font-bold text-white">{user.name}</strong>
+                <span className="text-[10px] text-sidebar-muted">
+                  {t(`enums.role.${user.role}`)}
+                </span>
+              </span>
+            )}
+          </span>
+          {!collapsed && (
+            <ChevronUp className="size-4 shrink-0 opacity-80 transition-transform group-data-[state=open]:rotate-180" />
+          )}
+        </Dropdown.Trigger>
+        <Dropdown.Content side="top" align="start" className="w-60">
+          <Dropdown.Label>{user.email}</Dropdown.Label>
+          <Dropdown.Item
+            icon={<UserCircle />}
+            onSelect={() => navigate(paths.app.account.getHref())}
+          >
+            {t('nav.account')}
+          </Dropdown.Item>
+          <Dropdown.Sub>
+            <Dropdown.SubTrigger icon={<Palette />}>{t('nav.theme')}</Dropdown.SubTrigger>
+            <Dropdown.SubContent>
+              {THEMES.map((value) => (
+                <Dropdown.Item
+                  key={value}
+                  icon={<ThemeSwatch theme={value} className="size-4" />}
+                  onSelect={() => setTheme(value)}
+                >
+                  <span className={cn('flex-1', theme === value && 'font-bold text-primary')}>
+                    {t(`theme.${value}`)}
+                  </span>
+                  {theme === value && <Check className="text-primary" />}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.SubContent>
+          </Dropdown.Sub>
+          <Dropdown.Item icon={<Globe />} onSelect={() => setLang(lang === 'fa' ? 'en' : 'fa')}>
+            {lang === 'fa' ? 'English' : 'فارسی'}
+          </Dropdown.Item>
+          <Dropdown.Item icon={<KeyRound />} onSelect={() => navigate(paths.app.account.getHref())}>
+            {t('auth.changePassword')}
+          </Dropdown.Item>
+          <Dropdown.Separator />
+          <Dropdown.Item
+            icon={<LogOut />}
+            destructive
+            onSelect={() =>
+              logout.mutate(undefined, { onSettled: () => navigate(paths.auth.login.getHref()) })
+            }
+          >
+            {t('nav.logout')}
+          </Dropdown.Item>
+        </Dropdown.Content>
+      </Dropdown.Root>
+    </div>
+  );
+}
+
+function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
+  const t = useT();
+  const { can } = useAuthorization();
+  return (
+    <div
+      className={cn(
+        'flex h-full flex-col gap-1.5 bg-sidebar py-[1.125rem]',
+        collapsed ? 'px-2.5' : 'px-3.5',
+      )}
+    >
+      <SidebarBrand collapsed={collapsed} />
+      <nav
+        aria-label={t('app.name')}
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden"
+      >
+        <NavSection title={t('nav.content')} items={contentNav} collapsed={collapsed} />
+        {can('backoffice:access') && (
+          <NavSection title={t('nav.backoffice')} items={adminNav} collapsed={collapsed} />
+        )}
+        {can('backoffice:access') && (
+          <NavSection title={t('smart.name')} items={smartNav} collapsed={collapsed} />
+        )}
+      </nav>
+      <AccountMenu collapsed={collapsed} />
+    </div>
   );
 }
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
-  const { sidebarOpen, setSidebarOpen } = useUi();
+  const t = useT();
+  const { sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useUi();
   const location = useLocation();
 
   useEffect(() => setSidebarOpen(false), [location.pathname, setSidebarOpen]);
 
   return (
     <div className="flex min-h-screen w-full">
-      {/* desktop sidebar */}
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 lg:block">
-        <Sidebar />
+      <a
+        href="#main"
+        className="sr-only z-[70] rounded-control bg-primary px-4 py-2 font-semibold text-primary-foreground focus:not-sr-only focus:fixed focus:start-3 focus:top-3"
+      >
+        {t('nav.skip')}
+      </a>
+      {/* desktop sidebar: in the flow, sticky, icons-only when collapsed */}
+      <aside
+        className={cn(
+          'sticky top-0 z-30 hidden h-screen shrink-0 transition-[width] duration-200 lg:block',
+          sidebarCollapsed ? 'w-[4.75rem]' : 'w-60',
+        )}
+      >
+        <Sidebar collapsed={sidebarCollapsed} />
       </aside>
-      {/* mobile sidebar */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute inset-y-0 start-0 w-64 shadow-2xl">
+      {/* mobile sidebar: a modal drawer (focus trap, Esc to close) */}
+      <D.Root open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <D.Portal>
+          <D.Overlay className="fixed inset-0 z-[64] animate-fade-in bg-[#0c1831]/45 backdrop-blur-[2px] lg:hidden" />
+          <D.Content
+            aria-describedby={undefined}
+            className="fixed inset-y-0 start-0 z-[65] w-72 max-w-[85vw] animate-slide-in shadow-pop outline-none ltr:[--slide-dir:-1] rtl:[--slide-dir:1] lg:hidden"
+          >
+            <D.Title className="sr-only">{t('nav.menu')}</D.Title>
             <Sidebar />
-            <button
-              className="absolute end-3 top-5 rounded-md p-1 text-sidebar-foreground hover:bg-white/10"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="size-5" />
-            </button>
-          </aside>
-        </div>
-      )}
-      <div className="flex min-w-0 flex-1 flex-col lg:ps-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
+          </D.Content>
+        </D.Portal>
+      </D.Root>
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 flex h-[4.5rem] items-center gap-3 border-b bg-background/85 px-4 backdrop-blur-md sm:px-6 lg:px-8">
+          {/* one hamburger: opens the drawer on phones, collapses the sidebar on desktop */}
           <button
-            className="rounded-md p-2 hover:bg-muted lg:hidden"
+            type="button"
+            className="flex size-10 shrink-0 items-center justify-center rounded-control bg-muted text-foreground transition hover:bg-accent hover:text-accent-foreground lg:hidden"
             onClick={() => setSidebarOpen(true)}
-            aria-label="menu"
+            aria-label={t('nav.openMenu')}
+            aria-expanded={sidebarOpen}
           >
             <Menu className="size-5" />
           </button>
-          <div className="flex-1" />
+          <button
+            type="button"
+            className="hidden size-10 shrink-0 items-center justify-center rounded-control bg-muted text-foreground transition hover:bg-accent hover:text-accent-foreground lg:flex"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            aria-label={sidebarCollapsed ? t('nav.expand') : t('nav.collapse')}
+            aria-expanded={!sidebarCollapsed}
+          >
+            <Menu className="size-5" />
+          </button>
           <SearchBox />
-          <NotificationBell />
-          <SmartToggle />
-          <UserMenu />
+          <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+            <NotificationBell />
+            <SmartToggle />
+          </div>
         </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-[96rem] min-w-0 flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8"
+        >
           {children}
         </main>
         <SmartRoot />

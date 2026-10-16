@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/form-controls';
+import { ThemePicker } from '@/components/ui/theme-picker';
 import { PageHeader } from '@/components/ui/misc';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
@@ -14,6 +15,7 @@ import { useAuthStore } from '@/stores/auth';
 import { notify } from '@/stores/notifications';
 import { formatDate } from '@/utils/format';
 import { useChangePassword } from '@/features/admin/api';
+import { ApiKeysCard } from '@/features/api-keys/components/api-keys-card';
 import { NotificationPreferencesCard } from '@/features/inbox/components/preferences-card';
 
 export default function AccountRoute() {
@@ -34,28 +36,30 @@ export default function AccountRoute() {
         <Card>
           <CardHeader title={t('account.profile')} />
           <CardBody>
-            <dl className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.name')}</dt>
-                <dd>{user.name}</dd>
+            <dl className="space-y-4 text-sm">
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.name')}</dt>
+                <dd className="font-semibold">{user.name}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.email')}</dt>
-                <dd dir="ltr">{user.email}</dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.email')}</dt>
+                <dd dir="ltr" className="text-start font-semibold">
+                  {user.email}
+                </dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.role')}</dt>
-                <dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.role')}</dt>
+                <dd className="font-semibold">
                   <Badge tone="primary">{t(`enums.role.${user.role}`)}</Badge>
                 </dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.loginMethod')}</dt>
-                <dd>{t(`enums.loginMethod.${user.loginMethod}`)}</dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.loginMethod')}</dt>
+                <dd className="font-semibold">{t(`enums.loginMethod.${user.loginMethod}`)}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">{t('users.lastLogin')}</dt>
-                <dd>{formatDate(user.lastLoginAt)}</dd>
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3">
+                <dt className="font-medium text-muted-foreground">{t('users.lastLogin')}</dt>
+                <dd className="font-semibold">{formatDate(user.lastLoginAt)}</dd>
               </div>
             </dl>
           </CardBody>
@@ -114,7 +118,14 @@ export default function AccountRoute() {
             )}
           </CardBody>
         </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader title={t('theme.title')} description={t('theme.hint')} />
+          <CardBody>
+            <ThemePicker />
+          </CardBody>
+        </Card>
         <NotificationPreferencesCard />
+        <ApiKeysCard />
       </div>
     </>
   );

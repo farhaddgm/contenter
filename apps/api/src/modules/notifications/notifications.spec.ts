@@ -3,7 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { createTransport } from 'nodemailer';
 import { Reflector } from '@nestjs/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { WebhookPayload } from '@contenter/shared';
+import { NotificationEvent, type WebhookPayload } from '@contenter/shared';
 import type { Env } from '../../config/env';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
@@ -653,7 +653,7 @@ describe('InboxService', () => {
     });
     const p = await svc.preferences('me');
     expect(p.emailAvailable).toBe(true);
-    expect(p.preferences).toHaveLength(8);
+    expect(p.preferences).toHaveLength(NotificationEvent.length);
     expect(p.preferences.find((x) => x.event === 'REVIEW_APPROVED')).toEqual({
       event: 'REVIEW_APPROVED',
       inApp: false,

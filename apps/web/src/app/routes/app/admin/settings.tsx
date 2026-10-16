@@ -24,6 +24,12 @@ import { useAiSettings, useUpdateAiSettings } from '@/features/admin/api';
 import { GoogleDriveCard } from '@/features/businesses/components/google-drive-card';
 import { GoogleAccessCard } from '@/features/settings/components/google-access-card';
 import { NotificationSettingsCard } from '@/features/inbox/components/settings-card';
+import { VariantSettingsCard } from '@/features/settings/components/variants-card';
+import { GoldenSettingsCard } from '@/features/settings/components/golden-card';
+import { SimilaritySettingsCard } from '@/features/settings/components/similarity-card';
+import { ReadabilitySettingsCard } from '@/features/settings/components/readability-card';
+import { AiRoutingCard } from '@/features/settings/components/ai-routing-card';
+import { BudgetCard } from '@/features/settings/components/budget-card';
 import { WorkflowCard } from '@/features/settings/components/workflow-card';
 import { SmartSettingsCard } from '@/features/smart/components/smart-settings-card';
 
@@ -50,6 +56,7 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
     models: data.models,
     effort: data.effort,
     maxSamplesPerProfile: data.maxSamplesPerProfile,
+    fallbackModel: data.fallbackModel ?? '',
   });
 
   const [customModels, setCustomModels] = useState<string[]>([]);
@@ -210,9 +217,21 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
               </Field>
             </CardBody>
           </Card>
+          <AiRoutingCard
+            form={form}
+            setForm={setForm}
+            modelOptions={modelOptions}
+            configured={configured}
+            mock={data.mock}
+          />
         </div>
         <Card>
           <CardHeader title={t('jobs.title')} description={t('settings.effortHint')} />
+          <div className="hidden gap-3 border-b bg-muted/60 px-5 py-2.5 text-xs font-bold text-muted-foreground sm:grid sm:grid-cols-[1fr_18rem_8rem]">
+            <span>{t('settings.jobKind')}</span>
+            <span>{t('settings.modelFor')}</span>
+            <span>{t('settings.effort')}</span>
+          </div>
           <div className="divide-y">
             {AiJobType.map((type) => (
               <div
@@ -222,13 +241,14 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
                 <p className="font-medium">{t(`enums.jobType.${type}`)}</p>
                 <Select
                   dir="ltr"
+                  aria-label={`${t(`enums.jobType.${type}`)} — ${t('settings.modelFor')}`}
                   value={form.models[type] ?? ''}
                   onChange={(e) => setModel(type, e.target.value)}
                   placeholder={`${t('settings.inheritDefault')}`}
                   options={modelOptions}
                 />
                 <Select
-                  dir="ltr"
+                  aria-label={`${t(`enums.jobType.${type}`)} — ${t('settings.effort')}`}
                   value={form.effort[type] ?? 'high'}
                   onChange={(e) =>
                     setForm({
@@ -239,7 +259,7 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
                       },
                     })
                   }
-                  options={AiEffort.map((e) => ({ value: e, label: e }))}
+                  options={AiEffort.map((e) => ({ value: e, label: t(`enums.effort.${e}`) }))}
                 />
               </div>
             ))}
@@ -252,7 +272,14 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
         </div>
       )}
       <div className="mt-6">
+        <BudgetCard />
+      </div>
+      <div className="mt-6">
         <WorkflowCard />
+        <ReadabilitySettingsCard />
+        <SimilaritySettingsCard />
+        <GoldenSettingsCard />
+        <VariantSettingsCard />
       </div>
       <div className="mt-6">
         <NotificationSettingsCard />

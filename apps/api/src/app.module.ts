@@ -14,13 +14,24 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BrandDocsModule } from './modules/brand-docs/brand-docs.module';
 import { BusinessesModule } from './modules/businesses/businesses.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { ChecklistsModule } from './modules/checklists/checklists.module';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
+import { ExportModule } from './modules/export/export.module';
+import { StyleFitModule } from './modules/style-fit/style-fit.module';
+import { VariantsModule } from './modules/variants/variants.module';
+import { CoverageModule } from './modules/pillars/coverage.module';
+import { GoldenModule } from './modules/golden/golden.module';
+import { SimilarityModule } from './modules/similarity/similarity.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ContentsModule } from './modules/contents/contents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { EditLearningModule } from './modules/edit-learning/edit-learning.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 import { IdeasModule } from './modules/ideas/ideas.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OpsModule } from './modules/ops/ops.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SamplesModule } from './modules/samples/samples.module';
@@ -57,11 +68,22 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     ProfilesModule,
     BrandDocsModule,
     IdeasModule,
+    FeedbackModule,
     ContentsModule,
     CalendarModule,
+    ChecklistsModule,
+    SimilarityModule,
+    GoldenModule,
+    CoverageModule,
+    VariantsModule,
+    StyleFitModule,
+    ExportModule,
+    ApiKeysModule,
     SearchModule,
     ReviewsModule,
+    EditLearningModule,
     NotificationsModule,
+    OpsModule,
     TagsModule,
     CampaignsModule,
     JobsModule,
