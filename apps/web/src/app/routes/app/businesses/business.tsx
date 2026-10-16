@@ -4,7 +4,7 @@ import {
   AlertTriangle,
   Archive,
   ArchiveRestore,
-  ChevronLeft,
+  ArrowRight,
   ExternalLink,
   FolderKanban,
   Globe,
@@ -160,7 +160,7 @@ export default function BusinessRoute() {
             to={paths.app.businesses.getHref()}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
-            <ChevronLeft className="size-4 ltr:hidden" />
+            <ArrowRight className="size-4 ltr:rotate-180" />
             {t('businesses.title')}
           </Link>
         }

@@ -6,3 +6,10 @@ import { afterEach, expect } from 'vitest';
 // (the package's /vitest entry could resolve a different hoisted vitest).
 expect.extend(matchers);
 afterEach(cleanup);
+
+// Radix popper (tooltips, menus) measures with ResizeObserver, which jsdom lacks.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};

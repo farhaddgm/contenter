@@ -36,8 +36,7 @@ import { MetricsCard } from './components/metrics-card';
 const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string | number>) =>
   translate('fa', key, vars);
 
-const content = (publishedAt: string | null) =>
-  ({ id: 'c1', publishedAt }) as unknown as Content;
+const content = (publishedAt: string | null) => ({ id: 'c1', publishedAt }) as unknown as Content;
 
 const reading = (over: Partial<ContentMetric> = {}): ContentMetric => ({
   id: 'm1',
@@ -103,7 +102,9 @@ describe('MetricsCard', () => {
     const dialog = screen.getByRole('dialog');
     const importButton = within(dialog).getByRole('button', { name: /ثبت ۰ ردیف/ });
     expect(importButton).toBeDisabled();
-    await userEvent.click(within(dialog).getByRole('textbox', { name: t('contents.metrics.table') }));
+    await userEvent.click(
+      within(dialog).getByRole('textbox', { name: t('contents.metrics.table') }),
+    );
     await userEvent.paste('date,views\n2026-10-02,10\n2026-10-03,abc');
     expect(await within(dialog).findByText(/۱ ردیف قابل ثبت است/)).toBeVisible();
     await userEvent.click(within(dialog).getByRole('button', { name: /ثبت ۱ ردیف/ }));

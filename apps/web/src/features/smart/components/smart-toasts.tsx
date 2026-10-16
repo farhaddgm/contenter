@@ -13,7 +13,7 @@ export function SmartToasts() {
       aria-live="assertive"
       className={cn(
         'pointer-events-none fixed bottom-4 z-[65] flex w-full max-w-sm flex-col gap-2 px-4',
-        side === 'left' ? 'right-0' : 'left-0',
+        side === 'end' ? 'start-0' : 'end-0',
       )}
     >
       {toasts.map((toast) => (

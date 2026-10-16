@@ -3,7 +3,8 @@ import { persist } from 'zustand/middleware';
 import type { WalkerStepKey } from '@contenter/shared';
 
 export type SmartTab = 'walker' | 'chat' | 'errors';
-export type SmartSide = 'left' | 'right';
+/** Logical edge: `end` is the left edge in RTL and the right edge in LTR. */
+export type SmartSide = 'start' | 'end';
 
 export interface SmartToast {
   id: string;
@@ -42,7 +43,7 @@ export const useSmart = create<SmartState>()(
   persist(
     (set, get) => ({
       enabled: true,
-      side: 'left',
+      side: 'end',
       // starts as a small pill so it never covers the page on first visit
       minimized: true,
       tab: 'walker',
@@ -53,7 +54,7 @@ export const useSmart = create<SmartState>()(
       toasts: [],
 
       setEnabled: (enabled) => set({ enabled }),
-      toggleSide: () => set({ side: get().side === 'left' ? 'right' : 'left' }),
+      toggleSide: () => set({ side: get().side === 'end' ? 'start' : 'end' }),
       setMinimized: (minimized) => set({ minimized }),
       setTab: (tab) => set({ tab }),
       setWalkerTopic: (walkerTopicId) =>
@@ -80,6 +81,12 @@ export const useSmart = create<SmartState>()(
     }),
     {
       name: 'contenter-smart',
+      version: 1,
+      // v0 stored a physical edge (`left`/`right`); it is now logical (`end`/`start`)
+      migrate: (state, version) => {
+        const s = state as { side?: string };
+        return version < 1 ? { ...s, side: s.side === 'right' ? 'start' : 'end' } : s;
+      },
       partialize: (s) => ({
         enabled: s.enabled,
         side: s.side,

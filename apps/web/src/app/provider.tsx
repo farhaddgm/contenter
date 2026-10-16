@@ -8,7 +8,7 @@ import { AuthLoader } from '@/lib/auth';
 import { createQueryClient } from '@/lib/react-query';
 import { useUi } from '@/stores/ui';
 
-/** Keeps <html> dir/lang and the dark class in sync with UI preferences. */
+/** Keeps <html> dir/lang, data-theme and the dark class in sync with UI preferences. */
 function DocumentSync() {
   const { theme, lang } = useUi();
   useEffect(() => {
@@ -18,11 +18,13 @@ function DocumentSync() {
   }, [lang]);
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () =>
-      document.documentElement.classList.toggle(
-        'dark',
-        theme === 'dark' || (theme === 'system' && media.matches),
-      );
+    const apply = () => {
+      const root = document.documentElement;
+      // `system` = honey by day, dark by night
+      const effective = theme === 'system' ? (media.matches ? 'dark' : 'honey') : theme;
+      root.dataset.theme = effective;
+      root.classList.toggle('dark', effective === 'dark');
+    };
     apply();
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);

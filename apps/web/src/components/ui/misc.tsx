@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, ChevronRight, Copy } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { NavLink } from 'react-router';
@@ -157,12 +157,27 @@ export function Segmented<T extends string>({
 export const Dropdown = {
   Root: DM.Root,
   Trigger: DM.Trigger,
-  Content: ({ children, align = 'end' }: { children: ReactNode; align?: 'start' | 'end' }) => (
+  Content: ({
+    children,
+    align = 'end',
+    side = 'bottom',
+    className,
+  }: {
+    children: ReactNode;
+    align?: 'start' | 'end';
+    side?: 'top' | 'bottom';
+    className?: string;
+  }) => (
     <DM.Portal>
       <DM.Content
         align={align}
-        sideOffset={6}
-        className="z-50 min-w-48 animate-pop-in rounded-xl border bg-card p-1.5 text-sm shadow-pop"
+        side={side}
+        sideOffset={8}
+        collisionPadding={12}
+        className={cn(
+          'z-[70] min-w-48 animate-pop-in rounded-xl border bg-card p-1.5 text-sm text-card-foreground shadow-pop',
+          className,
+        )}
       >
         {children}
       </DM.Content>
@@ -196,4 +211,24 @@ export const Dropdown = {
     </DM.Label>
   ),
   Separator: () => <DM.Separator className="my-1 h-px bg-border" />,
+  Sub: DM.Sub,
+  SubTrigger: ({ children, icon }: { children: ReactNode; icon?: ReactNode }) => (
+    <DM.SubTrigger className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 font-medium outline-none data-[highlighted]:bg-muted data-[state=open]:bg-muted [&_svg]:size-4 [&_svg]:text-muted-foreground">
+      {icon}
+      <span className="flex-1 text-start">{children}</span>
+      <ChevronRight className="size-4 shrink-0 rtl:rotate-180" />
+    </DM.SubTrigger>
+  ),
+  SubContent: ({ children }: { children: ReactNode }) => (
+    <DM.Portal>
+      <DM.SubContent
+        sideOffset={8}
+        alignOffset={-6}
+        collisionPadding={12}
+        className="z-[70] min-w-44 animate-pop-in rounded-xl border bg-card p-1.5 text-sm text-card-foreground shadow-pop"
+      >
+        {children}
+      </DM.SubContent>
+    </DM.Portal>
+  ),
 };

@@ -22,10 +22,16 @@ describe('walker steps', () => {
     expect(stepHref('approve_profile', 't1', refs)).toBe('/app/topics/t1/profile');
     expect(stepHref('generate_content', 't1', refs)).toBe('/app/topics/t1/ideas');
     expect(stepHref('review_content', 't1', refs)).toBe('/app/contents/c2');
-    expect(stepHref('approve_content', 't1', { ...refs, reviewContentId: null })).toBe('/app/contents/c1');
-    expect(stepHref('approve_content', 't1', { latestContentId: null, reviewContentId: null, latestProfileId: null })).toBe(
-      '/app/topics/t1/contents',
+    expect(stepHref('approve_content', 't1', { ...refs, reviewContentId: null })).toBe(
+      '/app/contents/c1',
     );
+    expect(
+      stepHref('approve_content', 't1', {
+        latestContentId: null,
+        reviewContentId: null,
+        latestProfileId: null,
+      }),
+    ).toBe('/app/topics/t1/contents');
   });
 
   it('falls back to the topic list without a project', () => {
@@ -41,13 +47,27 @@ describe('walker steps', () => {
 
 describe('smart store', () => {
   beforeEach(() => {
-    useSmart.setState({ enabled: false, minimized: true, tab: 'walker', selectedErrorId: null, toasts: [], walkerTopicId: null, walkerStep: 'select_topic', side: 'left' });
+    useSmart.setState({
+      enabled: false,
+      minimized: true,
+      tab: 'walker',
+      selectedErrorId: null,
+      toasts: [],
+      walkerTopicId: null,
+      walkerStep: 'select_topic',
+      side: 'end',
+    });
   });
 
   it('opening an error turns Smart on and shows the errors tab', () => {
     useSmart.getState().openError('e1');
     const s = useSmart.getState();
-    expect(s).toMatchObject({ enabled: true, minimized: false, tab: 'errors', selectedErrorId: 'e1' });
+    expect(s).toMatchObject({
+      enabled: true,
+      minimized: false,
+      tab: 'errors',
+      selectedErrorId: 'e1',
+    });
   });
 
   it('selecting a project moves the walker past project selection', () => {
@@ -60,7 +80,7 @@ describe('smart store', () => {
 
   it('switches sides', () => {
     useSmart.getState().toggleSide();
-    expect(useSmart.getState().side).toBe('right');
+    expect(useSmart.getState().side).toBe('start');
   });
 
   it('keeps one toast per error', () => {

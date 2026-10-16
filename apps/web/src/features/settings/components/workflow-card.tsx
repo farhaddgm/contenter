@@ -40,12 +40,12 @@ export function WorkflowCard() {
                 )
               }
               label={<span className="font-medium">{t('review.settings.requireFinal')}</span>}
+              hint={
+                data.requireFinalApproval
+                  ? t('review.settings.twoStage')
+                  : t('review.settings.oneStage')
+              }
             />
-            <p className="text-xs leading-6 text-muted-foreground">
-              {data.requireFinalApproval
-                ? t('review.settings.twoStage')
-                : t('review.settings.oneStage')}
-            </p>
           </>
         )}
       </CardBody>

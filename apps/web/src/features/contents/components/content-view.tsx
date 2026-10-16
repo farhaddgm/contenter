@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import {
   CheckCircle2,
-  ChevronLeft,
+  ArrowRight,
   History,
   Layers,
   MessageSquareText,
@@ -444,7 +444,7 @@ export function ContentView({ contentId }: { contentId: string }) {
             to={paths.app.topic.getHref(content.topicId, 'contents')}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
-            <ChevronLeft className="size-4 ltr:hidden" />
+            <ArrowRight className="size-4 ltr:rotate-180" />
             {content.topic?.title}
           </Link>
         }

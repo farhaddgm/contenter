@@ -3,7 +3,7 @@ import {
   Archive,
   ArchiveRestore,
   Building2,
-  ChevronLeft,
+  ArrowRight,
   Pencil,
   PenLine,
   Trash2,
@@ -73,7 +73,7 @@ export default function TopicRoute() {
             to={paths.app.topics.getHref()}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
-            <ChevronLeft className="size-4 ltr:hidden" />
+            <ArrowRight className="size-4 ltr:rotate-180" />
             {t('topics.title')}
           </Link>
         }

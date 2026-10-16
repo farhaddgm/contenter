@@ -3,6 +3,7 @@ import type { AccessLevel, User, UserAccessRow } from '@contenter/shared';
 import { Badge } from '@/components/ui/badge';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/form-controls';
+import { OwnerBadge } from '@/components/ui/owner-badge';
 import { Segmented } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
@@ -46,7 +47,12 @@ export function AccessDialog({ user, onClose }: { user: User; onClose: () => voi
     <Dialog
       open
       onOpenChange={(v) => !v && onClose()}
-      title={t('users.accessTitle', { name: user.name })}
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          {t('users.accessTitle', { name: user.name })}
+          <OwnerBadge />
+        </span>
+      }
       description={t('users.accessHint')}
     >
       <div className="space-y-3">
