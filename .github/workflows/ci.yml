@@ -36,3 +36,40 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # Browser tests of the main flows (e2e/README.md): real API (mock AI, inline queue), the web dev
+  # server and a real Postgres. No model key is used.
+  e2e:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: contenter
+          POSTGRES_PASSWORD: contenter
+          POSTGRES_DB: contenter
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U contenter" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://contenter:contenter@localhost:5432/contenter
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @contenter/shared
+      - run: npm run build -w @contenter/api
+      - run: npx -w @contenter/api prisma migrate deploy
+      - run: npx -w @contenter/api prisma db seed
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          if-no-files-found: ignore
