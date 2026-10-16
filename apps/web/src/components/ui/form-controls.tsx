@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { InfoTip } from './info-tip';
 
 const controlBase =
   'w-full rounded-control border border-input bg-card px-3 text-sm text-foreground transition-[border-color,box-shadow] placeholder:text-muted-foreground/75 hover:border-ring/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/20';
@@ -78,7 +79,10 @@ export function Label({
   );
 }
 
-/** Label + control + hint + error, wired for accessibility. */
+/**
+ * Label + control + error, wired for accessibility. A `hint` is shown in the "i" popup next to the
+ * label (hover / focus / tap), not under the field; without a label it falls back to plain text.
+ */
 export function Field({
   label,
   hint,
@@ -98,19 +102,22 @@ export function Field({
   return (
     <div className={cn('space-y-2', className)}>
       {label && (
-        <Label htmlFor={id}>
-          {label}
-          {optional && (
-            <span className="ms-1 text-xs font-normal text-muted-foreground">({optional})</span>
-          )}
-        </Label>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor={id}>
+            {label}
+            {optional && (
+              <span className="ms-1 text-xs font-normal text-muted-foreground">({optional})</span>
+            )}
+          </Label>
+          {hint ? <InfoTip>{hint}</InfoTip> : null}
+        </div>
       )}
       {children(id)}
       {error ? (
         <p role="alert" className="text-xs font-medium text-destructive">
           {error}
         </p>
-      ) : hint ? (
+      ) : hint && !label ? (
         <p className="text-xs leading-5 text-muted-foreground">{hint}</p>
       ) : null}
     </div>
@@ -121,39 +128,45 @@ export function Switch({
   checked,
   onCheckedChange,
   label,
+  hint,
   disabled,
 }: {
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
   label?: ReactNode;
+  /** Explanation shown in the "i" popup after the label. */
+  hint?: ReactNode;
   disabled?: boolean;
 }) {
   return (
-    <label
-      className={cn(
-        'inline-flex cursor-pointer items-center gap-2 text-sm',
-        disabled && 'opacity-50',
-      )}
-    >
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onCheckedChange(!checked)}
+    <span className="inline-flex items-center gap-1.5">
+      <label
         className={cn(
-          'relative h-6 w-10 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed',
-          checked ? 'bg-primary' : 'bg-input',
+          'inline-flex cursor-pointer items-center gap-2 text-sm',
+          disabled && 'cursor-not-allowed opacity-50',
         )}
       >
-        <span
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          disabled={disabled}
+          onClick={() => onCheckedChange(!checked)}
           className={cn(
-            'absolute top-0.5 size-5 rounded-full bg-white shadow transition-all',
-            checked ? 'start-[1.125rem]' : 'start-0.5',
+            'relative h-6 w-10 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed',
+            checked ? 'bg-primary' : 'bg-input',
           )}
-        />
-      </button>
-      {label}
-    </label>
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 size-5 rounded-full bg-white shadow transition-all',
+              checked ? 'start-[1.125rem]' : 'start-0.5',
+            )}
+          />
+        </button>
+        {label}
+      </label>
+      {hint ? <InfoTip>{hint}</InfoTip> : null}
+    </span>
   );
 }

@@ -15,13 +15,13 @@ import { ErrorsTab } from './errors-tab';
 import { WalkerChat } from './walker-chat';
 import { WalkerTab } from './walker-tab';
 
-/** Medium-size floating window docked to the left or right edge of the browser. */
+/** Medium-size floating window docked to the inline-start or inline-end edge of the browser. */
 export function SmartPanel() {
   const t = useT();
   const { side, toggleSide, minimized, setMinimized, tab, setTab } = useSmart();
   const summary = useSmartSummary(true);
   const openErrors = summary.data?.openErrors ?? 0;
-  const edge = side === 'left' ? 'left-4' : 'right-4';
+  const edge = side === 'end' ? 'end-4' : 'start-4';
 
   if (minimized) {
     return (

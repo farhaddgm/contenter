@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
+import { OwnerBadge } from '@/components/ui/owner-badge';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, Select, Switch } from '@/components/ui/form-controls';
@@ -185,7 +186,12 @@ export function GoogleAccessCard() {
   return (
     <Card>
       <CardHeader
-        title={t('googleAccess.title')}
+        title={
+          <>
+            {t('googleAccess.title')}
+            <OwnerBadge />
+          </>
+        }
         description={t('googleAccess.description')}
         actions={
           <Button size="sm" icon={<Plus />} onClick={() => setDialog({ user: null })}>

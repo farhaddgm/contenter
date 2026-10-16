@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FolderKey, Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Crown, FolderKey, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import {
   CreateUserSchema,
   LoginMethod,
@@ -13,6 +13,7 @@ import {
   type User,
 } from '@contenter/shared';
 import { Badge } from '@/components/ui/badge';
+import { OwnerBadge } from '@/components/ui/owner-badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -132,7 +133,15 @@ function UserDrawer({ user, onClose }: { user: User | null; onClose: () => void 
             />
           )}
         </Field>
-        <Field label={t('users.loginMethod')} hint={methodHint}>
+        <Field
+          label={
+            <span className="inline-flex items-center gap-2">
+              {t('users.loginMethod')}
+              <OwnerBadge />
+            </span>
+          }
+          hint={methodHint}
+        >
           {() => (
             <div>
               {canChooseMethod ? (
@@ -266,10 +275,18 @@ export default function UsersRoute() {
               variant="ghost"
               disabled={u.role === 'ADMIN'}
               title={u.role === 'ADMIN' ? t('users.accessAdmin') : t('users.accessButton')}
-              aria-label={t('users.accessButton')}
+              aria-label={`${t('users.accessButton')} — ${t('common.owner')}`}
+              className="relative"
               onClick={() => setAccessFor(u)}
             >
               <FolderKey />
+              <span
+                aria-hidden
+                title={t('common.ownerHint')}
+                className="absolute -end-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-brand text-brand-foreground ring-2 ring-card"
+              >
+                <Crown className="size-2" />
+              </span>
             </Button>
           )}
           <Button

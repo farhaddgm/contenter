@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/form-controls';
+import { ThemePicker } from '@/components/ui/theme-picker';
 import { PageHeader } from '@/components/ui/misc';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
@@ -115,6 +116,12 @@ export default function AccountRoute() {
             ) : (
               <p className="text-sm text-muted-foreground">{t('auth.googleOnlyHint')}</p>
             )}
+          </CardBody>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader title={t('theme.title')} description={t('theme.hint')} />
+          <CardBody>
+            <ThemePicker />
           </CardBody>
         </Card>
         <NotificationPreferencesCard />

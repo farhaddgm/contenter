@@ -69,6 +69,102 @@
   --elev-pop: 0 18px 45px rgb(0 0 0 / 0.5);
 }
 
+/*
+ * Extra palettes, same set as Bee Researcher (Settings → Appearance). Each one only overrides colour
+ * tokens; `honey` is :root, `dark` is .dark. All foreground/background pairs are AA (≥ 4.5:1).
+ */
+[data-theme='light'] {
+  --background: #f6f8fb;
+  --foreground: #15243a;
+  --muted: #eef3fb;
+  --muted-foreground: #53657c;
+  --border: #e5eaf1;
+  --input: #cbd6e6;
+  --primary: #2457d6;
+  --accent: #eaf0ff;
+  --accent-foreground: #1d46af;
+  --ring: #6f93ee;
+  --sidebar: #10234b;
+  --sidebar-foreground: #dbe6ff;
+  --sidebar-muted: #91a8d4;
+  --sidebar-active: #203b78;
+  --elev-card: 0 12px 34px rgb(24 44 76 / 0.07);
+  --elev-pop: 0 18px 45px rgb(23 35 63 / 0.18);
+}
+[data-theme='forest'] {
+  --background: #f3faf7;
+  --foreground: #12281f;
+  --muted: #e7f3ee;
+  --muted-foreground: #4a665a;
+  --border: #d4e8df;
+  --input: #b3d1c4;
+  --primary: #19735b;
+  --accent: #dff3ea;
+  --accent-foreground: #105441;
+  --ring: #3fa584;
+  --sidebar: #123f35;
+  --sidebar-foreground: #dcefe8;
+  --sidebar-muted: #8fc2b0;
+  --sidebar-active: #1d5c4c;
+  --elev-card: 0 12px 34px rgb(18 63 53 / 0.08);
+  --elev-pop: 0 18px 45px rgb(18 63 53 / 0.2);
+}
+[data-theme='slate'] {
+  --background: #f5f7fa;
+  --foreground: #1e293b;
+  --muted: #edf1f6;
+  --muted-foreground: #566478;
+  --border: #dce2ea;
+  --input: #c3ccd9;
+  --primary: #5b6b80;
+  --accent: #e8edf3;
+  --accent-foreground: #334155;
+  --ring: #94a3b8;
+  --sidebar: #26364e;
+  --sidebar-foreground: #e4eaf3;
+  --sidebar-muted: #9fb0c9;
+  --sidebar-active: #364a68;
+  --elev-card: 0 12px 34px rgb(38 54 78 / 0.08);
+  --elev-pop: 0 18px 45px rgb(38 54 78 / 0.2);
+}
+[data-theme='blackyellow'] {
+  --background: #f7f4e8;
+  --foreground: #171717;
+  --muted: #efeacf;
+  --muted-foreground: #5c5640;
+  --border: #ded5aa;
+  --input: #c9bf8a;
+  --primary: #171717;
+  --primary-foreground: #ffe45e;
+  --accent: #fff3b0;
+  --accent-foreground: #171717;
+  --ring: #c99700;
+  --sidebar: #171717;
+  --sidebar-foreground: #fff4b8;
+  --sidebar-muted: #c9b86a;
+  --sidebar-active: #3b3200;
+  --elev-card: 0 12px 34px rgb(23 23 23 / 0.08);
+  --elev-pop: 0 18px 45px rgb(23 23 23 / 0.22);
+}
+[data-theme='red'] {
+  --background: #fff4f6;
+  --foreground: #3c1820;
+  --muted: #ffe9ed;
+  --muted-foreground: #7a4550;
+  --border: #f1cbd2;
+  --input: #e6aab5;
+  --primary: #c4384d;
+  --accent: #ffe4e8;
+  --accent-foreground: #8c2236;
+  --ring: #e0657a;
+  --sidebar: #7d1f35;
+  --sidebar-foreground: #ffe4ea;
+  --sidebar-muted: #e8a3b3;
+  --sidebar-active: #9c2c47;
+  --elev-card: 0 12px 34px rgb(125 31 53 / 0.08);
+  --elev-pop: 0 18px 45px rgb(125 31 53 / 0.2);
+}
+
 @theme inline {
   --font-sans: 'Vazirmatn Variable', 'Vazirmatn', ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);

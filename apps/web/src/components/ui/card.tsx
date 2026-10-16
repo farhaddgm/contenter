@@ -1,5 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/utils/cn';
+import { InfoTip } from './info-tip';
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
@@ -9,6 +10,9 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     />
   );
 }
+
+/** Longest card description that is still printed under the title. */
+export const CARD_DESCRIPTION_INLINE_MAX = 90;
 
 export function CardHeader({
   title,
@@ -21,6 +25,8 @@ export function CardHeader({
   actions?: ReactNode;
   className?: string;
 }) {
+  // short subtitles stay visible; long explanations move into the "i" popup next to the title
+  const tip = typeof description === 'string' && description.length > CARD_DESCRIPTION_INLINE_MAX;
   return (
     <div
       className={cn(
@@ -29,8 +35,11 @@ export function CardHeader({
       )}
     >
       <div className="min-w-0 space-y-1">
-        <h3 className="text-base font-bold leading-snug">{title}</h3>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        <h3 className="flex items-center gap-2 text-base font-bold leading-snug">
+          {title}
+          {tip && <InfoTip>{description}</InfoTip>}
+        </h3>
+        {description && !tip && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && (
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>

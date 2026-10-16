@@ -2,14 +2,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router';
-import { Lightbulb, ScanSearch, Sparkles, Wand2 } from 'lucide-react';
 import { GoogleLoginError, LoginSchema, type LoginInput } from '@contenter/shared';
 import { Button } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/form-controls';
+import { Input } from '@/components/ui/form-controls';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
 import { googleSignInUrl, useAuthProviders, useLogin, useUser } from '@/lib/auth';
 import { ApiError } from '@/lib/api-client';
+import { useUi, type Lang } from '@/stores/ui';
+import { cn } from '@/utils/cn';
 
 function GoogleIcon() {
   return (
@@ -56,6 +57,7 @@ export function LoginPage({ withPassword = false }: { withPassword?: boolean }) 
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const login = useLogin();
+  const { lang, setLang } = useUi();
   const providers = useAuthProviders();
   const googleError = GoogleLoginError.find((code) => code === params.get('error'));
   const redirectTo = params.get('redirectTo') || paths.app.dashboard.getHref();
@@ -68,93 +70,27 @@ export function LoginPage({ withPassword = false }: { withPassword?: boolean }) 
 
   if (user) return <Navigate to={redirectTo} replace />;
 
-  const features = [
-    { icon: <ScanSearch />, text: t('topics.steps.analyze') },
-    { icon: <Wand2 />, text: t('topics.steps.profile') },
-    { icon: <Lightbulb />, text: t('topics.steps.ideas') },
-    { icon: <Sparkles />, text: t('topics.steps.contents') },
-  ];
+  const inputClass =
+    'h-[2.875rem] rounded-xl bg-card px-3.5 text-start placeholder:text-start rtl:placeholder:text-right';
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden bg-[radial-gradient(circle_at_20%_0,#f4d28c_0,var(--background)_46%)] p-4 py-10 dark:bg-[radial-gradient(circle_at_20%_0,#4a2c10_0,var(--background)_50%)]">
-      <div className="w-full max-w-[28.75rem] space-y-7 rounded-[1.75rem] border bg-card/95 p-8 shadow-[0_16px_42px_rgb(122_75_14/0.14)] sm:p-10">
-        <div className="space-y-3 text-center">
-          <img src="/logo.svg" alt="" className="mx-auto size-16 rounded-2xl shadow-md" />
-          <p className="text-xl font-extrabold" dir="ltr">
-            {t('app.name')}
-          </p>
-          <h1 className="pt-2 text-2xl font-extrabold">{t('auth.loginTitle')}</h1>
-          <p className="text-sm text-muted-foreground">{t('auth.loginSubtitle')}</p>
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_20%_0,color-mix(in_oklch,var(--ring)_38%,var(--background))_0,var(--background)_44%)] p-6">
+      <section
+        aria-labelledby="login-title"
+        className="w-full max-w-[28.75rem] rounded-[1.75rem] border bg-card/95 p-8 shadow-[0_16px_42px_color-mix(in_oklch,var(--sidebar)_16%,transparent)] sm:p-10"
+      >
+        <div className="mb-2 flex min-h-[8rem] items-center justify-center">
+          <img src="/logo-full.svg" alt={t('app.name')} className="h-auto w-full max-w-[21rem]" />
         </div>
-        {withPassword && (
-          <form
-            className="space-y-4"
-            onSubmit={form.handleSubmit((values) =>
-              login.mutate(values, { onSuccess: () => navigate(redirectTo, { replace: true }) }),
-            )}
-          >
-            <Field label={t('auth.email')} error={form.formState.errors.email?.message}>
-              {(id) => (
-                <Input
-                  id={id}
-                  type="email"
-                  dir="ltr"
-                  className="h-11 text-start"
-                  autoComplete="email"
-                  autoFocus
-                  {...form.register('email')}
-                />
-              )}
-            </Field>
-            <Field label={t('auth.password')} error={form.formState.errors.password?.message}>
-              {(id) => (
-                <Input
-                  id={id}
-                  type="password"
-                  dir="ltr"
-                  className="h-11 text-start"
-                  autoComplete="current-password"
-                  {...form.register('password')}
-                />
-              )}
-            </Field>
-            {login.error && (
-              <p
-                role="alert"
-                className="rounded-control bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive"
-              >
-                {login.error instanceof ApiError && login.error.status === 401
-                  ? t('auth.loginFailed')
-                  : login.error.message}
-              </p>
-            )}
-            <Button type="submit" className="w-full" size="lg" isLoading={login.isPending}>
-              {t('auth.login')}
-            </Button>
-          </form>
-        )}
-        {googleError && (
-          <p
-            role="alert"
-            className="rounded-control bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive"
-          >
-            {t(`auth.googleErrors.${googleError}`)}
-          </p>
-        )}
-        {withPassword && providers.data?.google && (
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            {t('auth.or')}
-            <span className="h-px flex-1 bg-border" />
-          </div>
-        )}
+        <h1 id="login-title" className="sr-only">
+          {t('auth.loginTitle')}
+        </h1>
         {/* Always shown on the Google-only page; an unconfigured server answers ?error=not_configured. */}
         {(!withPassword || providers.data?.google) && (
           <Button
             asChild
-            variant={withPassword ? 'outline' : 'default'}
             size="lg"
-            className="w-full"
+            className="mt-4 h-[2.875rem] w-full rounded-xl text-[0.9375rem]"
           >
             <a href={googleSignInUrl(redirectTo)}>
               <GoogleIcon />
@@ -162,19 +98,89 @@ export function LoginPage({ withPassword = false }: { withPassword?: boolean }) 
             </a>
           </Button>
         )}
-      </div>
-      <ul className="flex max-w-3xl flex-wrap justify-center gap-2.5">
-        {features.map((f, i) => (
-          <li
-            key={i}
-            className="flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-xs font-medium text-muted-foreground [&_svg]:size-3.5 [&_svg]:text-primary"
+        {googleError && (
+          <p role="alert" className="mt-3 text-sm font-medium text-destructive">
+            {t(`auth.googleErrors.${googleError}`)}
+          </p>
+        )}
+        {withPassword && (
+          <form
+            noValidate
+            className="mt-1"
+            onSubmit={form.handleSubmit((values) =>
+              login.mutate(values, { onSuccess: () => navigate(redirectTo, { replace: true }) }),
+            )}
           >
-            {f.icon}
-            {f.text}
-          </li>
-        ))}
-      </ul>
-      <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Contenter</p>
+            <Input
+              dir="ltr"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              placeholder={t('auth.email')}
+              aria-label={t('auth.email')}
+              aria-invalid={!!form.formState.errors.email}
+              aria-describedby="login-email-error"
+              className={cn(inputClass, 'mt-3')}
+              {...form.register('email')}
+            />
+            <p
+              id="login-email-error"
+              role="alert"
+              className="mx-0.5 mt-1.5 min-h-[1.125rem] text-xs text-destructive"
+            >
+              {form.formState.errors.email?.message}
+            </p>
+            <Input
+              dir="ltr"
+              type="password"
+              autoComplete="current-password"
+              placeholder={t('auth.password')}
+              aria-label={t('auth.password')}
+              aria-invalid={!!form.formState.errors.password}
+              aria-describedby="login-password-error"
+              className={inputClass}
+              {...form.register('password')}
+            />
+            <p
+              id="login-password-error"
+              role="alert"
+              className="mx-0.5 mt-1.5 min-h-[1.125rem] text-xs text-destructive"
+            >
+              {form.formState.errors.password?.message}
+            </p>
+            <Button
+              type="submit"
+              size="lg"
+              className="mt-3 h-[2.875rem] w-full rounded-xl text-[0.9375rem] font-bold"
+              isLoading={login.isPending}
+            >
+              {t('auth.login')}
+            </Button>
+            {login.error && (
+              <p role="alert" className="mt-3 text-sm text-destructive">
+                {login.error instanceof ApiError && login.error.status === 401
+                  ? t('auth.loginFailed')
+                  : login.error.message}
+              </p>
+            )}
+          </form>
+        )}
+        <label
+          dir="ltr"
+          className="mt-[1.125rem] flex w-full items-center justify-center rounded-[0.6875rem] border bg-muted p-[0.1875rem]"
+        >
+          <span className="sr-only">{t('nav.language')}</span>
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value as Lang)}
+            aria-label={t('nav.language')}
+            className="h-[2.375rem] w-full cursor-pointer rounded-lg bg-card px-3 text-center text-xs font-bold text-primary"
+          >
+            <option value="fa">فارسی</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </section>
     </main>
   );
 }

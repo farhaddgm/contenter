@@ -46,7 +46,9 @@ describe('ExportMenu', () => {
     const dialog = await open();
     expect(within(dialog).getByRole('combobox')).toHaveValue('zip');
     await userEvent.selectOptions(within(dialog).getByRole('combobox'), 'csv');
-    expect(within(dialog).getByText(new RegExp('BOM'))).toBeVisible();
+    // the format explanation lives in the field's "i" popup
+    await userEvent.click(within(dialog).getByRole('button', { name: 'راهنما' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/BOM/);
     await userEvent.click(within(dialog).getByRole('switch'));
     await userEvent.click(within(dialog).getByRole('button', { name: t('export.download') }));
     expect(state.mutate.mock.calls[0]![0]).toEqual({

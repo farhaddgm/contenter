@@ -236,10 +236,16 @@ describe('NotificationSettingsCard', () => {
     expect(screen.getByText(t('inbox.settings.emailHint'))).toBeVisible();
   });
 
-  it('starts from the stored webhook and its events, and never shows the secret', () => {
+  it('starts from the stored webhook and its events, and never shows the secret', async () => {
     render1(settings());
     expect(screen.getByDisplayValue('https://hooks.test/x')).toBeVisible();
-    expect(screen.getByText(t('inbox.settings.secretSet'))).toBeVisible();
+    // the "a secret is stored" note is in a field's "i" popup
+    let found = false;
+    for (const tip of screen.getAllByRole('button', { name: 'راهنما' })) {
+      await userEvent.click(tip);
+      if (screen.queryByText(t('inbox.settings.secretSet'))) found = true;
+    }
+    expect(found).toBe(true);
     expect(screen.getAllByRole('button', { pressed: true }).map((b) => b.textContent)).toEqual([
       t('inbox.events.REVIEW_APPROVED'),
     ]);

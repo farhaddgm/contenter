@@ -6,6 +6,8 @@ import { Badge } from './badge';
 import { Button } from './button';
 import { EmptyState } from './table';
 import { PageHeader } from './misc';
+import { Field, Input } from './form-controls';
+import { OwnerBadge } from './owner-badge';
 import { useSmart } from '@/features/smart/store';
 import { Switch } from './form-controls';
 
@@ -63,5 +65,21 @@ describe('UI components', () => {
     render(<Switch checked={false} onCheckedChange={onChange} label="Auto" />);
     await userEvent.click(screen.getByRole('switch'));
     expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('Field shows its hint in an "i" popup, not as text under the field', async () => {
+    render(
+      <Field label="Name" hint="Explains the name">
+        {(id) => <Input id={id} />}
+      </Field>,
+    );
+    expect(screen.queryByText('Explains the name')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'راهنما' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Explains the name');
+  });
+
+  it('OwnerBadge labels owner-only sections', () => {
+    render(<OwnerBadge />);
+    expect(screen.getByText('مالک')).toBeInTheDocument();
   });
 });
