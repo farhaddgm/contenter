@@ -88,6 +88,7 @@ export function FromPresenceDialog({ onOpenChange }: { onOpenChange: (v: boolean
       onOpenChange={onOpenChange}
       title={t('businesses.presence.title')}
       description={t('businesses.presence.subtitle')}
+      descriptionAsTip
       className="max-w-2xl"
       footer={
         <>

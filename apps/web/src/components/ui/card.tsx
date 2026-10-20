@@ -19,14 +19,20 @@ export function CardHeader({
   description,
   actions,
   className,
+  descriptionAsTip,
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   className?: string;
+  /** Always put the description in the "i" popup, however short it is (pure explanations only, never status). */
+  descriptionAsTip?: boolean;
 }) {
   // short subtitles stay visible; long explanations move into the "i" popup next to the title
-  const tip = typeof description === 'string' && description.length > CARD_DESCRIPTION_INLINE_MAX;
+  const tip =
+    !!description &&
+    (descriptionAsTip ||
+      (typeof description === 'string' && description.length > CARD_DESCRIPTION_INLINE_MAX));
   return (
     <div
       className={cn(

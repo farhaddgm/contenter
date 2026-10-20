@@ -239,7 +239,11 @@ export function NotificationSettingsCard() {
   const { data } = useNotificationSettings();
   return (
     <Card>
-      <CardHeader title={t('inbox.settings.title')} description={t('inbox.settings.subtitle')} />
+      <CardHeader
+        title={t('inbox.settings.title')}
+        description={t('inbox.settings.subtitle')}
+        descriptionAsTip
+      />
       {data ? <Form initial={data} /> : <Spinner />}
     </Card>
   );

@@ -87,6 +87,7 @@ export function GoogleDriveCard() {
       <CardHeader
         title={t('businesses.drive.title')}
         description={t('businesses.drive.subtitle')}
+        descriptionAsTip
         actions={
           admin && data?.configured && <ConnectDriveButton another={data.accounts.length > 0} />
         }

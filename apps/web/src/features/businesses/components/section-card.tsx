@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Check, CheckCheck, History, Pencil, ShieldAlert, Sparkles, X } from 'lucide-react';
+import {
+  Check,
+  CheckCheck,
+  ChevronDown,
+  History,
+  Pencil,
+  ShieldAlert,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import {
   BUSINESS_SECTION_MAX_CHARS,
   BUSINESS_SECTION_META,
@@ -16,6 +25,7 @@ import { MarkdownView } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
+import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/format';
 import {
   useAcceptSuggestion,
@@ -36,6 +46,8 @@ export function SectionCard({
   editable,
   suggesting,
   onSuggest,
+  open,
+  onOpenChange,
 }: {
   businessId: string;
   sectionKey: BusinessSectionKey;
@@ -45,6 +57,9 @@ export function SectionCard({
   /** An AI suggestion job for this section is running. */
   suggesting: boolean;
   onSuggest: (key: BusinessSectionKey) => void;
+  /** The section body is expanded (collapsed by default; the parent owns it so the TOC can open it). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const t = useT();
   const save = useUpdateSection(businessId);
@@ -89,9 +104,24 @@ export function SectionCard({
   return (
     <Card id={`section-${sectionKey}`}>
       <CardHeader
+        className={open ? undefined : 'border-b-0'}
         title={
           <span className="flex flex-wrap items-center gap-2">
-            {title}
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-controls={`section-body-${sectionKey}`}
+              onClick={() => onOpenChange(!open)}
+              className="inline-flex items-center gap-1.5 rounded-md text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/25"
+            >
+              <ChevronDown
+                className={cn(
+                  'size-4 shrink-0 text-muted-foreground transition-transform',
+                  open && 'rotate-180',
+                )}
+              />
+              {title}
+            </button>
             {content && section && (
               <Badge tone={section.source === 'AI' ? 'primary' : 'neutral'}>
                 {t(`enums.sectionSource.${section.source}`)}
@@ -113,6 +143,7 @@ export function SectionCard({
           </span>
         }
         description={t(`businesses.sectionHints.${sectionKey}`)}
+        descriptionAsTip
         actions={
           <>
             {section && (
@@ -132,7 +163,10 @@ export function SectionCard({
                   size="sm"
                   variant="outline"
                   icon={<Pencil />}
-                  onClick={() => setEditing({ suggestionId: null, text: section?.content ?? '' })}
+                  onClick={() => {
+                    setEditing({ suggestionId: null, text: section?.content ?? '' });
+                    onOpenChange(true);
+                  }}
                 >
                   {content ? t('common.edit') : t('businesses.write')}
                 </Button>
@@ -150,7 +184,7 @@ export function SectionCard({
           </>
         }
       />
-      <CardBody className="space-y-4">
+      <CardBody id={`section-body-${sectionKey}`} hidden={!open} className="space-y-4">
         {editing ? (
           <div className="space-y-2">
             {editing.suggestionId && (

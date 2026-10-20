@@ -119,7 +119,7 @@ export default function AccountRoute() {
           </CardBody>
         </Card>
         <Card className="lg:col-span-2">
-          <CardHeader title={t('theme.title')} description={t('theme.hint')} />
+          <CardHeader title={t('theme.title')} description={t('theme.hint')} descriptionAsTip />
           <CardBody>
             <ThemePicker />
           </CardBody>

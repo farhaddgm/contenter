@@ -93,6 +93,7 @@ export function NotesCard({
           </span>
         }
         description={t('businesses.notes.hint')}
+        descriptionAsTip
       />
       <CardBody className="space-y-4">
         {running && (

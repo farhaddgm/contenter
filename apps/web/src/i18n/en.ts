@@ -1714,6 +1714,7 @@ export const en: DeepStrings<Dictionary> = {
     profile: 'Business profile',
     profileHint:
       'Write each section yourself or ask AI for a suggestion; AI builds on everything recorded so far and nothing is applied until you accept it.',
+    aiNoteTitle: 'Used by AI jobs',
     aiNote:
       'This profile is sent to every AI job of the linked projects (analysis, style profile, ideas, generation and revision).',
     sectionHints: {

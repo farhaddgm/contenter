@@ -98,6 +98,7 @@ function BrandDocForm({
       onOpenChange={onOpenChange}
       title={doc ? t('brandDocs.edit') : t('brandDocs.add')}
       description={t('brandDocs.subtitle')}
+      descriptionAsTip
       className="max-w-3xl"
       footer={
         <>

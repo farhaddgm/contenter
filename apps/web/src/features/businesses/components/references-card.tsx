@@ -223,6 +223,7 @@ function AddReferenceDialog({
       onOpenChange={onOpenChange}
       title={t('businesses.references.addTitle')}
       description={t('businesses.references.addSubtitle')}
+      descriptionAsTip
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -442,6 +443,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
       <CardHeader
         title={t('businesses.references.title')}
         description={t('businesses.references.hint')}
+        descriptionAsTip
         actions={
           editable && (
             <Button size="sm" variant="outline" icon={<Plus />} onClick={() => setAddOpen(true)}>

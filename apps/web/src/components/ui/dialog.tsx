@@ -2,6 +2,7 @@ import { Dialog as D } from 'radix-ui';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useT } from '@/i18n';
+import { InfoTip } from './info-tip';
 import { cn } from '@/utils/cn';
 
 interface BaseProps {
@@ -9,6 +10,8 @@ interface BaseProps {
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
   description?: ReactNode;
+  /** Show the description in an "i" popup next to the title (pure explanations only). */
+  descriptionAsTip?: boolean;
   children?: ReactNode;
   footer?: ReactNode;
   className?: string;
@@ -16,12 +19,22 @@ interface BaseProps {
 
 const overlay = 'fixed inset-0 z-50 animate-fade-in bg-[#2a1a0a]/50 backdrop-blur-[3px]';
 
-function Header({ title, description }: Pick<BaseProps, 'title' | 'description'>) {
+function Header({
+  title,
+  description,
+  descriptionAsTip,
+}: Pick<BaseProps, 'title' | 'description' | 'descriptionAsTip'>) {
+  const tip = !!description && descriptionAsTip;
   return (
     <div className="space-y-1 pe-8">
-      <D.Title className="text-lg font-bold leading-snug">{title}</D.Title>
+      <D.Title className="flex items-center gap-2 text-lg font-bold leading-snug">
+        {title}
+        {tip ? <InfoTip>{description}</InfoTip> : null}
+      </D.Title>
       {description ? (
-        <D.Description className="text-sm text-muted-foreground">{description}</D.Description>
+        <D.Description className={tip ? 'sr-only' : 'text-sm text-muted-foreground'}>
+          {description}
+        </D.Description>
       ) : (
         <D.Description className="sr-only">{typeof title === 'string' ? title : ''}</D.Description>
       )}
@@ -45,6 +58,7 @@ export function Dialog({
   onOpenChange,
   title,
   description,
+  descriptionAsTip,
   children,
   footer,
   className,
@@ -59,7 +73,7 @@ export function Dialog({
             className,
           )}
         >
-          <Header title={title} description={description} />
+          <Header title={title} description={description} descriptionAsTip={descriptionAsTip} />
           <div className="-mx-1 overflow-y-auto px-1">{children}</div>
           {footer && <div className="flex flex-wrap justify-end gap-2">{footer}</div>}
           <CloseButton />
@@ -75,6 +89,7 @@ export function Drawer({
   onOpenChange,
   title,
   description,
+  descriptionAsTip,
   children,
   footer,
   className,
@@ -90,7 +105,7 @@ export function Drawer({
           )}
         >
           <div className="border-b px-6 py-5">
-            <Header title={title} description={description} />
+            <Header title={title} description={description} descriptionAsTip={descriptionAsTip} />
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
           {footer && (

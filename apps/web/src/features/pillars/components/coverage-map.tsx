@@ -36,6 +36,7 @@ export function CoverageMap({ businessId }: { businessId: string }) {
           </span>
         }
         description={t('coverage.subtitle')}
+        descriptionAsTip
         actions={
           <div className="flex flex-wrap gap-2">
             <Select

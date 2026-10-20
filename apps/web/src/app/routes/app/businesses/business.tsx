@@ -24,6 +24,7 @@ import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { InfoTip, TitleWithTip } from '@/components/ui/info-tip';
 import { PageHeader, Segmented } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { paths } from '@/config/paths';
@@ -79,6 +80,15 @@ export default function BusinessRoute() {
   );
   const [allSources, setAllSources] = useState(false);
   const [tab, setTab] = useState<Tab>('profile');
+  /** Profile sections the user expanded; every section starts collapsed. */
+  const [openSections, setOpenSections] = useState<ReadonlySet<BusinessSectionKey>>(new Set());
+  const setSectionOpen = (key: BusinessSectionKey, open: boolean) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   const facts = useFacts(businessId);
   const terms = useTerms(businessId);
   const assets = useAssets(businessId);
@@ -119,6 +129,8 @@ export default function BusinessRoute() {
   /** Opens the profile tab and scrolls to a section (or another anchor) once it is rendered. */
   const jumpTo = (anchor: string) => {
     setTab('profile');
+    const key = BusinessSectionKey.find((k) => `section-${k}` === anchor);
+    if (key) setSectionOpen(key, true);
     requestAnimationFrame(() =>
       document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     );
@@ -298,10 +310,11 @@ export default function BusinessRoute() {
                   disabled={building}
                   onJump={(key) => jumpTo(`section-${key}`)}
                 />
-                <div>
-                  <h2 className="text-lg font-semibold">{t('businesses.profile')}</h2>
-                  <p className="text-sm text-muted-foreground">{t('businesses.profileHint')}</p>
-                </div>
+                <h2 className="text-lg font-semibold">
+                  <TitleWithTip tip={t('businesses.profileHint')}>
+                    {t('businesses.profile')}
+                  </TitleWithTip>
+                </h2>
                 <nav
                   aria-label={t('businesses.toc')}
                   className="flex flex-wrap gap-x-4 gap-y-2 rounded-xl border bg-card px-4 py-3 text-xs"
@@ -353,6 +366,8 @@ export default function BusinessRoute() {
                         editable={editable}
                         suggesting={suggestTracker.isRunning && !!suggestJob?.keys.includes(key)}
                         onSuggest={(k) => setSuggestKeys([k])}
+                        open={openSections.has(key)}
+                        onOpenChange={(open) => setSectionOpen(key, open)}
                       />
                     ))}
                   </section>
@@ -407,8 +422,10 @@ export default function BusinessRoute() {
                     {t('businesses.researchedAt', { date: formatDate(business.researchedAt) })}
                   </p>
                 )}
-                <p className="rounded-md bg-primary/5 px-3 py-2 text-xs leading-6 text-primary">
-                  {t('businesses.aiNote')}
+                <p className="flex items-center gap-1.5 text-xs text-primary">
+                  <Sparkles className="size-3.5" />
+                  {t('businesses.aiNoteTitle')}
+                  <InfoTip>{t('businesses.aiNote')}</InfoTip>
                 </p>
               </CardBody>
             </Card>

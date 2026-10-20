@@ -36,6 +36,7 @@ export function PillarsCard({ businessId }: { businessId: string }) {
           </span>
         }
         description={t('coverage.pillars.hint', { max: PILLAR_MAX })}
+        descriptionAsTip
       />
       {isLoading || !data ? (
         <CardBody className="flex justify-center py-6">

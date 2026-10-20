@@ -115,6 +115,7 @@ function AddAssetDialog({
       onOpenChange={onOpenChange}
       title={t('businesses.assets.addTitle')}
       description={t('businesses.assets.addSubtitle')}
+      descriptionAsTip
       className="max-w-2xl"
       footer={
         <>
@@ -473,6 +474,7 @@ export function AssetsPanel({ businessId }: { businessId: string }) {
       <CardHeader
         title={t('businesses.assets.title')}
         description={t('businesses.assets.hint')}
+        descriptionAsTip
         actions={
           editable && (
             <Button size="sm" icon={<Plus />} onClick={() => setAddOpen(true)}>

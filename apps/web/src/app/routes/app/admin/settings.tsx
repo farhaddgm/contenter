@@ -132,7 +132,11 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
       <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
         <div className="space-y-6">
           <Card className="h-fit">
-            <CardHeader title={t('settings.providers')} description={t('settings.providersHint')} />
+            <CardHeader
+              title={t('settings.providers')}
+              description={t('settings.providersHint')}
+              descriptionAsTip
+            />
             <CardBody className="space-y-4">
               <ul className="space-y-2">
                 {data.providers.map((p) => (
@@ -226,7 +230,11 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
           />
         </div>
         <Card>
-          <CardHeader title={t('jobs.title')} description={t('settings.effortHint')} />
+          <CardHeader
+            title={t('jobs.title')}
+            description={t('settings.effortHint')}
+            descriptionAsTip
+          />
           <div className="hidden gap-3 border-b bg-muted/60 px-5 py-2.5 text-xs font-bold text-muted-foreground sm:grid sm:grid-cols-[1fr_18rem_8rem]">
             <span>{t('settings.jobKind')}</span>
             <span>{t('settings.modelFor')}</span>

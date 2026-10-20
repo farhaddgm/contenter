@@ -62,6 +62,7 @@ export function FromSourcesDialog({ onOpenChange }: { onOpenChange: (v: boolean)
       onOpenChange={onOpenChange}
       title={t('businesses.fromSources.title')}
       description={t('businesses.fromSources.subtitle')}
+      descriptionAsTip
       className="max-w-2xl"
       footer={
         <>

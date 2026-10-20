@@ -54,7 +54,11 @@ export function AiContextCard({ topicId }: { topicId: string }) {
 
   return (
     <Card>
-      <CardHeader title={t('aiContext.title')} description={t('aiContext.subtitle')} />
+      <CardHeader
+        title={t('aiContext.title')}
+        description={t('aiContext.subtitle')}
+        descriptionAsTip
+      />
       <ul className="grid gap-1 p-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Source
           icon={<Building2 />}

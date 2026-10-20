@@ -153,6 +153,7 @@ export function AuditCard({
           </span>
         }
         description={audit ? undefined : t('businesses.audit.hint')}
+        descriptionAsTip
         actions={
           editable &&
           !running && (

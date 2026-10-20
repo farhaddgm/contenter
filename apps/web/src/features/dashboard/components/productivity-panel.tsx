@@ -40,6 +40,7 @@ export function ProductivityPanel() {
       <CardHeader
         title={t('productivity.title')}
         description={t('productivity.subtitle')}
+        descriptionAsTip
         actions={
           <div className="flex flex-wrap gap-2">
             <Select

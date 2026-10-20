@@ -46,6 +46,7 @@ export function DiscoverDialog({ onOpenChange }: { onOpenChange: (v: boolean) =>
       onOpenChange={onOpenChange}
       title={t('businesses.discover.title')}
       description={t('businesses.discover.subtitle')}
+      descriptionAsTip
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

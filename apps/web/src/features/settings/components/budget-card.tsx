@@ -55,6 +55,7 @@ export function BudgetCard() {
           </span>
         }
         description={t('settings.budget.subtitle')}
+        descriptionAsTip
       />
       <CardBody>{!data ? <Spinner /> : <BudgetForm data={data} />}</CardBody>
     </Card>
@@ -67,7 +68,9 @@ function BudgetForm({ data }: { data: BudgetResponse }) {
   const save = useUpdateBudget();
   const options = useBusinessOptions();
   const [form, setForm] = useState<BudgetSettings>(data.settings);
-  const [cap, setCap] = useState(data.settings.monthlyUsd === null ? '' : String(data.settings.monthlyUsd));
+  const [cap, setCap] = useState(
+    data.settings.monthlyUsd === null ? '' : String(data.settings.monthlyUsd),
+  );
   const [addId, setAddId] = useState('');
   const u = data.usage;
 
@@ -80,7 +83,10 @@ function BudgetForm({ data }: { data: BudgetResponse }) {
       return { ...f, businesses };
     });
 
-  const listed = new Set([...u.byBusiness.map((b) => b.businessId), ...Object.keys(form.businesses)]);
+  const listed = new Set([
+    ...u.byBusiness.map((b) => b.businessId),
+    ...Object.keys(form.businesses),
+  ]);
   const addable = (options.data ?? []).filter((b) => !listed.has(b.id));
   const nameOf = (id: string) =>
     u.byBusiness.find((b) => b.businessId === id)?.name ??
@@ -92,9 +98,7 @@ function BudgetForm({ data }: { data: BudgetResponse }) {
     <div className="space-y-6">
       <div className="space-y-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-          <span className="font-medium">
-            {t('settings.budget.thisMonth', { label: u.label })}
-          </span>
+          <span className="font-medium">{t('settings.budget.thisMonth', { label: u.label })}</span>
           <span className="tabular-nums" dir="ltr">
             {formatUsd(u.spentUsd)}
             {u.capUsd !== null && ` / ${formatUsd(u.capUsd)}`}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AlertCircle, CheckCircle2, ChevronDown, Circle } from 'lucide-react';
 import type { BusinessHealth, HealthCheck } from '@contenter/shared';
 import { Card, CardBody } from '@/components/ui/card';
+import { InfoTip } from '@/components/ui/info-tip';
 import { useT } from '@/i18n';
 import { cn } from '@/utils/cn';
 import { formatNumber } from '@/utils/format';
@@ -64,7 +65,10 @@ export function HealthCard({
             </div>
           </div>
           <div className="min-w-0">
-            <p className="font-semibold">{t('businesses.health.title')}</p>
+            <p className="flex items-center gap-1.5 font-semibold">
+              {t('businesses.health.title')}
+              <InfoTip>{t('businesses.health.hint')}</InfoTip>
+            </p>
             <p className="text-xs text-muted-foreground">
               {t('businesses.completeness', {
                 filled: formatNumber(health.filled),
@@ -73,7 +77,6 @@ export function HealthCard({
             </p>
           </div>
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">{t('businesses.health.hint')}</p>
 
         {pending.length > 0 && (
           <div>

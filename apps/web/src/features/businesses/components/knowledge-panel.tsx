@@ -76,6 +76,7 @@ function FactsCard({ businessId }: { businessId: string }) {
           </span>
         }
         description={t('businesses.facts.hint')}
+        descriptionAsTip
         actions={
           editable && (
             <Button size="sm" icon={<Plus />} onClick={() => setEditing('new')}>
@@ -371,6 +372,7 @@ function TermsCard({ businessId }: { businessId: string }) {
           </span>
         }
         description={t('businesses.terms.hint')}
+        descriptionAsTip
       />
       <CardBody className="space-y-4">
         {editable && (
