@@ -28,6 +28,7 @@ export function NotificationPreferencesCard() {
           </span>
         }
         description={t('inbox.preferences.subtitle')}
+        descriptionAsTip
       />
       <CardBody className="space-y-4">
         {!data ? (

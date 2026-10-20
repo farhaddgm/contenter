@@ -3,6 +3,7 @@ import { BookOpen, FileText, Globe, Link2, Plus, SearchCheck } from 'lucide-reac
 import type { BusinessReference, ResearchScope } from '@contenter/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/form-controls';
+import { InfoTip } from '@/components/ui/info-tip';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -50,30 +51,28 @@ export function ScopePicker({
       {scopes.map((s) => {
         const Icon = ICON[s];
         return (
-          <label
+          <div
             key={s}
             className={cn(
-              'flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 text-sm transition',
+              'flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm transition',
               value.scope === s ? 'border-primary bg-primary/5' : 'hover:bg-muted',
             )}
           >
-            <input
-              type="radio"
-              name={group}
-              className="mt-1 accent-primary"
-              checked={value.scope === s}
-              onChange={() => onChange({ ...value, scope: s })}
-            />
-            <span className="min-w-0">
+            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+              <input
+                type="radio"
+                name={group}
+                className="accent-primary"
+                checked={value.scope === s}
+                onChange={() => onChange({ ...value, scope: s })}
+              />
               <span className="flex items-center gap-1.5 font-medium">
                 <Icon className="size-4 text-muted-foreground" />
                 {t(`businesses.scope.${s}`)}
               </span>
-              <span className="block text-xs leading-5 text-muted-foreground">
-                {t(`businesses.scope.${s}Hint`)}
-              </span>
-            </span>
-          </label>
+            </label>
+            <InfoTip>{t(`businesses.scope.${s}Hint`)}</InfoTip>
+          </div>
         );
       })}
       {businessId && value.scope !== 'NONE' && (

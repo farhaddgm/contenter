@@ -50,6 +50,7 @@ export function ApiKeysCard() {
           </span>
         }
         description={t('apiKeys.subtitle', { max: formatNumber(API_KEY_MAX_ACTIVE) })}
+        descriptionAsTip
         actions={
           <Button
             size="sm"

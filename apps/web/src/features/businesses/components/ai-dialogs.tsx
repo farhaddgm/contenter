@@ -82,6 +82,7 @@ export function SuggestDialog({
       onOpenChange={onOpenChange}
       title={t('businesses.suggest.title')}
       description={t('businesses.suggest.subtitle')}
+      descriptionAsTip
       className="max-w-2xl"
       footer={
         <>
@@ -182,6 +183,7 @@ export function BuildDialog({
       onOpenChange={onOpenChange}
       title={t('businesses.buildTitle')}
       description={t('businesses.buildBody')}
+      descriptionAsTip
       className="max-w-2xl"
       footer={
         <>

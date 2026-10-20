@@ -69,6 +69,7 @@ export function EditLearningPanel({ topicId }: { topicId: string }) {
       <CardHeader
         title={t('editLearning.title')}
         description={t('editLearning.subtitle')}
+        descriptionAsTip
         actions={
           canEdit && (
             <Button

@@ -24,6 +24,7 @@ export function FeedbackSummaryCard() {
           </span>
         }
         description={t('feedback.summary.subtitle')}
+        descriptionAsTip
         actions={
           <Select
             aria-label={t('feedback.summary.title')}

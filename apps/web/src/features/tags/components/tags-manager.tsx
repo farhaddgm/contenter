@@ -123,6 +123,7 @@ export function TagsManager({ topicId }: { topicId: string }) {
           </span>
         }
         description={t('tags.subtitle')}
+        descriptionAsTip
         actions={
           editable && (
             <Button

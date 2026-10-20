@@ -240,6 +240,7 @@ export function BlocklistDialog({ onOpenChange }: { onOpenChange: (v: boolean) =
       onOpenChange={onOpenChange}
       title={t('businesses.blocklist.title')}
       description={t('businesses.blocklist.subtitle')}
+      descriptionAsTip
       className="max-w-2xl"
     >
       <div className="space-y-5">

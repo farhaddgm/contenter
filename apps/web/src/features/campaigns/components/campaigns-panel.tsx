@@ -251,6 +251,7 @@ export function CampaignsPanel({ topicId }: { topicId: string }) {
           </span>
         }
         description={t('campaigns.subtitle')}
+        descriptionAsTip
         actions={
           <>
             {archivedCount > 0 && (

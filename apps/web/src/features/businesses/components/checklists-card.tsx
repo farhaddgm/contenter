@@ -49,6 +49,7 @@ export function ChecklistsCard({ businessId }: { businessId: string }) {
           </span>
         }
         description={t('businesses.checklists.hint')}
+        descriptionAsTip
       />
       {/* keyed by what is saved, so a save (or another editor's change) resets the form without an effect */}
       <ChecklistsForm key={JSON.stringify(data)} businessId={businessId} saved={data} />
