@@ -461,6 +461,15 @@ export const en: DeepStrings<Dictionary> = {
       invalid: 'Enter a number from 1 to 3.',
     },
   },
+  stale: {
+    title: 'Stale content',
+    subtitle:
+      'Approved or published content that no longer matches the current key facts of the brand: a number that changed or a fact that expired. Found by code; nothing is changed.',
+    none: '{{count}} contents checked; none clashes with the current facts.',
+    nothingToCheck: 'No key facts recorded yet, or no approved content.',
+    truncated: 'Only the newest contents were checked.',
+    published: 'Published {{date}}',
+  },
   coverage: {
     title: 'Content coverage map',
     subtitle:
@@ -1023,6 +1032,10 @@ export const en: DeepStrings<Dictionary> = {
         LATIN_PUNCTUATION: '{{count}} Latin commas, semicolons or question marks in Persian text.',
         SPACE_BEFORE_PUNCTUATION: '{{count}} spaces before punctuation.',
         DOUBLE_SPACE: '{{count}} double spaces.',
+        REGISTER_COLLOQUIAL:
+          'The brand is "formal" but {{count}} spoken words appear (e.g. "{{example}}").',
+        REGISTER_STIFF:
+          'The brand is "casual" but {{count}} stiff, bureaucratic phrases appear (e.g. "{{example}}").',
       },
     },
     score: 'Score',
@@ -1066,7 +1079,8 @@ export const en: DeepStrings<Dictionary> = {
       COMMENT_REPLIED: 'For those who commented in the same thread.',
       CONTENT_DUE: 'For the creator, the sender and the approver of a scheduled approved content.',
       BACKUP_VERIFY_FAILED: 'For admins: the weekly backup restore check (docs/13) failed.',
-      AI_FALLBACK_USED: 'For admins: the main model was unavailable (credit, key or outage) and the fallback took over.',
+      AI_FALLBACK_USED:
+        'For admins: the main model was unavailable (credit, key or outage) and the fallback took over.',
       AI_BUDGET_WARNING: 'For admins: AI spending this month reached the warning level.',
       AI_BUDGET_EXCEEDED: 'For admins: the monthly AI cap is used up.',
     },
@@ -1157,6 +1171,22 @@ export const en: DeepStrings<Dictionary> = {
     },
   },
   calendar: {
+    occasion: {
+      ideate: 'Ideas for this occasion',
+      pickTopic: 'Which project should the ideas go to?',
+      holiday: 'Official holiday',
+      approximate:
+        "This date is computed from the lunar calendar and can differ by a day or two from the official one; check it against this year's official calendar before planning.",
+      mourningHint: 'A day of mourning: no promotions, discounts, jokes or cheerful emoji.',
+      tone: { CELEBRATION: 'Festive', MOURNING: 'Mourning', NEUTRAL: 'Neutral' },
+      kind: {
+        NATIONAL: 'National',
+        RELIGIOUS: 'Religious',
+        SEASONAL: 'Seasonal',
+        PROFESSION: 'Professional day',
+        COMMERCIAL: 'Commercial',
+      },
+    },
     title: 'Content calendar',
     subtitle: 'The publishing plan of approved contents. Drag a content to another day to move it.',
     month: 'Month',
@@ -1703,6 +1733,10 @@ export const en: DeepStrings<Dictionary> = {
       website: 'Website',
       location: 'Location (city / country)',
       language: 'Main content language',
+      register: 'Language register',
+      registers: { NONE: 'Not set', FORMAL: 'Formal', STANDARD: 'Standard', CASUAL: 'Casual' },
+      registerHint:
+        'Formal, standard or casual; the AI is told, and texts are checked against a fixed word list (a note only, never a block).',
     },
     archive: 'Archive',
     unarchive: 'Activate',

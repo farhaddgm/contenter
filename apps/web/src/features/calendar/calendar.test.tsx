@@ -200,4 +200,27 @@ describe('CalendarView', () => {
     );
     expect(within(dialog).getByDisplayValue('2026-10-10T09:30')).toBeVisible();
   });
+  it('shows the occasions of the month and offers ideas for one', async () => {
+    vi.setSystemTime(new Date(2027, 2, 21, 12, 0));
+    renderView();
+    const chip = within(cell('2027-03-21')).getByTestId('occasion-chip');
+    expect(chip).toHaveTextContent('نوروز');
+    await userEvent.click(chip);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('ایده برای این مناسبت')).toBeVisible();
+    // no project picked yet: nothing to link to
+    expect(within(dialog).queryByRole('link')).toBeNull();
+  });
+
+  it('warns on a day of mourning', async () => {
+    vi.setSystemTime(new Date(2026, 5, 25, 12, 0));
+    renderView();
+    const chips = screen.getAllByTestId('occasion-chip');
+    const ashura = chips.find((c) => c.textContent?.includes('عاشورا'));
+    expect(ashura).toBeDefined();
+    await userEvent.click(ashura!);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/تبلیغ، تخفیف/)).toBeVisible();
+    expect(within(dialog).getByText(/ممکن است یک یا دو روز/)).toBeVisible();
+  });
 });

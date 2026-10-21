@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
   analyzeReadability,
+  asRegister,
   checkContentQuality,
   checkTerms,
   ContentListQuerySchema,
@@ -145,6 +146,7 @@ export class ContentsService {
       select: {
         business: {
           select: {
+            register: true,
             terms: { where: { isActive: true } },
             facts: { where: { isActive: true } },
           },
@@ -164,6 +166,7 @@ export class ContentsService {
       format: c.format,
       terms,
       facts: topic?.business?.facts ?? [],
+      register: asRegister(topic?.business?.register),
     });
     return {
       ...c,

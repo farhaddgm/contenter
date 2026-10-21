@@ -1,12 +1,26 @@
 import { useMemo, useState, type DragEvent } from 'react';
 import { Link } from 'react-router';
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, GripVertical } from 'lucide-react';
-import { calendarMomentOf, type CalendarItem, type CalendarState } from '@contenter/shared';
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  GripVertical,
+  Lightbulb,
+} from 'lucide-react';
+import {
+  calendarMomentOf,
+  occasionDirection,
+  occasionsBetween,
+  type CalendarItem,
+  type CalendarState,
+  type Occasion,
+} from '@contenter/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
-import { Select } from '@/components/ui/form-controls';
+import { Field, Select } from '@/components/ui/form-controls';
 import { PageHeader, Segmented } from '@/components/ui/misc';
 import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
@@ -94,9 +108,35 @@ function ItemChip({
   );
 }
 
+/** An occasion of the day: red for mourning days, so nobody schedules a promotion there. */
+function OccasionChip({ occasion, onOpen }: { occasion: Occasion; onOpen: (o: Occasion) => void }) {
+  const lang = useUi((s) => s.lang);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(occasion)}
+      data-testid="occasion-chip"
+      title={lang === 'fa' ? occasion.fa : occasion.en}
+      className={cn(
+        'w-full truncate rounded px-1 py-0.5 text-start text-[10px] leading-4',
+        occasion.tone === 'MOURNING'
+          ? 'bg-destructive/10 text-destructive'
+          : occasion.holiday
+            ? 'bg-warning/15 text-foreground'
+            : 'bg-muted text-muted-foreground',
+      )}
+    >
+      {lang === 'fa' ? occasion.fa : occasion.en}
+      {occasion.approximate ? ' ~' : ''}
+    </button>
+  );
+}
+
 function DayCell({
   day,
   items,
+  occasions,
+  onOccasion,
   isToday,
   limit,
   onOpen,
@@ -105,6 +145,8 @@ function DayCell({
 }: {
   day: GridDay;
   items: CalendarItem[];
+  occasions: Occasion[];
+  onOccasion: (o: Occasion) => void;
   isToday: boolean;
   limit: number;
   onOpen: (item: CalendarItem) => void;
@@ -145,6 +187,9 @@ function DayCell({
       >
         {formatNumber(day.day)}
       </span>
+      {occasions.map((o) => (
+        <OccasionChip key={o.id} occasion={o} onOpen={onOccasion} />
+      ))}
       {shown.map((item) => (
         <ItemChip key={item.id} item={item} onOpen={onOpen} />
       ))}
@@ -208,6 +253,70 @@ function ItemDialog({ item, onClose }: { item: CalendarItem; onClose: () => void
   );
 }
 
+/** Details of an occasion, with a link that starts ideas for it on a project (docs/61). */
+function OccasionDialog({ occasion, onClose }: { occasion: Occasion; onClose: () => void }) {
+  const t = useT();
+  const lang = useUi((s) => s.lang);
+  const [topicId, setTopicId] = useState('');
+  const { data: topics } = useTopics({ page: 1, pageSize: 100, status: 'ACTIVE' });
+  const href = topicId
+    ? `${paths.app.topic.getHref(topicId, 'ideas')}?direction=${encodeURIComponent(occasionDirection(occasion))}`
+    : '';
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={lang === 'fa' ? occasion.fa : occasion.en}
+      description={formatDate(new Date(`${occasion.date}T12:00:00`))}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            {t('common.close')}
+          </Button>
+          <Button asChild={!!href} disabled={!href} icon={<Lightbulb />}>
+            {href ? (
+              <Link to={href}>{t('calendar.occasion.ideate')}</Link>
+            ) : (
+              t('calendar.occasion.ideate')
+            )}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={occasion.tone === 'MOURNING' ? 'danger' : 'outline'}>
+            {t(`calendar.occasion.tone.${occasion.tone}`)}
+          </Badge>
+          {occasion.holiday && <Badge tone="primary">{t('calendar.occasion.holiday')}</Badge>}
+          <Badge tone="outline">{t(`calendar.occasion.kind.${occasion.kind}`)}</Badge>
+        </div>
+        {occasion.tone === 'MOURNING' && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs leading-5">
+            {t('calendar.occasion.mourningHint')}
+          </p>
+        )}
+        {occasion.approximate && (
+          <p className="rounded-md bg-warning/10 px-3 py-2 text-xs leading-5">
+            {t('calendar.occasion.approximate')}
+          </p>
+        )}
+        <Field label={t('calendar.occasion.pickTopic')}>
+          {(id) => (
+            <Select
+              id={id}
+              placeholder="—"
+              value={topicId}
+              onChange={(e) => setTopicId(e.target.value)}
+              options={(topics?.items ?? []).map((tp) => ({ value: tp.id, label: tp.title }))}
+            />
+          )}
+        </Field>
+      </div>
+    </Dialog>
+  );
+}
+
 /** The content calendar: month or week, Jalali in Persian, with drag-to-reschedule. */
 export function CalendarView() {
   const t = useT();
@@ -219,6 +328,7 @@ export function CalendarView() {
   const [campaignId, setCampaignId] = useState('');
   // the dialog shows the live item, so a plan saved inside it is reflected right away
   const [openedId, setOpenedId] = useState<string | null>(null);
+  const [occasion, setOccasion] = useState<Occasion | null>(null);
   const schedule = useScheduleAny();
   const { data: topics } = useTopics({ page: 1, pageSize: 100, status: 'ACTIVE' });
   const { data: campaigns } = useCampaigns(topicId || undefined);
@@ -245,6 +355,14 @@ export function CalendarView() {
     }
     return map;
   }, [data]);
+  // occasions come from code (shared), per local day of the grid
+  const occasionsByDay = useMemo(() => {
+    const map = new Map<string, Occasion[]>();
+    for (const o of occasionsBetween(dayKey(grid.from), dayKey(addDays(grid.to, -1)))) {
+      map.set(o.date, [...(map.get(o.date) ?? []), o]);
+    }
+    return map;
+  }, [grid]);
   const known = useMemo(
     () => new Map([...(data?.items ?? []), ...(data?.ready ?? [])].map((i) => [i.id, i])),
     [data],
@@ -364,6 +482,8 @@ export function CalendarView() {
                     key={day.key}
                     day={day}
                     items={byDay.get(day.key) ?? []}
+                    occasions={occasionsByDay.get(day.key) ?? []}
+                    onOccasion={setOccasion}
                     isToday={day.key === today}
                     limit={view === 'month' ? MONTH_CELL_LIMIT : 20}
                     onOpen={(i) => setOpenedId(i.id)}
@@ -418,6 +538,7 @@ export function CalendarView() {
       </div>
 
       {opened && <ItemDialog item={opened} onClose={() => setOpenedId(null)} />}
+      {occasion && <OccasionDialog occasion={occasion} onClose={() => setOccasion(null)} />}
     </>
   );
 }

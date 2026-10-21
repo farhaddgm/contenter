@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { AccessLevel } from './enums';
 import { PaginationQuerySchema, patchOf } from './schemas';
 import { InstagramManualSchema, type ReferenceAnalysis } from './social';
+import { LanguageRegisterSchema, type LanguageRegister } from './register-enum';
 
 // ---------- enums ----------
 
@@ -256,6 +257,8 @@ export const CreateBusinessSchema = z.object({
   website: optionalUrl,
   location: z.string().trim().max(200).optional().default(''),
   language: z.string().trim().min(2).max(10).default('fa'),
+  /** Formal / standard / casual Persian; null clears it (docs/61). */
+  register: LanguageRegisterSchema.nullable().optional(),
 });
 export type CreateBusinessInput = z.input<typeof CreateBusinessSchema>;
 
@@ -489,6 +492,7 @@ export interface Business {
   website: string;
   location: string;
   language: string;
+  register: LanguageRegister | null;
   keyword: string | null;
   status: BusinessStatus;
   origin: BusinessOrigin;

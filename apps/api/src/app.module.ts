@@ -20,6 +20,7 @@ import { ExportModule } from './modules/export/export.module';
 import { StyleFitModule } from './modules/style-fit/style-fit.module';
 import { VariantsModule } from './modules/variants/variants.module';
 import { CoverageModule } from './modules/pillars/coverage.module';
+import { StaleModule } from './modules/stale/stale.module';
 import { GoldenModule } from './modules/golden/golden.module';
 import { SimilarityModule } from './modules/similarity/similarity.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
@@ -75,6 +76,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     SimilarityModule,
     GoldenModule,
     CoverageModule,
+    StaleModule,
     VariantsModule,
     StyleFitModule,
     ExportModule,

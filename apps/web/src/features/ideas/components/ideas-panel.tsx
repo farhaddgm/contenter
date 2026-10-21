@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Lightbulb, PenLine, RotateCcw, Sparkles, Star, ThumbsDown, Trash2 } from 'lucide-react';
 import { ContentFormat, IdeaSort, type Idea, type IdeaStatus } from '@contenter/shared';
 import { Badge, statusTone } from '@/components/ui/badge';
@@ -28,8 +29,11 @@ function IdeateDialog({
   open,
   onOpenChange,
   onQueued,
+  initialDirection = '',
 }: {
   topicId: string;
+  /** From the occasions calendar (`?direction=`), docs/61. */
+  initialDirection?: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onQueued: (jobId: string) => void;
@@ -37,7 +41,7 @@ function IdeateDialog({
   const t = useT();
   const ideate = useIdeate(topicId);
   const [count, setCount] = useState(5);
-  const [direction, setDirection] = useState('');
+  const [direction, setDirection] = useState(initialDirection);
   const [format, setFormat] = useState('');
   return (
     <Dialog
@@ -248,7 +252,10 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
   const [sort, setSort] = useState<IdeaSort>('newest');
   const [jobId, setJobId] = useState<string | null>(null);
   const [writeIdea, setWriteIdea] = useState<Idea | null>(null);
-  const ideateDialog = useDisclosure();
+  // the occasions calendar links here with the direction already written
+  const [params, setParams] = useSearchParams();
+  const presetDirection = params.get('direction') ?? '';
+  const ideateDialog = useDisclosure(!!presetDirection);
   const writeDialog = useDisclosure();
   const tags = useTags(topicId);
   const { data, isLoading } = useIdeas(topicId, {
@@ -368,7 +375,11 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
       <IdeateDialog
         topicId={topicId}
         open={ideateDialog.isOpen}
-        onOpenChange={ideateDialog.setIsOpen}
+        initialDirection={presetDirection}
+        onOpenChange={(v) => {
+          ideateDialog.setIsOpen(v);
+          if (!v && presetDirection) setParams({}, { replace: true });
+        }}
         onQueued={setJobId}
       />
       {writeDialog.isOpen && (

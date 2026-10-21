@@ -157,6 +157,8 @@ model Business {
   website      String             @default("")
   location     String             @default("")
   language     String             @default("fa")
+  /// Language register (FORMAL / STANDARD / CASUAL, shared LanguageRegister); null = not set (docs/61)
+  register     String?
   /// Keyword of the discovery this business was built from
   keyword      String?
   status       BusinessStatus     @default(ACTIVE)

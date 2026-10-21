@@ -50,6 +50,7 @@ import { HealthCard } from '@/features/businesses/components/health-card';
 import { KnowledgePanel } from '@/features/businesses/components/knowledge-panel';
 import { useDriveResultNotice } from '@/features/businesses/components/google-drive-card';
 import { CoverageMap } from '@/features/pillars/components/coverage-map';
+import { StaleCard } from '@/features/stale/components/stale-card';
 import { PillarsCard } from '@/features/pillars/components/pillars-card';
 import { GoldenExamplesCard } from '@/features/golden/components/golden-examples-card';
 import { ChecklistsCard } from '@/features/businesses/components/checklists-card';
@@ -293,6 +294,7 @@ export default function BusinessRoute() {
             {tab === 'coverage' && (
               <>
                 <CoverageMap businessId={business.id} />
+                <StaleCard businessId={business.id} />
                 <PillarsCard businessId={business.id} />
               </>
             )}
