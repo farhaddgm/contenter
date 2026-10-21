@@ -45,7 +45,13 @@ describe('platform limits', () => {
 
   it('flags a text over the platform limit, counting body, call to action and hashtags', () => {
     const report = checkContentQuality(
-      base({ platform: 'INSTAGRAM', format: 'CAPTION', body: 'ا'.repeat(2190), cta: 'بخرید', hashtags: ['a', 'b'] }),
+      base({
+        platform: 'INSTAGRAM',
+        format: 'CAPTION',
+        body: 'ا'.repeat(2190),
+        cta: 'بخرید',
+        hashtags: ['a', 'b'],
+      }),
     );
     const issue = report.issues.find((i) => i.code === 'LENGTH_OVER');
     expect(issue?.params).toMatchObject({ max: 2200 });
@@ -55,7 +61,9 @@ describe('platform limits', () => {
   it('accepts a text exactly at the limit', () => {
     const r = checkContentQuality(base({ platform: 'X', format: 'POST', body: 'ا'.repeat(280) }));
     expect(r.issues.map((i) => i.code)).not.toContain('LENGTH_OVER');
-    const over = checkContentQuality(base({ platform: 'X', format: 'POST', body: 'ا'.repeat(281) }));
+    const over = checkContentQuality(
+      base({ platform: 'X', format: 'POST', body: 'ا'.repeat(281) }),
+    );
     expect(over.issues.map((i) => i.code)).toContain('LENGTH_OVER');
   });
 
@@ -110,7 +118,9 @@ describe('key facts', () => {
   const fact = { label: 'قیمت اشتراک ماهانه', value: '۵۰۰ هزار تومان' };
 
   it('flags a sentence about a fact that quotes a different number', () => {
-    const r = checkContentQuality(base({ body: 'قیمت اشتراک ماهانه ۴۰۰ هزار تومان است.', facts: [fact] }));
+    const r = checkContentQuality(
+      base({ body: 'قیمت اشتراک ماهانه ۴۰۰ هزار تومان است.', facts: [fact] }),
+    );
     const issue = r.issues.find((i) => i.code === 'FACT_NUMBER_MISMATCH');
     expect(issue).toBeDefined();
     expect(issue?.params).toMatchObject({ label: fact.label, expected: fact.value });
@@ -173,7 +183,9 @@ describe('Persian typography', () => {
   });
 
   it('leaves correct text and longer words alone', () => {
-    expect(persianTypographyIssues('می‌کنیم، کتاب‌ها، بزرگ‌تر. او اسلامی است و می‌داند.')).toEqual([]);
+    expect(persianTypographyIssues('می‌کنیم، کتاب‌ها، بزرگ‌تر. او اسلامی است و می‌داند.')).toEqual(
+      [],
+    );
   });
 
   it('finds Arabic letters and Latin punctuation, with the replacement', () => {
@@ -236,5 +248,39 @@ describe('report', () => {
     expect(checkContentQuality(input)).toEqual(a);
     expect(a.rules.confidence).toBe('official');
     expect(a.length).toBeGreaterThan(0);
+  });
+});
+
+describe('language register', () => {
+  const base = {
+    title: 'معرفی',
+    hashtags: [],
+    cta: '',
+    platform: 'INSTAGRAM',
+    format: 'POST',
+  } as const;
+  it('notes spoken forms for a formal brand and stiff phrases for a casual one', () => {
+    const spoken = checkContentQuality({
+      ...base,
+      body: 'ما می‌خوایم یه محصول خوب معرفی کنیم.',
+      register: 'FORMAL',
+    });
+    expect(spoken.issues.map((i) => i.code)).toContain('REGISTER_COLLOQUIAL');
+    const stiff = checkContentQuality({
+      ...base,
+      body: 'در خصوص این محصول توضیحات ارائه می‌باشد.',
+      register: 'CASUAL',
+    });
+    expect(stiff.issues.map((i) => i.code)).toContain('REGISTER_STIFF');
+  });
+  it('stays silent without a register and never adds a warning', () => {
+    const body = 'ما می‌خوایم یه محصول معرفی کنیم.';
+    expect(checkContentQuality({ ...base, body }).issues.map((i) => i.code)).not.toContain(
+      'REGISTER_COLLOQUIAL',
+    );
+    expect(checkContentQuality({ ...base, body, register: 'FORMAL' }).warnings).toBe(0);
+    expect(
+      checkContentQuality({ ...base, body, register: 'STANDARD' }).issues.map((i) => i.code),
+    ).not.toContain('REGISTER_COLLOQUIAL');
   });
 });

@@ -31,3 +31,7 @@ export * from './style-fit';
 export * from './export';
 export * from './ai-routing';
 export * from './budget';
+export * from './occasions';
+export * from './register';
+export * from './register-enum';
+export * from './stale';

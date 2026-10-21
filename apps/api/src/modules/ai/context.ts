@@ -20,6 +20,8 @@ import {
   BUSINESS_SECTION_SPEC,
   BusinessSectionKey,
   isFactExpired,
+  isRegister,
+  registerInstruction,
   type FetchedMedia,
   type SampleAnalysisResult,
 } from '@contenter/shared';
@@ -123,7 +125,7 @@ export const UNREVIEWED_MARK = '(AI draft — not yet confirmed by the admin)';
 export type BusinessForPrompt = Pick<
   Business,
   'name' | 'tagline' | 'industry' | 'website' | 'location' | 'language'
-> & {
+> & { register?: string | null } & {
   sections: (Pick<BusinessSection, 'key' | 'content'> &
     Partial<Pick<BusinessSection, 'source' | 'reviewedAt'>>)[];
   /** Analyzed brand assets (past articles, creatives, videos …), when loaded. */
@@ -352,6 +354,7 @@ export function formatBusiness(
     b.industry ? `Industry: ${b.industry}` : null,
     b.location ? `Location: ${b.location}` : null,
     b.website ? `Website: ${b.website}` : null,
+    registerInstruction(isRegister(b.register) ? b.register : null),
   ]
     .filter(Boolean)
     .join('\n');

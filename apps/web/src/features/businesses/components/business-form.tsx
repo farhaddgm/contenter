@@ -1,6 +1,11 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateBusinessSchema, type Business, type CreateBusinessInput } from '@contenter/shared';
+import {
+  CreateBusinessSchema,
+  LanguageRegister,
+  type Business,
+  type CreateBusinessInput,
+} from '@contenter/shared';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/dialog';
 import { Field, Input, Select } from '@/components/ui/form-controls';
@@ -37,6 +42,7 @@ export function BusinessFormDrawer({
       website: business?.website ?? '',
       location: business?.location ?? '',
       language: business?.language ?? 'fa',
+      register: business?.register ?? null,
     },
   });
 
@@ -119,6 +125,23 @@ export function BusinessFormDrawer({
         </Field>
         <Field label={t('businesses.fields.language')}>
           {(id) => <Select id={id} options={CONTENT_LANGS} {...form.register('language')} />}
+        </Field>
+        <Field
+          label={t('businesses.fields.register')}
+          hint={t('businesses.fields.registerHint')}
+          optional={t('common.optional')}
+        >
+          {(id) => (
+            <Select
+              id={id}
+              placeholder={t('businesses.fields.registers.NONE')}
+              options={LanguageRegister.map((r) => ({
+                value: r,
+                label: t(`businesses.fields.registers.${r}`),
+              }))}
+              {...form.register('register', { setValueAs: (v) => (v ? v : null) })}
+            />
+          )}
         </Field>
       </form>
     </Drawer>

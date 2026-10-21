@@ -21,6 +21,8 @@ import {
   type TermIssue,
   type TermRule,
 } from './business-profile';
+import { registerMarkers } from './register';
+import type { LanguageRegister } from './register-enum';
 
 // ─────────────────────────────── platform rules ───────────────────────────────
 
@@ -64,7 +66,11 @@ export const PLATFORM_RULES: Record<Platform, PlatformRules> = {
     note: 'message: 4096 characters; caption of a media post: 1024',
   },
   LINKEDIN: { maxChars: 3000, confidence: 'known', note: 'post: 3000 characters' },
-  X: { maxChars: 280, confidence: 'known', note: 'post: 280 characters (a thread is checked per post)' },
+  X: {
+    maxChars: 280,
+    confidence: 'known',
+    note: 'post: 280 characters (a thread is checked per post)',
+  },
   TIKTOK: { maxChars: 2200, confidence: 'known', note: 'caption: 2200 characters' },
   BLOG: { confidence: 'unknown' },
   OTHER: { confidence: 'unknown' },
@@ -275,6 +281,8 @@ export const QualityIssueCode = [
   'LATIN_PUNCTUATION',
   'SPACE_BEFORE_PUNCTUATION',
   'DOUBLE_SPACE',
+  'REGISTER_COLLOQUIAL',
+  'REGISTER_STIFF',
   'PLACEHOLDER',
   'EMPTY_BODY',
 ] as const;
@@ -306,6 +314,8 @@ export interface QualityInput {
   format: ContentFormat;
   facts?: readonly QualityFactRule[];
   terms?: readonly TermRule[];
+  /** The brand's language register; unset = not checked (docs/61). */
+  register?: LanguageRegister | null;
   now?: Date;
 }
 
@@ -321,16 +331,32 @@ export interface QualityReport {
 const stripHash = (h: string) => h.trim().replace(/^#+/, '');
 
 /** Text as it is published: body, hashtags and call to action. */
-export function publishText(
-  i: Pick<QualityInput, 'body' | 'hashtags' | 'cta'>,
-): string {
-  const tags = i.hashtags.map(stripHash).filter(Boolean).map((h) => `#${h}`).join(' ');
+export function publishText(i: Pick<QualityInput, 'body' | 'hashtags' | 'cta'>): string {
+  const tags = i.hashtags
+    .map(stripHash)
+    .filter(Boolean)
+    .map((h) => `#${h}`)
+    .join(' ');
   return [i.body.trim(), i.cta.trim(), tags].filter(Boolean).join('\n\n');
 }
 
 const charCount = (s: string) => [...s].length;
 
-const STOP_WORDS = new Set(['از', 'در', 'به', 'با', 'و', 'را', 'که', 'این', 'آن', 'برای', 'تا', 'of', 'the']);
+const STOP_WORDS = new Set([
+  'از',
+  'در',
+  'به',
+  'با',
+  'و',
+  'را',
+  'که',
+  'این',
+  'آن',
+  'برای',
+  'تا',
+  'of',
+  'the',
+]);
 
 const tokens = (s: string): string[] =>
   normalizeTermText(s)
@@ -406,7 +432,12 @@ export function checkContentQuality(input: QualityInput): QualityReport {
     issues.push({
       code: t.kind === 'AVOID' ? 'TERM_AVOID' : 'TERM_USE',
       severity: 'warn',
-      params: { found: t.found, term: t.term, count: t.count, replaceWith: t.replaceWith.join('، ') },
+      params: {
+        found: t.found,
+        term: t.term,
+        count: t.count,
+        replaceWith: t.replaceWith.join('، '),
+      },
     });
   }
 
@@ -422,7 +453,12 @@ export function checkContentQuality(input: QualityInput): QualityReport {
     let expiredReported = false;
     for (const sentence of sentences) {
       const talks = mentionsLabel(sentence, fact.label);
-      if (expired && !expiredReported && (talks || (normalizedValue.length >= 4 && countPhrase(normalizeTermText(sentence), fact.value) > 0))) {
+      if (
+        expired &&
+        !expiredReported &&
+        (talks ||
+          (normalizedValue.length >= 4 && countPhrase(normalizeTermText(sentence), fact.value) > 0))
+      ) {
         issues.push({
           code: 'FACT_EXPIRED',
           severity: 'warn',
@@ -474,6 +510,25 @@ export function checkContentQuality(input: QualityInput): QualityReport {
       severity: 'info',
       params: { count: list.length, example: list[0].found },
     });
+  }
+  // language register: spoken forms in a formal brand, stiff phrases in a casual one (info only)
+  if (input.register && persianShare(checked) >= 0.5) {
+    const hits = registerMarkers(checked);
+    const list =
+      input.register === 'FORMAL' ? hits.colloquial : input.register === 'CASUAL' ? hits.stiff : [];
+    if (list.length) {
+      issues.push({
+        code: input.register === 'FORMAL' ? 'REGISTER_COLLOQUIAL' : 'REGISTER_STIFF',
+        severity: 'info',
+        params: {
+          count: list.reduce((n, h) => n + h.count, 0),
+          example: list
+            .slice(0, 3)
+            .map((h) => h.text)
+            .join('، '),
+        },
+      });
+    }
   }
   if (persianShare(checked) >= 0.5 && hasMixedDigits(checked)) {
     issues.push({ code: 'DIGITS_MIXED', severity: 'info', params: {} });
