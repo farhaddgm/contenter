@@ -48,6 +48,7 @@ JSON با `schemaVersion: 1` و `exportedAt`. فیلدها:
 - `business`: نام، شعار، حوزه، وب‌سایت، موقعیت، زبان، وضعیت، `origin`، `keyword`، `buildState`، `researchedAt`، تاریخ‌ها، `sources` (منابع تحقیق وب) و `gaps` (موارد تأییدنشده).
 - `sections`: **هر ۱۵ بخش پروفایل** به ترتیب رجیستری (حتی خالی‌ها با `content: ''`): `key`، `content`، `source` (`ADMIN` یا `AI`)، `reviewedAt` (`null` = متن AI که کسی تأیید نکرده) و `updatedAt`. کلید بخش تازه در آینده به انتها اضافه می‌شود.
 - `facts`: واقعیت‌های کلیدی با `label`، `value`، `category`، `sourceUrl`، `note`، `source`، `verified`، `validUntil`، `isActive`.
+- `offerings`: کاتالوگ محصولات و خدمات (docs/67) با `id`، `name`، `aliases`، `kind`، `status`، `push`، `summary`، `features`، `priceAmount` (رشتهٔ اعشاری)، `priceCurrency`، `priceFrom`، `priceUnit`، `priceValidUntil`، `availableFrom`، `availableUntil`، `url`، `source`، `verified`، `isActive`، `updatedAt`؛ بدون `note` و شواهد داخلی؛ با ترتیب `push` نزولی، `sortOrder`، نام و `id`. فیلد افزوده است و نسخهٔ schema تغییر نکرد.
 - `terms`: واژه‌نامهٔ برند (`USE` / `AVOID`، `alternatives`).
 - `notes`: توضیح‌های ادمین برای AI (تا ۵۰ مورد، تازه‌ترین اول) با وضعیت و خلاصهٔ تغییر.
 - `references`: منابع مرجع با نوع، نشانی، وضعیت، `contentChars` و `excerpt` (حداکثر ۲۰۰۰ نویسهٔ اول؛ متن کامل در Contenter می‌ماند).

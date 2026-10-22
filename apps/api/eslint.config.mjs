@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 
 // The Prisma delegates that belong to a business's identity (docs/63-business-boundary.md).
 const BUSINESS_DELEGATES =
-  '^business(Member|Section|SectionRevision|Suggestion|Discovery|Reference|Note|Asset|Fact|Term|Audit|Style)?$|^styleSource$';
+  '^business(Member|Section|SectionRevision|Suggestion|Discovery|Reference|Note|Asset|Fact|Term|Audit|Style|Offering)?$|^styleSource$';
 const CLIENT = '^(prisma|tx)$';
 const BUSINESS_TABLE_MESSAGE =
   'Business tables are read through BusinessApi (modules/businesses/business-api.ts), not queried directly. See docs/63-business-boundary.md.';
@@ -41,6 +41,7 @@ export default tseslint.config(
       'src/modules/ai/runners/business.runners.ts',
       'src/modules/ai/runners/business-extra.runners.ts',
       'src/modules/ai/runners/business-style.runner.ts',
+      'src/modules/ai/runners/business-offerings.runner.ts',
       'src/modules/ai/runners/embed-reference.runner.ts',
       'src/common/access.ts',
       'src/modules/users/users.module.ts',

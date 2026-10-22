@@ -142,6 +142,91 @@ export function extractNumbers(text: string): string[] {
   return [...out];
 }
 
+// ─────────────────────────────── prices ───────────────────────────────
+
+export const PriceCurrency = ['IRT', 'IRR', 'USD', 'EUR'] as const;
+export type PriceCurrency = (typeof PriceCurrency)[number];
+
+/** Currency words (already normalized by `normalizeTermText`) → currency. */
+const CURRENCY_OF: Record<string, PriceCurrency> = {
+  تومان: 'IRT',
+  تومن: 'IRT',
+  toman: 'IRT',
+  irt: 'IRT',
+  ریال: 'IRR',
+  rial: 'IRR',
+  irr: 'IRR',
+  دلار: 'USD',
+  usd: 'USD',
+  dollar: 'USD',
+  dollars: 'USD',
+  یورو: 'EUR',
+  eur: 'EUR',
+  euro: 'EUR',
+  euros: 'EUR',
+};
+const CURRENCY_WORD = Object.keys(CURRENCY_OF)
+  .sort((a, b) => b.length - a.length)
+  .join('|');
+const SCALE_WORD = Object.keys(SCALE_WORDS).join('|');
+/** "199 هزار تومان", "199000 ریال", "20 dollars", "۱۹۹ هزار تومانی" */
+const PRICE_AFTER = new RegExp(
+  `(\\d+(?:\\.\\d+)?)(?:\\s*(${SCALE_WORD}))?\\s*(${CURRENCY_WORD})ی?(?![\\p{L}])`,
+  'gu',
+);
+/** "$20", "€ 1.5 million" */
+const PRICE_SYMBOL = new RegExp(`([$€])\\s*(\\d+(?:\\.\\d+)?)(?:\\s*(${SCALE_WORD}))?`, 'gu');
+
+export interface PriceMention {
+  /** In the currency's own unit ("۱۹۹ هزار تومان" → 199000). */
+  value: number;
+  currency: PriceCurrency;
+}
+
+/**
+ * Amounts a text states as prices: a number (with an optional scale word like "هزار") right
+ * before a currency word, or after a currency symbol. A number without a currency is not a price
+ * (a warranty of "۳ ماه" or a count is not), which keeps the offering check quiet.
+ */
+export function extractPrices(text: string): PriceMention[] {
+  const t = normalizeTermText(normalizeDigits(text)).replace(/(?<=\d),(?=\d{3}(?!\d))/g, '');
+  const out: PriceMention[] = [];
+  const push = (num: string, scale: string | undefined, currency: PriceCurrency) => {
+    const factor = scale ? (SCALE_WORDS[normalizeTermText(scale)] ?? 1) : 1;
+    const value = Number(num) * factor;
+    if (Number.isFinite(value) && value < Number.MAX_SAFE_INTEGER) out.push({ value, currency });
+  };
+  for (const m of t.matchAll(PRICE_AFTER)) {
+    const currency = CURRENCY_OF[m[3]!];
+    if (currency) push(m[1]!, m[2], currency);
+  }
+  for (const m of t.matchAll(PRICE_SYMBOL)) {
+    push(m[2]!, m[3], m[1] === '$' ? 'USD' : 'EUR');
+  }
+  return out;
+}
+
+export type PriceComparison = 'match' | 'mismatch' | 'incomparable';
+
+/**
+ * A stated price against an offering's price. Toman and rial are compared through ×10 (both are
+ * written in Iranian texts); other currencies are only compared with themselves. With `from`
+ * (the price is "from …") any amount at or above it matches.
+ */
+export function comparePrice(
+  offer: { amount: number; currency: string; from?: boolean },
+  found: PriceMention,
+): PriceComparison {
+  let value = found.value;
+  if (found.currency !== offer.currency) {
+    if (offer.currency === 'IRT' && found.currency === 'IRR') value = found.value / 10;
+    else if (offer.currency === 'IRR' && found.currency === 'IRT') value = found.value * 10;
+    else return 'incomparable';
+  }
+  const ok = offer.from ? value >= offer.amount - 0.005 : Math.abs(value - offer.amount) < 0.005;
+  return ok ? 'match' : 'mismatch';
+}
+
 // ─────────────────────────────── Persian typography ───────────────────────────────
 
 export const TypographyKind = [
@@ -285,6 +370,8 @@ export const QualityIssueCode = [
   'REGISTER_STIFF',
   'PLACEHOLDER',
   'EMPTY_BODY',
+  'OFFERING_PRICE_MISMATCH',
+  'OFFERING_UNAVAILABLE',
 ] as const;
 export type QualityIssueCode = (typeof QualityIssueCode)[number];
 
@@ -305,6 +392,21 @@ export interface QualityFactRule {
   isActive?: boolean;
 }
 
+/** What the check needs to know about an offering of the business catalog (docs/67). */
+export interface QualityOfferingRule {
+  name: string;
+  /** Other spellings of the name that count as the same offering. */
+  aliases?: readonly string[];
+  /** Decimal as text ("199000"); with `priceCurrency`. Empty = no price to compare. */
+  priceAmount?: string | null;
+  priceCurrency?: string | null;
+  /** The price is "from …": any stated price at or above it matches. */
+  priceFrom?: boolean;
+  priceValidUntil?: string | Date | null;
+  /** False when the offering is paused, discontinued or out of its season. */
+  available: boolean;
+}
+
 export interface QualityInput {
   title: string;
   body: string;
@@ -313,6 +415,8 @@ export interface QualityInput {
   platform: Platform;
   format: ContentFormat;
   facts?: readonly QualityFactRule[];
+  /** Catalog offerings: stated prices are compared with theirs, unavailable ones are named. */
+  offerings?: readonly QualityOfferingRule[];
   terms?: readonly TermRule[];
   /** The brand's language register; unset = not checked (docs/61). */
   register?: LanguageRegister | null;
@@ -480,6 +584,62 @@ export function checkContentQuality(input: QualityInput): QualityReport {
             label: fact.label,
             expected: fact.value,
             found: found.join('، '),
+            sentence: sentence.length > 140 ? `${sentence.slice(0, 137)}…` : sentence,
+          },
+        });
+      }
+    }
+  }
+
+  // catalog offerings (docs/67): the price a sentence states for an offering, and offerings that
+  // are not for sale; only numbers next to a currency count as prices
+  for (const o of input.offerings ?? []) {
+    const names = [o.name, ...(o.aliases ?? [])].filter((n) => n.trim());
+    const amount = o.priceAmount ? Number(o.priceAmount) : Number.NaN;
+    const priced = Number.isFinite(amount) && !!o.priceCurrency;
+    const expired = priced && isFactExpired(o.priceValidUntil ?? null, now);
+    let unavailableReported = false;
+    let expiredReported = false;
+    for (const sentence of sentences) {
+      if (!names.some((n) => mentionsLabel(sentence, n))) continue;
+      if (!o.available && !unavailableReported) {
+        issues.push({ code: 'OFFERING_UNAVAILABLE', severity: 'warn', params: { name: o.name } });
+        unavailableReported = true;
+      }
+      if (!priced) continue;
+      const stated = extractPrices(sentence)
+        .map((p) => ({
+          p,
+          result: comparePrice(
+            { amount, currency: o.priceCurrency!, from: o.priceFrom },
+            p,
+          ),
+        }))
+        .filter((x) => x.result !== 'incomparable');
+      if (!stated.length) continue;
+      if (expired) {
+        if (!expiredReported) {
+          issues.push({
+            code: 'FACT_EXPIRED',
+            severity: 'warn',
+            params: {
+              label: o.name,
+              value: `${o.priceAmount} ${o.priceCurrency}`,
+              validUntil: new Date(o.priceValidUntil!).toISOString().slice(0, 10),
+            },
+          });
+          expiredReported = true;
+        }
+        continue;
+      }
+      if (!stated.some((x) => x.result === 'match')) {
+        issues.push({
+          code: 'OFFERING_PRICE_MISMATCH',
+          severity: 'warn',
+          params: {
+            name: o.name,
+            expected: `${o.priceAmount} ${o.priceCurrency}`,
+            found: stated.map((x) => `${x.p.value} ${x.p.currency}`).join('، '),
             sentence: sentence.length > 140 ? `${sentence.slice(0, 137)}…` : sentence,
           },
         });

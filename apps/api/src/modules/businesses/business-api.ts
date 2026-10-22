@@ -1,12 +1,46 @@
 import { Global, Injectable, Module } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { DocooBusinessListQuery, InstagramStats, StyleTrait } from '@contenter/shared';
+import {
+  offeringQualityRule,
+  type DocooBusinessListQuery,
+  type InstagramStats,
+  type QualityOfferingRule,
+  type StyleTrait,
+} from '@contenter/shared';
 import { paginate } from '../../common/pagination';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
+/** The fields of a catalog row that the prompt and the quality check read (docs/67). */
+export const OFFERING_CORE_SELECT = {
+  name: true,
+  aliases: true,
+  kind: true,
+  status: true,
+  push: true,
+  summary: true,
+  features: true,
+  priceAmount: true,
+  priceCurrency: true,
+  priceFrom: true,
+  priceUnit: true,
+  priceValidUntil: true,
+  availableFrom: true,
+  availableUntil: true,
+} satisfies Prisma.BusinessOfferingSelect;
+
+/** Catalog rows a model and the quality gate may use: switched on and confirmed by a person. */
+const USABLE_OFFERING = { isActive: true, verified: true } as const;
+/** Push level first, then the admin's order; a total order, so the prompt and export are stable. */
+const OFFERING_ORDER = [
+  { push: 'desc' },
+  { sortOrder: 'asc' },
+  { name: 'asc' },
+  { id: 'asc' },
+] satisfies Prisma.BusinessOfferingOrderByWithRelationInput[];
+
 /**
  * What `formatBusiness` needs: the sections (with review state), active key facts and
- * terminology, and the usable brand assets (newest first).
+ * terminology, the catalog and the usable brand assets (newest first).
  */
 export const BUSINESS_PROMPT_INCLUDE = {
   sections: { select: { key: true, content: true, source: true, reviewedAt: true } },
@@ -15,6 +49,7 @@ export const BUSINESS_PROMPT_INCLUDE = {
     orderBy: [{ category: 'asc' }, { createdAt: 'asc' }],
     select: { label: true, value: true, category: true, verified: true, validUntil: true },
   },
+  offerings: { where: USABLE_OFFERING, orderBy: OFFERING_ORDER, select: OFFERING_CORE_SELECT },
   terms: {
     where: { isActive: true },
     orderBy: [{ kind: 'asc' }, { createdAt: 'asc' }],
@@ -33,6 +68,7 @@ export const EXPORT_INCLUDE = {
   sections: true,
   facts: { orderBy: [{ category: 'asc' }, { createdAt: 'asc' }] },
   terms: { orderBy: { createdAt: 'asc' } },
+  offerings: { orderBy: OFFERING_ORDER },
   notes: { orderBy: { createdAt: 'desc' }, take: 50 },
   references: { orderBy: { createdAt: 'asc' } },
   assets: { orderBy: { createdAt: 'desc' }, take: 200 },
@@ -120,6 +156,15 @@ export class BusinessApi {
       where: { businessId, isActive: true },
       select: { label: true, value: true, validUntil: true },
     });
+  }
+
+  /** Catalog rows the quality gate and the stale check compare texts with (docs/67). */
+  async offeringsForQuality(businessId: string, now = new Date()): Promise<QualityOfferingRule[]> {
+    const rows = await this.prisma.businessOffering.findMany({
+      where: { businessId, ...USABLE_OFFERING },
+      select: OFFERING_CORE_SELECT,
+    });
+    return rows.map((r) => offeringQualityRule(r, now));
   }
 
   /** The business's latest Instagram statistics (computed in code, docs/28), or null. */

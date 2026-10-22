@@ -29,13 +29,13 @@
 - **عملیات محتوا (در Contenter می‌ماند، به `Content`/review وابسته است):** `ContentPillar` و coverage، `ChecklistTemplate`، stale-contents، نمونه‌های طلایی (golden)، register و بررسی‌های quality.
 
 ## ۴. قانون ESLint
-`apps/api/eslint.config.mjs` (شامل `BusinessStyle` و `StyleSource` و runner `business-style.runner.ts` در فهرست استثنا) قاعدهٔ `no-restricted-syntax` دارد: هر `prisma.business*` / `this.prisma.business*` / `tx.business*` خارج از فهرست مجاز، خطای lint است (`npm run lint`). فقط دسترسی از طریق delegate بررسی می‌شود؛ فیلتر رابطه‌ای از سمت `Topic` (مثل `topic.business`، `where: { business: … }`) آزاد است چون `Topic.businessId` کلید خارجی است.
+`apps/api/eslint.config.mjs` (شامل `BusinessStyle`، `StyleSource` و `BusinessOffering` و runnerهای `business-style.runner.ts` و `business-offerings.runner.ts` در فهرست استثنا) قاعدهٔ `no-restricted-syntax` دارد: هر `prisma.business*` / `this.prisma.business*` / `tx.business*` خارج از فهرست مجاز، خطای lint است (`npm run lint`). فقط دسترسی از طریق delegate بررسی می‌شود؛ فیلتر رابطه‌ای از سمت `Topic` (مثل `topic.business`، `where: { business: … }`) آزاد است چون `Topic.businessId` کلید خارجی است.
 
 ## ۵. فهرست استثنا (بدهی مرزی)
 | فایل | چرا | وضعیت |
 | --- | --- | --- |
 | `modules/businesses/**` | مالک جدول‌هاست | دائمی |
-| `modules/ai/runners/business.runners.ts`، `business-extra.runners.ts`، `embed-reference.runner.ts` | نوشتن خروجی مدل | موقت: اگر روزی runnerها به `modules/businesses` رفتند حذف می‌شود |
+| `modules/ai/runners/business.runners.ts`، `business-extra.runners.ts`، `business-style.runner.ts`، `business-offerings.runner.ts`، `embed-reference.runner.ts` | نوشتن خروجی مدل | موقت: اگر روزی runnerها به `modules/businesses` رفتند حذف می‌شود |
 | `common/access.ts` | خواندن `createdById`/`members` برای کنترل دسترسی | دائمی (دسترسی عرضی است) |
 | `modules/users/users.module.ts` | مدیریت `BusinessMember` توسط owner (docs/17) | موقت: با دروازهٔ نوشتنی حذف می‌شود |
 | `**/*.spec.ts` | mock کلاینت | دائمی |

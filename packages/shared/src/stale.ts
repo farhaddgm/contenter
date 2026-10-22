@@ -1,7 +1,8 @@
 /**
  * Stale-content tracker (docs/61-occasions-register-stale.md). A piece of approved or published
  * content goes stale when a key fact of the business changed or expired after it was written:
- * the quality gate already knows how to see that (`FACT_EXPIRED`, `FACT_NUMBER_MISMATCH`), so this
+ * the quality gate already knows how to see that (`FACT_EXPIRED`, `FACT_NUMBER_MISMATCH`, and a
+ * catalog price that changed, `OFFERING_PRICE_MISMATCH`, docs/67), so this
  * only runs the same code over the whole business. No model is involved.
  */
 import type { ContentFormat, ContentStatus, Platform } from './enums';
@@ -10,11 +11,13 @@ import {
   type QualityFactRule,
   type QualityIssue,
   type QualityIssueCode,
+  type QualityOfferingRule,
 } from './quality';
 
 export const STALE_CODES = [
   'FACT_EXPIRED',
   'FACT_NUMBER_MISMATCH',
+  'OFFERING_PRICE_MISMATCH',
 ] as const satisfies readonly QualityIssueCode[];
 /** Most contents one report looks at. */
 export const STALE_MAX_CONTENTS = 300;
@@ -57,8 +60,9 @@ export function findStale(
   candidates: readonly StaleCandidate[],
   facts: readonly QualityFactRule[],
   now: Date = new Date(),
+  offerings: readonly QualityOfferingRule[] = [],
 ): StaleContent[] {
-  if (!facts.length) return [];
+  if (!facts.length && !offerings.length) return [];
   const out: StaleContent[] = [];
   for (const c of candidates) {
     const report = checkContentQuality({
@@ -69,6 +73,7 @@ export function findStale(
       platform: c.platform,
       format: c.format,
       facts,
+      offerings,
       now,
     });
     const issues = report.issues.filter((i) => (STALE_CODES as readonly string[]).includes(i.code));

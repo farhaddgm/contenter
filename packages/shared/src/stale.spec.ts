@@ -53,4 +53,22 @@ describe('findStale', () => {
     );
     expect(out.map((c) => c.id)).toEqual(['b', 'a']);
   });
+
+  it('finds content that quotes an old catalog price, with no key facts at all', () => {
+    const offerings = [
+      { name: 'اشتراک ماهانه', priceAmount: '600000', priceCurrency: 'IRT', available: true },
+    ];
+    const out = findStale([cand({})], [], new Date('2026-06-01'), offerings);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.issues.map((i) => i.code)).toEqual(['OFFERING_PRICE_MISMATCH']);
+    // the current price is fine, and an unavailable offering is not "stale" by itself
+    expect(
+      findStale([cand({ body: 'اشتراک ماهانه ۶۰۰ هزار تومان است.' })], [], new Date('2026-06-01'), offerings),
+    ).toEqual([]);
+    expect(
+      findStale([cand({ body: 'اشتراک ماهانه را امتحان کنید.' })], [], new Date('2026-06-01'), [
+        { ...offerings[0]!, available: false },
+      ]),
+    ).toEqual([]);
+  });
 });

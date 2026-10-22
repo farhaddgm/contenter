@@ -26,6 +26,7 @@ import {
   defaultFormatFor,
   variantAnglesFor,
   effectivePlatform,
+  offeringQualityRule,
   RepurposeContentSchema,
   EditContentVersionSchema,
   GenerateContentSchema,
@@ -45,6 +46,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { OFFERING_CORE_SELECT } from '../businesses/business-api';
 import { SettingsService } from '../settings/settings.module';
 import { StyleFitService } from '../style-fit/style-fit.module';
 import { CoverageService } from '../pillars/coverage.module';
@@ -149,6 +151,11 @@ export class ContentsService {
             register: true,
             terms: { where: { isActive: true } },
             facts: { where: { isActive: true } },
+            // catalog rows the admin confirmed (docs/67): their prices are checked in the text
+            offerings: {
+              where: { isActive: true, verified: true },
+              select: OFFERING_CORE_SELECT,
+            },
           },
         },
         businessId: true,
@@ -166,6 +173,7 @@ export class ContentsService {
       format: c.format,
       terms,
       facts: topic?.business?.facts ?? [],
+      offerings: (topic?.business?.offerings ?? []).map((o) => offeringQualityRule(o)),
       register: asRegister(topic?.business?.register),
     });
     return {
