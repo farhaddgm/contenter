@@ -6,6 +6,7 @@ import { BudgetController, BudgetService } from './budget.service';
 import { AiExecutor } from './ai-executor.service';
 import { AiJobsService } from './ai-jobs.service';
 import { ContextLoader } from './context-loader.service';
+import { AiKeysService } from './provider/ai-keys.service';
 import { AiProviderRegistry } from './provider/provider-registry';
 import { PromptService } from './prompts/prompt.service';
 import { AnalyzeSampleRunner } from './runners/analyze-sample.runner';
@@ -55,6 +56,7 @@ const RUNNERS = [
   imports: [SamplesCoreModule],
   controllers: [BudgetController],
   providers: [
+    AiKeysService,
     AiProviderRegistry,
     AiAlertsService,
     AiBatchService,
@@ -71,6 +73,7 @@ const RUNNERS = [
     AiJobsService,
     PromptService,
     ContextLoader,
+    AiKeysService,
     AiProviderRegistry,
     AiAlertsService,
     BudgetService,

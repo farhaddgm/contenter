@@ -53,9 +53,9 @@ function usageOf(u: Anthropic.Beta.BetaUsage): AiUsage {
 export class AnthropicProvider implements AiProvider, BatchProvider {
   readonly name = 'anthropic';
   private readonly logger = new Logger(AnthropicProvider.name);
-  private readonly client: Anthropic;
+  private client: Anthropic;
 
-  private readonly hasCredentials: boolean;
+  private hasCredentials: boolean;
 
   get configured(): boolean {
     return this.hasCredentials;
@@ -76,6 +76,16 @@ export class AnthropicProvider implements AiProvider, BatchProvider {
         'ANTHROPIC_API_KEY is empty — Claude models are unavailable until it is set.',
       );
     }
+  }
+
+  /** Swap the key at runtime (saved in the admin page); undefined goes back to the environment. */
+  setApiKey(apiKey: string | undefined): void {
+    this.hasCredentials = !!(
+      apiKey ||
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.ANTHROPIC_AUTH_TOKEN
+    );
+    this.client = new Anthropic(apiKey ? { apiKey } : {});
   }
 
   async generateStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
