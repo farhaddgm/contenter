@@ -13,6 +13,7 @@ import {
 import { AccessService } from '../../common/access';
 import type { AuthUser } from '../../common/auth.decorators';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { BusinessApi } from '../businesses/business-api';
 
 const MAX_SAMPLES = 30;
 
@@ -39,6 +40,7 @@ export class StyleFitService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async forContent(user: AuthUser, c: StyleFitSubject): Promise<StyleFitResult> {
@@ -91,13 +93,7 @@ export class StyleFitService {
     } catch {
       return null;
     }
-    const ref = await this.prisma.businessReference.findFirst({
-      where: { businessId, kind: 'INSTAGRAM', status: 'READY', isActive: true },
-      orderBy: { updatedAt: 'desc' },
-      select: { analysis: true },
-    });
-    const a = ref?.analysis as { type?: string; stats?: InstagramStats } | null;
-    return a?.type === 'INSTAGRAM' && a.stats ? a.stats : null;
+    return this.businesses.instagramStats(businessId);
   }
 }
 

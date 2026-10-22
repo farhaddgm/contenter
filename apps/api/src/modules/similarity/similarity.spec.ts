@@ -4,6 +4,7 @@ import type { AuthUser } from '../../common/auth.decorators';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { SettingsService } from '../settings/settings.module';
 import { SimilarityService, type SimilaritySubject } from './similarity.module';
+import { BusinessApi } from '../businesses/business-api';
 
 const TEXT =
   'قهوه را تازه آسیاب کنید و آب را کمی صبر بدهید تا از جوش بیفتد. بعد آرام روی قهوه بریزید و سی ثانیه صبر کنید. حالا یک فنجان قهوهٔ خوب دارید.';
@@ -73,6 +74,7 @@ function setup(over: { denyBusiness?: boolean; contents?: unknown[]; refs?: unkn
     prisma as unknown as PrismaService,
     access as unknown as AccessService,
     settings as unknown as SettingsService,
+    new BusinessApi(prisma as unknown as PrismaService),
   );
   return { svc, contentFind, ideaFind, sampleFind, refFind, assert };
 }

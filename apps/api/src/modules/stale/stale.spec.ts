@@ -3,6 +3,7 @@ import type { AccessService } from '../../common/access';
 import type { AuthUser } from '../../common/auth.decorators';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import { StaleService } from './stale.module';
+import { BusinessApi } from '../businesses/business-api';
 
 const user = { id: 'u1', role: 'ADMIN' } as AuthUser;
 
@@ -13,7 +14,7 @@ function service(facts: unknown[], contents: unknown[]) {
     content: { findMany: findContents },
   } as unknown as PrismaService;
   const access = { visibleTopics: vi.fn().mockReturnValue(undefined) } as unknown as AccessService;
-  return { svc: new StaleService(prisma, access), findContents };
+  return { svc: new StaleService(prisma, access, new BusinessApi(prisma)), findContents };
 }
 
 const row = (body: string) => ({

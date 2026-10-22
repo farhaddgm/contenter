@@ -15,6 +15,7 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
+import { BusinessApi } from '../businesses/business-api';
 import { AiAlertsService } from './ai-alerts.service';
 
 const SETTINGS_KEY = 'budget';
@@ -44,6 +45,7 @@ export class BudgetService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly alerts: AiAlertsService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async getSettings(): Promise<BudgetSettings> {
@@ -110,16 +112,7 @@ export class BudgetService {
 
     // a business with a cap is listed even before it has spent anything
     const ids = [...new Set([...byBusiness.keys(), ...Object.keys(s.businesses)])];
-    const names = ids.length
-      ? new Map(
-          (
-            await this.prisma.business.findMany({
-              where: { id: { in: ids } },
-              select: { id: true, name: true },
-            })
-          ).map((b) => [b.id, b.name]),
-        )
-      : new Map<string, string>();
+    const names = await this.businesses.names(ids);
 
     const cap = s.monthlyUsd;
     return {

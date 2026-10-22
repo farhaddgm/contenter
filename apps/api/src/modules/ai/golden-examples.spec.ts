@@ -3,6 +3,7 @@ import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { SettingsService } from '../settings/settings.module';
 import { formatBusiness, formatGoldenExamples, type BusinessForPrompt } from './context';
 import { ContextLoader } from './context-loader.service';
+import { BusinessApi } from '../businesses/business-api';
 
 const business: BusinessForPrompt = {
   name: 'Acme',
@@ -61,6 +62,7 @@ function setup(
   const settings = opts.settings ? { getGolden: async () => opts.settings } : undefined;
   const ctx = new ContextLoader(
     prisma as unknown as PrismaService,
+    new BusinessApi(prisma as unknown as PrismaService),
     settings as unknown as SettingsService,
   );
   return { ctx, findMany };

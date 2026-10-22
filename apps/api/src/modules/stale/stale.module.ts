@@ -8,6 +8,7 @@ import {
 import { AccessService, BusinessScoped } from '../../common/access';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { BusinessApi } from '../businesses/business-api';
 
 /**
  * Approved or published contents of a business whose text clashes with a key fact that changed or
@@ -18,13 +19,11 @@ export class StaleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async forBusiness(businessId: string, user: AuthUser): Promise<StaleReport> {
-    const facts = await this.prisma.businessFact.findMany({
-      where: { businessId, isActive: true },
-      select: { label: true, value: true, validUntil: true },
-    });
+    const facts = await this.businesses.activeFacts(businessId);
     if (!facts.length) return { checked: 0, truncated: false, items: [] };
     const visible = this.access.visibleTopics(user);
     const rows = await this.prisma.content.findMany({

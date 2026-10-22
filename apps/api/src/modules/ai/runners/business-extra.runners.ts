@@ -16,7 +16,8 @@ import { FileStorageService } from '../../../infra/storage/file-storage.service'
 import { cleanUrl, writeSection } from '../../businesses/section-writer';
 import { AiExecutor } from '../ai-executor.service';
 import { clamp, formatBusiness, formatSectionSpec, formatStandingNotes } from '../context';
-import { BUSINESS_PROMPT_INCLUDE, ContextLoader } from '../context-loader.service';
+import { BUSINESS_PROMPT_INCLUDE } from '../../businesses/business-api';
+import { ContextLoader } from '../context-loader.service';
 import { mergeSources, NonRetryableAiError, sumUsage } from '../provider/ai-provider';
 import { filterSources } from '../source-blocklist';
 import { consult, SEARCHES } from './business.runners';

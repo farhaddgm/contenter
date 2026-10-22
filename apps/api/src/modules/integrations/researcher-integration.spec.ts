@@ -5,6 +5,7 @@ import { ResearcherIntegrationController, ResearcherIntegrationGuard } from './r
 import { DocooExportService } from './docoo-export.service';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
+import { BusinessApi } from '../businesses/business-api';
 
 const researcherToken = 'r'.repeat(40), docooToken = 'd'.repeat(40);
 const env = (extra = {}) => ({ RESEARCHER_INTEGRATION_TOKEN: researcherToken, INTEGRATION_TOKEN: docooToken, RESEARCHER_BUSINESS_ACCESS: 'selected', RESEARCHER_BUSINESS_IDS: ['allowed'], ...extra }) as unknown as Env;
@@ -45,7 +46,7 @@ describe('Researcher integration: independent read-only consumer', () => {
   });
   it('filters counts and both list queries, including deny-all', async () => {
     const db = { business: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) }, $transaction: vi.fn((calls) => Promise.all(calls)) };
-    const service = new DocooExportService(db as unknown as PrismaService, {} as AuditService);
+    const service = new DocooExportService({} as AuditService, new BusinessApi(db as unknown as PrismaService));
     for (const ids of [[], ['allowed']]) {
       await service.ping(ids);
       expect(db.business.count).toHaveBeenLastCalledWith({ where: { id: { in: ids } } });

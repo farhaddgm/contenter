@@ -8,6 +8,7 @@ import {
 import type { Env } from '../../config/env';
 import { buildDocooExport, type ExportRow } from './docoo-export.builder';
 import { DocooExportService } from './docoo-export.service';
+import { BusinessApi } from '../businesses/business-api';
 import { IntegrationTokenGuard, safeEqual } from './integration-token.guard';
 
 const at = (day: number) => new Date(`2026-10-0${day}T08:00:00.000Z`);
@@ -313,7 +314,7 @@ describe('DocooExportService', () => {
       },
       $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
-    const service = new DocooExportService(prisma as never, audit as never);
+    const service = new DocooExportService(audit as never, new BusinessApi(prisma as never));
     const page = await service.list({ page: 1, pageSize: 20, q: 'وی' });
     expect(page.total).toBe(1);
     expect(page.items[0]).toMatchObject({
@@ -331,7 +332,7 @@ describe('DocooExportService', () => {
     const prisma = {
       business: { findUnique: vi.fn().mockResolvedValueOnce(row()).mockResolvedValueOnce(null) },
     };
-    const service = new DocooExportService(prisma as never, audit as never);
+    const service = new DocooExportService(audit as never, new BusinessApi(prisma as never));
     const out = await service.export('biz1', '10.0.0.1');
     expect(out.business.id).toBe('biz1');
     expect(audit.log).toHaveBeenCalledWith(
