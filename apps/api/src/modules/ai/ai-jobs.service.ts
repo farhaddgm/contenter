@@ -13,7 +13,7 @@ import { PermanentJobError, QueueService, type AttemptInfo } from '../../infra/q
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { ErrorTrackerService } from '../smart/smart-core.services';
-import { batchContext, JobDeferredError } from './batch/batch-context';
+import { batchContext, JobDeferredError, type BatchContext } from './batch/batch-context';
 import { BudgetService } from './budget.service';
 import { estimateCostUsd } from './pricing';
 import { NonRetryableAiError } from './provider/ai-provider';
@@ -109,10 +109,13 @@ export class AiJobsService implements OnModuleInit {
 
     try {
       // an economy job's model calls may defer it; see batch/batch-context.ts
-      const result = await batchContext.run(
-        { jobId, economy: job.economy && isEconomyTask(job.type), seq: 0 },
-        () => runner.run(job),
-      );
+      const ctx: BatchContext = {
+        jobId,
+        economy: job.economy && isEconomyTask(job.type),
+        seq: 0,
+        promptChars: 0,
+      };
+      const result = await batchContext.run(ctx, () => runner.run(job));
       await this.prisma.aiJob.update({
         where: { id: jobId },
         data: {
@@ -122,6 +125,7 @@ export class AiJobsService implements OnModuleInit {
           inputTokens: result.usage.inputTokens,
           outputTokens: result.usage.outputTokens,
           cacheReadTokens: result.usage.cacheReadTokens,
+          promptChars: ctx.unmeasured || !ctx.promptChars ? null : ctx.promptChars,
           costUsd: estimateCostUsd(result.model, result.usage),
           promptKey: result.prompt.key,
           promptVersion: result.prompt.version,

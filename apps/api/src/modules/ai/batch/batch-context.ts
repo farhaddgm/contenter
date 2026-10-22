@@ -15,6 +15,13 @@ export interface BatchContext {
   economy: boolean;
   /** Position of the next model call of this run. */
   seq: number;
+  /**
+   * Characters of the prompts (system + user) this run rendered, summed over its model calls
+   * (docs/66). Read by `AiJobsService` once the run succeeds.
+   */
+  promptChars?: number;
+  /** Set when a call's size cannot be compared with its tokens (web research, images). */
+  unmeasured?: boolean;
 }
 
 export const batchContext = new AsyncLocalStorage<BatchContext>();

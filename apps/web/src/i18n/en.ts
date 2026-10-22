@@ -1878,6 +1878,61 @@ export const en: DeepStrings<Dictionary> = {
       references: 'References',
       styles: 'Styles',
       assets: 'Content & files',
+      context: 'What the model sees',
+    },
+    context: {
+      title: 'What the model sees about this business',
+      hint: 'The exact text given to the model about this business when AI works, block by block with the size of each. Tokens and cost are approximate. This page does not call any model and costs nothing.',
+      target: {
+        DRAFT: 'Writing a draft',
+        IDEATE: 'Ideation',
+        PROFILE: 'Profile jobs',
+      },
+      topicLabel: 'Project',
+      topicNone: 'No project',
+      needsTopic:
+        'Reference documents, golden examples and the writing style depend on a project. Pick one to include them.',
+      documentsNote:
+        'Reference documents are shown here with an equal share each. In a real job, when they exceed the budget, the passages closest to the topic are chosen, so the text may differ a little.',
+      total: 'Total: {{chars}} characters · about {{tokens}} tokens',
+      barHint: "Each block's share of the whole text",
+      cost: 'Approximate input cost per job: {{cost}}',
+      model: 'Model: {{model}}',
+      ratio: {
+        DEFAULT:
+          'Default ratio of {{value}} characters per token; not yet measured from real jobs.',
+        MEASURED:
+          'Measured ratio of {{value}} characters per token, from {{samples}} recent jobs (whole prompt).',
+      },
+      table: {
+        block: 'Block',
+        chars: 'Characters',
+        tokens: 'Tokens (approx.)',
+        share: 'Share',
+      },
+      show: 'Show text',
+      hide: 'Hide text',
+      copyAll: 'Copy all text',
+      cut: 'Cut',
+      omitted: '{{count}} left out',
+      unreviewed: 'Unconfirmed AI draft',
+      blocks: {
+        HEAD: 'Details',
+        FACTS: 'Key facts',
+        TERMS: 'Terminology',
+        ASSETS: 'Past content',
+        DOCUMENTS: 'Reference documents',
+        EXAMPLES: 'Golden examples',
+        STYLE: 'Writing style',
+      },
+      warnings: {
+        SECTION_CUT: '{{count}} section(s) hit the length cap and were cut; the model does not see the rest.',
+        BLOCK_OMITTED: 'In {{count}} block(s), items or text were left out because of the budget.',
+        UNREVIEWED_AI:
+          '{{count}} section(s) are still "unconfirmed AI drafts" and the model states their details as uncertain.',
+        DOCUMENTS_DOMINATE: 'Reference documents take more than half of the whole text.',
+        NO_FACTS: 'There are no active, unexpired key facts; the model cannot quote exact numbers or prices.',
+      },
     },
     toc: 'Sections',
     review: {

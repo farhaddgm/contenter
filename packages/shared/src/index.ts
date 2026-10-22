@@ -36,3 +36,4 @@ export * from './occasions';
 export * from './register';
 export * from './register-enum';
 export * from './stale';
+export * from './context-report';

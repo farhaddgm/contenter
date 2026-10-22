@@ -21,6 +21,7 @@ import { ExportModule } from './modules/export/export.module';
 import { StyleFitModule } from './modules/style-fit/style-fit.module';
 import { VariantsModule } from './modules/variants/variants.module';
 import { CoverageModule } from './modules/pillars/coverage.module';
+import { ContextPreviewModule } from './modules/context-preview/context-preview.module';
 import { StaleModule } from './modules/stale/stale.module';
 import { GoldenModule } from './modules/golden/golden.module';
 import { SimilarityModule } from './modules/similarity/similarity.module';
@@ -79,6 +80,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     GoldenModule,
     CoverageModule,
     StaleModule,
+    ContextPreviewModule,
     VariantsModule,
     StyleFitModule,
     ExportModule,
