@@ -1949,6 +1949,31 @@ export const en: DeepStrings<Dictionary> = {
         NO_FACTS: 'There are no active, unexpired key facts; the model cannot quote exact numbers or prices.',
       },
     },
+    lock: {
+      action: 'Lock section',
+      title: 'Lock the section "{{section}}"',
+      intro: 'The lock decides who can change the text of this section. AI never changes a locked section directly; you see its proposal and decide.',
+      badge: { AI_ONLY: 'AI-locked', ADMIN_ONLY: 'Admin only' },
+      hint: {
+        AI_ONLY: 'AI does not change this section directly and only proposes; people who can edit may still edit it.',
+        ADMIN_ONLY: 'AI does not change this section directly, and only an admin can edit it, restore a version or accept a proposal into it.',
+      },
+      level: {
+        NONE: 'Not locked',
+        AI_ONLY: 'Locked against AI',
+        ADMIN_ONLY: 'Admin only',
+      },
+      levelHint: {
+        NONE: 'Anyone who can edit, and the AI, can change the text (the previous version is always kept).',
+        AI_ONLY: 'AI only proposes; AI builds and revisions do not change the section directly.',
+        ADMIN_ONLY: 'As "Locked against AI", and editing, restoring a version and accepting a proposal need an admin.',
+      },
+      noteLabel: 'Why it is locked',
+      noteHint: 'Keep it short so whoever meets the lock later knows why it is there. It is not written to the activity log.',
+      by: 'Locked by {{name}} · {{date}}',
+      locked: 'Lock saved.',
+      unlocked: 'Lock removed.',
+    },
     toc: 'Sections',
     review: {
       unreviewed: 'Not reviewed',

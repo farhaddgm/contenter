@@ -9,21 +9,24 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import {
   BusinessSectionKey,
   CreateBusinessFactSchema,
   CreateBusinessTermSchema,
   FixAuditIssueSchema,
+  SetSectionLockSchema,
   UpdateBusinessFactSchema,
   UpdateBusinessTermSchema,
   type CreateBusinessFactInput,
   type CreateBusinessTermInput,
   type FixAuditIssueInput,
+  type SetSectionLockInput,
   type UpdateBusinessFactInput,
   type UpdateBusinessTermInput,
 } from '@contenter/shared';
-import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
+import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
 import { BusinessScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ProfileKnowledgeService } from './profile-knowledge.service';
@@ -43,6 +46,19 @@ export class ProfileKnowledgeController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.knowledge.reviewSection(id, key, user);
+  }
+
+  /** Locks a section against direct AI writes, or also against everyone but admins (docs/69). */
+  @Roles('ADMIN')
+  @BusinessScoped('business')
+  @Put('businesses/:id/sections/:key/lock')
+  setSectionLock(
+    @Param('id') id: string,
+    @Param('key', SectionKeyPipe) key: BusinessSectionKey,
+    @Body(new ZodValidationPipe(SetSectionLockSchema)) body: SetSectionLockInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.knowledge.setSectionLock(id, key, body, user);
   }
 
   // ---------- facts ----------

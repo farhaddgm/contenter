@@ -5,6 +5,7 @@
  * (suggestions the admin accepts), and a business can be discovered and built from web research.
  * See docs/12-businesses.md. Enums mirror `apps/api/prisma/schema.prisma`.
  */
+import type { SectionLock } from './section-lock';
 import { z } from 'zod';
 import type { AccessLevel } from './enums';
 import { PaginationQuerySchema, patchOf } from './schemas';
@@ -459,9 +460,14 @@ export interface BusinessSection {
   source: SectionSource;
   /** When a person confirmed the current text (null = AI text nobody has reviewed yet). */
   reviewedAt: string | null;
+  /** Who may change the text (docs/69). */
+  lock: SectionLock;
+  lockedAt: string | null;
+  lockNote: string;
   updatedAt: string;
   updatedBy?: { id: string; name: string } | null;
   reviewedBy?: { id: string; name: string } | null;
+  lockedBy?: { id: string; name: string } | null;
 }
 
 export interface BusinessSectionRevision {

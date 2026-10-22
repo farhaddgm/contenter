@@ -52,6 +52,7 @@ model User {
   businesses          Business[]
   businessSections    BusinessSection[]         @relation("SectionUpdatedBy")
   reviewedSections    BusinessSection[]         @relation("SectionReviewedBy")
+  lockedSections      BusinessSection[]         @relation("SectionLockedBy")
   businessFacts       BusinessFact[]
   businessOfferings   BusinessOffering[]        @relation("OfferingUpdatedBy")
   sectionRevisions    BusinessSectionRevision[]
@@ -136,6 +137,12 @@ enum BusinessSectionKey {
 enum SectionSource {
   ADMIN
   AI
+}
+
+enum SectionLock {
+  NONE
+  AI_ONLY
+  ADMIN_ONLY
 }
 
 enum SuggestionStatus {
@@ -227,12 +234,19 @@ model BusinessSection {
   /// When a person confirmed the current text; null = AI text nobody has reviewed yet
   reviewedAt   DateTime?
   reviewedById String?
+  /// Who may change the text (docs/69): NONE = anyone with EDIT and the AI · AI_ONLY = no direct AI writes · ADMIN_ONLY = also only admins
+  lock         SectionLock        @default(NONE)
+  lockedAt     DateTime?
+  lockedById   String?
+  /// Why it is locked (≤ 200 characters); never written to the audit log
+  lockNote     String             @default("")
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
   business   Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   updatedBy  User?                     @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   reviewedBy User?                     @relation("SectionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  lockedBy   User?                     @relation("SectionLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
   revisions  BusinessSectionRevision[]
 
   @@unique([businessId, key])

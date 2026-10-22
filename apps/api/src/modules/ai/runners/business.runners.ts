@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AiJob, Prisma } from '@prisma/client';
 import {
+  aiMustSuggest,
   BUSINESS_FACT_LIMIT,
   BusinessBuildResultSchema,
   BusinessDiscoveryResultSchema,
@@ -39,6 +40,11 @@ import type { AiRunner, RunnerResult } from './runner';
 /** Web searches allowed per research step. */
 export const SEARCHES = { discover: 10, build: 12, suggest: 6, revise: 8 } as const;
 const NO_RESEARCH = '(no web research for this request — rely on the business profile)';
+/** Rationale of a build suggestion for a locked section (docs/69), in the business language. */
+const BUILD_LOCKED_NOTE: Record<string, string> = {
+  fa: 'ساخته‌شده از تحقیق وب. این بخش قفل است و مستقیم تغییر نکرد؛ مقایسه کنید و تصمیم بگیرید.',
+  en: 'Built from web research. This section is locked, so it was not changed; compare and decide.',
+};
 /** Rationale of a build suggestion that sits next to admin-written text, in the business language. */
 const BUILD_KEPT_NOTE: Record<string, string> = {
   fa: 'ساخته‌شده از تحقیق وب. متن خودتان حفظ شد؛ مقایسه کنید و تصمیم بگیرید.',
@@ -388,8 +394,10 @@ export class BusinessBuildRunner implements AiRunner {
         if (!content || seen.has(s.key)) continue;
         seen.add(s.key);
         const existing = byKey.get(s.key);
-        if (existing?.content.trim() && existing.source === 'ADMIN') {
-          if (existing.content.trim() === content) continue;
+        // a locked section (docs/69) and hand-written text only get a suggestion
+        const locked = aiMustSuggest(existing?.lock);
+        if (locked || (existing?.content.trim() && existing.source === 'ADMIN')) {
+          if (existing?.content.trim() === content) continue;
           await tx.businessSuggestion.updateMany({
             where: { businessId: b.id, key: s.key, status: 'PENDING' },
             data: { status: 'DISMISSED', decidedAt: new Date() },
@@ -399,7 +407,9 @@ export class BusinessBuildRunner implements AiRunner {
               businessId: b.id,
               key: s.key,
               content,
-              rationale: BUILD_KEPT_NOTE[b.language] ?? BUILD_KEPT_NOTE.en!,
+              rationale: locked
+                ? (BUILD_LOCKED_NOTE[b.language] ?? BUILD_LOCKED_NOTE.en!)
+                : (BUILD_KEPT_NOTE[b.language] ?? BUILD_KEPT_NOTE.en!),
               jobId: job.id,
             },
           });
@@ -411,6 +421,7 @@ export class BusinessBuildRunner implements AiRunner {
             content,
             source: 'AI',
             userId: null,
+            actor: { kind: 'AI' },
           });
           written++;
         }

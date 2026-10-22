@@ -9,6 +9,7 @@ import type {
   CreateBusinessTermInput,
   FixAuditIssueInput,
   JobAccepted,
+  SetSectionLockInput,
   UpdateBusinessFactInput,
   UpdateBusinessTermInput,
 } from '@contenter/shared';
@@ -33,6 +34,16 @@ export function useReviewSection(businessId: string) {
   return useMutation({
     mutationFn: (key: BusinessSectionKey) =>
       api.post<BusinessSection>(`/businesses/${businessId}/sections/${key}/review`),
+    onSuccess: invalidate,
+  });
+}
+
+/** Locks or unlocks a section (admin only; docs/69). */
+export function useSetSectionLock(businessId: string) {
+  const invalidate = useInvalidateBusiness(businessId);
+  return useMutation({
+    mutationFn: ({ key, ...data }: { key: BusinessSectionKey } & SetSectionLockInput) =>
+      api.put<BusinessSection>(`/businesses/${businessId}/sections/${key}/lock`, data),
     onSuccess: invalidate,
   });
 }
