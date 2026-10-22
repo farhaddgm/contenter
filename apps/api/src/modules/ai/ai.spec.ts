@@ -123,6 +123,7 @@ describe('renderTemplate', () => {
         'text',
       ],
       business_audit: ['language', 'sections_spec', 'business', 'gaps', 'standing_notes'],
+      business_style_build: ['language', 'business', 'style_name', 'direction', 'sources'],
       learn_from_edits: [
         'language',
         'pair_count',

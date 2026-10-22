@@ -26,6 +26,7 @@ import {
   RepurposeContentRunner,
   ReviseContentRunner,
 } from './runners/content.runners';
+import { BusinessStyleBuildRunner } from './runners/business-style.runner';
 import { EmbedReferenceRunner } from './runners/embed-reference.runner';
 import { IdeateRunner } from './runners/ideate.runner';
 import { LearnFromEditsRunner } from './runners/learn-from-edits.runner';
@@ -49,6 +50,7 @@ const RUNNERS = [
   BusinessReviseRunner,
   BusinessAssetAnalyzeRunner,
   BusinessAuditRunner,
+  BusinessStyleBuildRunner,
 ];
 
 @Global()

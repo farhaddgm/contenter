@@ -84,6 +84,8 @@ import {
 import { AssetImportService } from './asset-import.service';
 import { PodSpaceService } from './podspace.service';
 import { ProfileKnowledgeController } from './profile-knowledge.controller';
+import { StylesController } from './styles.controller';
+import { StylesService } from './styles.service';
 import { ProfileKnowledgeService } from './profile-knowledge.service';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
@@ -1119,6 +1121,7 @@ export class BusinessItemsController {
     BusinessItemsController,
     BusinessNotesAssetsController,
     ProfileKnowledgeController,
+    StylesController,
   ],
   providers: [
     BusinessesService,
@@ -1131,6 +1134,7 @@ export class BusinessItemsController {
     BusinessAssetsService,
     AssetUploadInterceptor,
     ProfileKnowledgeService,
+    StylesService,
   ],
   exports: [BusinessesService],
 })

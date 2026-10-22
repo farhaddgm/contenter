@@ -89,6 +89,8 @@ export interface Topic {
   activeProfileId: string | null;
   businessId: string | null;
   business?: { id: string; name: string } | null;
+  styleId?: string | null;
+  style?: { id: string; name: string } | null;
   /** Set when the admin skipped the sample-contents step (content then rests on documents). */
   samplesSkippedAt: ISODate | null;
   createdAt: ISODate;

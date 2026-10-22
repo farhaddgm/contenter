@@ -36,10 +36,12 @@ import { AccessService, TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
+import { BusinessApi } from '../businesses/business-api';
 
 const COUNTS = {
   _count: { select: { samples: true, ideas: true, contents: true, profiles: true } },
   business: { select: { id: true, name: true } },
+  style: { select: { id: true, name: true } },
 };
 
 @Injectable()
@@ -48,6 +50,7 @@ export class TopicsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly access: AccessService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async list(query: z.infer<typeof TopicListQuerySchema>, user: AuthUser) {
@@ -98,9 +101,18 @@ export class TopicsService {
     }
   }
 
+  /** A project may only use a built and confirmed style of its own business (docs/64). */
+  private async assertStyle(businessId: string | null | undefined, styleId: string | null | undefined) {
+    if (!styleId) return;
+    if (!businessId || !(await this.businesses.styleForPrompt(businessId, styleId))) {
+      throw new BadRequestException('Style not found, not built yet or not confirmed by the admin');
+    }
+  }
+
   async create(input: CreateTopicInput, user: AuthUser) {
     const data = CreateTopicSchema.parse(input);
     await this.assertBusiness(data.businessId, user);
+    await this.assertStyle(data.businessId, data.styleId);
     const topic = await this.prisma.topic.create({ data: { ...data, createdById: user.id } });
     this.audit.log({
       userId: user.id,
@@ -115,11 +127,24 @@ export class TopicsService {
     const data = UpdateTopicSchema.parse(input);
     const current = await this.prisma.topic.findUnique({
       where: { id },
-      select: { businessId: true },
+      select: { businessId: true, styleId: true },
     });
     // only a new link is checked, so editing a topic linked to a hidden business still works
-    if (data.businessId !== current?.businessId) await this.assertBusiness(data.businessId, user);
-    const topic = await this.prisma.topic.update({ where: { id }, data });
+    if (data.businessId !== undefined && data.businessId !== current?.businessId) {
+      await this.assertBusiness(data.businessId, user);
+    }
+    const businessId = data.businessId === undefined ? current?.businessId : data.businessId;
+    const businessChanged = businessId !== current?.businessId;
+    // a style is checked when it changes and again when the business under it changes
+    if (data.styleId && (data.styleId !== current?.styleId || businessChanged)) {
+      await this.assertStyle(businessId, data.styleId);
+    }
+    // another business (or none) cannot keep the old business's style
+    const dropStyle = businessChanged && data.styleId === undefined;
+    const topic = await this.prisma.topic.update({
+      where: { id },
+      data: { ...data, ...(dropStyle ? { styleId: null } : {}) },
+    });
     this.audit.log({
       userId: user.id,
       action: 'topic.update',

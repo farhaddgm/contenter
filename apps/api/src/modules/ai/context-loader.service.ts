@@ -67,6 +67,7 @@ export class ContextLoader {
       select: {
         businessId: true,
         samplesSkippedAt: true,
+        styleId: true,
         title: true,
         description: true,
         audience: true,
@@ -89,7 +90,14 @@ export class ContextLoader {
       ...business,
       documents,
       // only a draft being written gets examples; ideas, profiles and the like do not
-      ...(target ? { examples: await this.goldenExamples(topic.businessId, target) } : {}),
+      ...(target
+        ? {
+            examples: await this.goldenExamples(topic.businessId, target),
+            style: topic.styleId
+              ? await this.businesses.styleForPrompt(topic.businessId, topic.styleId)
+              : null,
+          }
+        : {}),
     };
   }
 

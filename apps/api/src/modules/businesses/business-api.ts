@@ -1,6 +1,6 @@
 import { Global, Injectable, Module } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { DocooBusinessListQuery, InstagramStats } from '@contenter/shared';
+import type { DocooBusinessListQuery, InstagramStats, StyleTrait } from '@contenter/shared';
 import { paginate } from '../../common/pagination';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
@@ -47,6 +47,13 @@ const SUMMARY_INCLUDE = {
   _count: { select: { topics: true } },
   sections: { select: { content: true } },
 } satisfies Prisma.BusinessInclude;
+
+export interface StylePromptRow {
+  name: string;
+  summary: string;
+  guide: string;
+  traits: StyleTrait[];
+}
 
 /** Reference documents a model may read: finished, switched on, with text. */
 const READABLE_REFERENCE = { status: 'READY', isActive: true, content: { not: '' } } as const;
@@ -134,6 +141,24 @@ export class BusinessApi {
       this.prisma.businessReference.count({ where: { business, ...READABLE_REFERENCE } }),
     ]);
     return { filledSections, readableReferences };
+  }
+
+  /**
+   * The style a project chose, only when it belongs to the business, is built and confirmed by
+   * the admin (docs/64). Anything else is null: an unconfirmed style never reaches a draft.
+   */
+  async styleForPrompt(businessId: string, styleId: string): Promise<StylePromptRow | null> {
+    const row = await this.prisma.businessStyle.findFirst({
+      where: { id: styleId, businessId, buildState: 'READY', reviewedAt: { not: null } },
+      select: { name: true, summary: true, guide: true, traits: true },
+    });
+    if (!row) return null;
+    return {
+      name: row.name,
+      summary: row.summary,
+      guide: row.guide,
+      traits: Array.isArray(row.traits) ? (row.traits as unknown as StyleTrait[]) : [],
+    };
   }
 
   // ---- integrations (Docoo, Bee Researcher): read-only, scoped by an optional allowlist ----

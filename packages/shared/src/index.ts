@@ -8,6 +8,7 @@ export * from './business';
 export * from './business-assets';
 export * from './social';
 export * from './business-profile';
+export * from './business-style';
 export * from './integration';
 export * from './workflow';
 export * from './calendar';

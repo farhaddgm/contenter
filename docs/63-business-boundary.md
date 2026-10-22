@@ -12,6 +12,7 @@
 ## ۲. دروازه: `BusinessApi`
 | متد | کاربرد | مصرف‌کننده |
 | --- | --- | --- |
+| `styleForPrompt(businessId, styleId)` | سبک ساخته‌شده و تأییدشدهٔ پروژه (docs/64) | `ContextLoader`، `TopicsService` |
 | `names(ids)` | نام کسب‌وکارها | `BudgetService` |
 | `promptProfile(id)` | پروفایل با مجموعهٔ پرامپت (`BUSINESS_PROMPT_INCLUDE`) | `ContextLoader` |
 | `readableReferences(id, {order, take})` | رفرنس‌های READY و فعال با متن | `ContextLoader`، `SimilarityService` |
@@ -28,7 +29,7 @@
 - **عملیات محتوا (در Contenter می‌ماند، به `Content`/review وابسته است):** `ContentPillar` و coverage، `ChecklistTemplate`، stale-contents، نمونه‌های طلایی (golden)، register و بررسی‌های quality.
 
 ## ۴. قانون ESLint
-`apps/api/eslint.config.mjs` قاعدهٔ `no-restricted-syntax` دارد: هر `prisma.business*` / `this.prisma.business*` / `tx.business*` خارج از فهرست مجاز، خطای lint است (`npm run lint`). فقط دسترسی از طریق delegate بررسی می‌شود؛ فیلتر رابطه‌ای از سمت `Topic` (مثل `topic.business`، `where: { business: … }`) آزاد است چون `Topic.businessId` کلید خارجی است.
+`apps/api/eslint.config.mjs` (شامل `BusinessStyle` و `StyleSource` و runner `business-style.runner.ts` در فهرست استثنا) قاعدهٔ `no-restricted-syntax` دارد: هر `prisma.business*` / `this.prisma.business*` / `tx.business*` خارج از فهرست مجاز، خطای lint است (`npm run lint`). فقط دسترسی از طریق delegate بررسی می‌شود؛ فیلتر رابطه‌ای از سمت `Topic` (مثل `topic.business`، `where: { business: … }`) آزاد است چون `Topic.businessId` کلید خارجی است.
 
 ## ۵. فهرست استثنا (بدهی مرزی)
 | فایل | چرا | وضعیت |

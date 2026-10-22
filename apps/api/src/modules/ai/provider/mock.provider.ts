@@ -4,6 +4,7 @@ import {
   type BusinessBuildResult,
   type BusinessDiscoveryResult,
   type BusinessAssetAnalysis,
+  type StyleBuild,
   type BusinessAuditResult,
   type BusinessReviseResult,
   type BusinessSuggestResult,
@@ -255,6 +256,18 @@ export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvide
           ],
           gaps: ['قیمت‌ها از منابع عمومی تأیید نشد (mock).'],
         } satisfies BusinessReviseResult;
+      case 'BUSINESS_STYLE_BUILD':
+        return {
+          summary: 'سبک آزمایشی (mock): جمله‌های کوتاه، لحن صمیمی و پایان با یک دعوت ساده.',
+          traits: [
+            { category: 'TONE', name: 'صمیمی و مطمئن', description: 'مثل یک دوست آگاه حرف می‌زند، نه رسمی و نه شوخ‌طبعانه.' },
+            { category: 'HOOK', name: 'شروع با سؤال', description: 'جملهٔ اول یک سؤال دربارهٔ مشکل روزمرهٔ مخاطب است.' },
+            { category: 'RHYTHM', name: 'جمله‌های کوتاه', description: 'بیشتر جمله‌ها زیر ده کلمه‌اند و هر خط یک ایده دارد.' },
+          ],
+          guide:
+            'با یک سؤال دربارهٔ مشکل مخاطب شروع کن. جمله‌ها را کوتاه و هر خط را یک ایده نگه دار. لحن صمیمی و مطمئن باشد. در پایان یک دعوت ساده بگذار. (mock)',
+          caveats: ['این خروجی آزمایشی (mock) است و از منبع واقعی ساخته نشده.'],
+        } satisfies StyleBuild;
       case 'BUSINESS_ASSET_ANALYZE':
         return {
           summary: 'تحلیل آزمایشی (mock): یک قطعهٔ تبلیغاتی ساده با پیام اصلی روشن.',

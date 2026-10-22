@@ -1,13 +1,20 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateTopicSchema, Platform, type CreateTopicInput, type Topic } from '@contenter/shared';
+import {
+  CreateTopicSchema,
+  Platform,
+  isStyleUsable,
+  type CreateTopicInput,
+  type Topic,
+} from '@contenter/shared';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/dialog';
 import { Field, Input, Select, Textarea } from '@/components/ui/form-controls';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { useBusinessOptions } from '@/features/businesses/api/businesses';
+import { useStyles } from '@/features/businesses/api/styles';
 import { useCreateTopic, useUpdateTopic } from '../api/topics';
 
 const LANGS = [
@@ -45,6 +52,7 @@ export function TopicFormDrawer({
       platform: 'INSTAGRAM',
       language: 'fa',
       businessId: null,
+      styleId: null,
     },
   });
 
@@ -59,6 +67,7 @@ export function TopicFormDrawer({
               platform: topic.platform,
               language: topic.language,
               businessId: topic.businessId,
+              styleId: topic.styleId ?? null,
             }
           : {
               title: '',
@@ -67,6 +76,7 @@ export function TopicFormDrawer({
               platform: 'INSTAGRAM',
               language: 'fa',
               businessId: defaultBusinessId ?? null,
+              styleId: null,
             },
       );
     }
@@ -77,7 +87,19 @@ export function TopicFormDrawer({
     .filter((b) => b.status === 'ACTIVE' || b.id === topic?.businessId)
     .map((b) => ({ value: b.id, label: b.name }));
 
-  const onSubmit = form.handleSubmit((values) => {
+  // Only built and confirmed styles of the chosen business can be picked; the current one stays visible.
+  const chosenBusiness = useWatch({ control: form.control, name: 'businessId' });
+  const styles = useStyles(chosenBusiness);
+  const styleOptions = (styles.data ?? [])
+    .filter((s) => isStyleUsable(s) || s.id === topic?.styleId)
+    .map((s) => ({ value: s.id, label: s.name }));
+
+  const onSubmit = form.handleSubmit((raw) => {
+    // a style left over from another business is dropped
+    const values = {
+      ...raw,
+      styleId: styleOptions.some((o) => o.value === raw.styleId) ? raw.styleId : null,
+    };
     if (topic) {
       update.mutate(values, {
         onSuccess: () => {
@@ -132,6 +154,22 @@ export function TopicFormDrawer({
                 placeholder={t('topics.noBusiness')}
                 options={businessOptions}
                 {...form.register('businessId', { setValueAs: (v: string | null) => v || null })}
+              />
+            )}
+          </Field>
+        )}
+        {chosenBusiness && styleOptions.length > 0 && (
+          <Field
+            label={t('topics.fields.style')}
+            hint={t('topics.fields.styleHint')}
+            error={errors.styleId?.message}
+          >
+            {(id) => (
+              <Select
+                id={id}
+                placeholder={t('topics.noStyle')}
+                options={styleOptions}
+                {...form.register('styleId', { setValueAs: (v: string | null) => v || null })}
               />
             )}
           </Field>
