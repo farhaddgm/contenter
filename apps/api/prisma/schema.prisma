@@ -59,6 +59,8 @@ model User {
   businessReferences  BusinessReference[]
   googleDriveAccounts GoogleDriveAccount[]
   businessNotes       BusinessNote[]
+  businessStyles      BusinessStyle[]
+  styleSources        StyleSource[]
   businessAssets      BusinessAsset[]
   topicMemberships    TopicMember[]             @relation("TopicMemberUser")
   topicGrants         TopicMember[]             @relation("TopicMemberGrantedBy")
@@ -189,6 +191,7 @@ model Business {
   members     BusinessMember[]
   checklists  ChecklistTemplate[]
   pillars     ContentPillar[]
+  styles      BusinessStyle[]
 
   @@index([status, updatedAt])
 }
@@ -602,6 +605,8 @@ model Topic {
   activeProfileId  String?     @unique
   /// Business this project produces content for; its profile is sent to every AI job of the topic
   businessId       String?
+  /// Imitation style the drafts are written in (docs/64); one of the business's reviewed styles
+  styleId          String?
   /// Set when the admin chose to produce content without sample contents (docs/19-optional-samples.md)
   samplesSkippedAt DateTime?
   createdById      String?
@@ -610,6 +615,7 @@ model Topic {
 
   createdBy     User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   business      Business?            @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  style         BusinessStyle?       @relation(fields: [styleId], references: [id], onDelete: SetNull)
   activeProfile ContentProfile?      @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
   principles    Principle[]
   samples       SampleContent[]
@@ -627,6 +633,7 @@ model Topic {
 
   @@index([status, createdAt])
   @@index([businessId])
+  @@index([styleId])
 }
 
 /// Label an editor puts on ideas and contents of one topic (docs/20-tags-campaigns.md).
@@ -1328,6 +1335,8 @@ enum AiJobType {
   LEARN_FROM_EDITS
   /// Splits a business reference into chunks and embeds them (docs/60)
   EMBED_REFERENCE
+  /// Reads the sources of an imitation style and writes its guide (docs/64)
+  BUSINESS_STYLE_BUILD
 }
 
 enum AiJobStatus {
@@ -1658,4 +1667,67 @@ model ApiKey {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+enum StyleSourceKind {
+  INSTAGRAM
+  WEBSITE
+  URL
+  TEXT
+}
+
+/// A named writing style learned from other brands' pages and adapted to one business (docs/64).
+/// Not the business's own material, so it never mixes with `BusinessReference`.
+model BusinessStyle {
+  id          String             @id @default(cuid())
+  businessId  String
+  name        String
+  /// What the admin wants taken (or left) from the sources
+  direction   String             @default("")
+  buildState  BusinessBuildState @default(NONE)
+  buildError  String?
+  lastJobId   String?
+  summary     String             @default("")
+  /// `StyleTrait[]` (packages/shared business-style.ts)
+  traits      Json               @default("[]")
+  /// Writing instructions adapted to this business; goes into drafts as [STYLE]
+  guide       String             @default("")
+  caveats     String[]
+  builtAt     DateTime?
+  /// AI output stays unreviewed until the admin confirms or edits it
+  reviewedAt  DateTime?
+  createdById String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  business  Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  sources   StyleSource[]
+  topics    Topic[]
+
+  @@unique([businessId, name])
+  @@index([businessId, updatedAt])
+}
+
+/// A page of another brand (Instagram account, site, single page or pasted text) a style learns from.
+model StyleSource {
+  id          String          @id @default(cuid())
+  styleId     String
+  kind        StyleSourceKind
+  url         String          @default("")
+  title       String          @default("")
+  content     String          @default("")
+  /// What code computed while reading an INSTAGRAM / WEBSITE source (`ReferenceAnalysis`)
+  analysis    Json?
+  status      ReferenceStatus @default(PENDING)
+  error       String?
+  fetchedAt   DateTime?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  style     BusinessStyle @relation(fields: [styleId], references: [id], onDelete: Cascade)
+  createdBy User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([styleId, createdAt])
 }

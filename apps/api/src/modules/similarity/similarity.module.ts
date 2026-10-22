@@ -8,6 +8,7 @@ import {
 import { AccessService } from '../../common/access';
 import type { AuthUser } from '../../common/auth.decorators';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { BusinessApi } from '../businesses/business-api';
 import { SettingsService } from '../settings/settings.module';
 
 /** How many of each kind are compared (the newest first); keeps one detail request cheap. */
@@ -43,6 +44,7 @@ export class SimilarityService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly settings: SettingsService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async forContent(user: AuthUser, c: SimilaritySubject): Promise<SimilarityReport> {
@@ -151,12 +153,7 @@ export class SimilarityService {
     } catch {
       return [];
     }
-    return this.prisma.businessReference.findMany({
-      where: { businessId, isActive: true, status: 'READY' },
-      orderBy: { updatedAt: 'desc' },
-      take: MAX_REFERENCES,
-      select: { id: true, title: true, url: true, content: true },
-    });
+    return this.businesses.readableReferences(businessId, { order: 'recent', take: MAX_REFERENCES });
   }
 }
 

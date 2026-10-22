@@ -56,11 +56,12 @@ import { GoldenExamplesCard } from '@/features/golden/components/golden-examples
 import { ChecklistsCard } from '@/features/businesses/components/checklists-card';
 import { NotesCard } from '@/features/businesses/components/notes-card';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
+import { StylesPanel } from '@/features/businesses/components/styles-panel';
 import { SectionCard } from '@/features/businesses/components/section-card';
 import { SourceList } from '@/features/businesses/components/source-dialogs';
 
 const SOURCES_PREVIEW = 12;
-const TABS = ['profile', 'knowledge', 'coverage', 'references', 'assets'] as const;
+const TABS = ['profile', 'knowledge', 'coverage', 'references', 'assets', 'styles'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function BusinessRoute() {
@@ -300,6 +301,7 @@ export default function BusinessRoute() {
             )}
             {tab === 'references' && <ReferencesCard businessId={business.id} />}
             {tab === 'assets' && <AssetsPanel businessId={business.id} />}
+            {tab === 'styles' && <StylesPanel businessId={business.id} />}
             {tab === 'profile' && (
               <>
                 <NotesCard

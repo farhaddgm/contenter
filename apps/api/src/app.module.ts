@@ -12,6 +12,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BrandDocsModule } from './modules/brand-docs/brand-docs.module';
+import { BusinessApiModule } from './modules/businesses/business-api';
 import { BusinessesModule } from './modules/businesses/businesses.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { ChecklistsModule } from './modules/checklists/checklists.module';
@@ -62,6 +63,7 @@ import { SmartCoreModule, SmartModule } from './modules/smart/smart.module';
     UsersModule,
     GoogleAccessModule,
     GoogleDriveModule,
+    BusinessApiModule,
     BusinessesModule,
     IntegrationsModule,
     TopicsModule,

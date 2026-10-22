@@ -25,7 +25,8 @@ import {
   formatSectionSpec,
   formatStandingNotes,
 } from '../context';
-import { BUSINESS_PROMPT_INCLUDE, ContextLoader } from '../context-loader.service';
+import { BUSINESS_PROMPT_INCLUDE } from '../../businesses/business-api';
+import { ContextLoader } from '../context-loader.service';
 import {
   mergeSources,
   NonRetryableAiError,

@@ -172,6 +172,8 @@ export const CreateTopicSchema = z.object({
   language: z.string().trim().min(2).max(10).default('fa'),
   /** Business this project produces content for (null = none). */
   businessId: z.string().trim().min(1).nullish(),
+  /** Imitation style of that business (docs/64); null = none. */
+  styleId: z.string().trim().min(1).nullish(),
 });
 export type CreateTopicInput = z.input<typeof CreateTopicSchema>;
 

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
 import {
   DEFAULT_GOLDEN_SETTINGS,
   pickGoldenExamples,
@@ -7,6 +6,7 @@ import {
   type Platform,
 } from '@contenter/shared';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { BusinessApi } from '../businesses/business-api';
 import { SettingsService } from '../settings/settings.module';
 import { MAX_DOCUMENTS_TEXT, type DocumentForPrompt, type ExampleForPrompt } from './context';
 import { SemanticRetriever } from './semantic/semantic.service';
@@ -20,30 +20,6 @@ export interface ExampleTarget {
 }
 
 /**
- * What `formatBusiness` needs: the sections (with review state), active key facts and
- * terminology, and the usable brand assets (newest first).
- */
-export const BUSINESS_PROMPT_INCLUDE = {
-  sections: { select: { key: true, content: true, source: true, reviewedAt: true } },
-  facts: {
-    where: { isActive: true },
-    orderBy: [{ category: 'asc' }, { createdAt: 'asc' }],
-    select: { label: true, value: true, category: true, verified: true, validUntil: true },
-  },
-  terms: {
-    where: { isActive: true },
-    orderBy: [{ kind: 'asc' }, { createdAt: 'asc' }],
-    select: { term: true, kind: true, alternatives: true, note: true },
-  },
-  assets: {
-    where: { isActive: true },
-    orderBy: { createdAt: 'desc' },
-    take: 40,
-    select: { kind: true, title: true, description: true, analysis: true },
-  },
-} satisfies Prisma.BusinessInclude;
-
-/**
  * Loads the shared context every generative task needs: the linked business, principles, brand
  * documents and the active profile.
  */
@@ -51,6 +27,7 @@ export const BUSINESS_PROMPT_INCLUDE = {
 export class ContextLoader {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly businesses: BusinessApi,
     private readonly settings?: SettingsService,
     private readonly semantic?: SemanticRetriever,
   ) {}
@@ -90,6 +67,7 @@ export class ContextLoader {
       select: {
         businessId: true,
         samplesSkippedAt: true,
+        styleId: true,
         title: true,
         description: true,
         audience: true,
@@ -112,7 +90,14 @@ export class ContextLoader {
       ...business,
       documents,
       // only a draft being written gets examples; ideas, profiles and the like do not
-      ...(target ? { examples: await this.goldenExamples(topic.businessId, target) } : {}),
+      ...(target
+        ? {
+            examples: await this.goldenExamples(topic.businessId, target),
+            style: topic.styleId
+              ? await this.businesses.styleForPrompt(topic.businessId, topic.styleId)
+              : null,
+          }
+        : {}),
     };
   }
 
@@ -165,33 +150,16 @@ export class ContextLoader {
 
   /** Readable, active reference documents of a business (same rule as `usableWhere`). */
   documents(businessId: string) {
-    return this.prisma.businessReference.findMany({
-      where: { businessId, status: 'READY', isActive: true, content: { not: '' } },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, title: true, url: true, content: true },
-    });
+    return this.businesses.readableReferences(businessId);
   }
 
   businessById(businessId: string) {
-    return this.prisma.business.findUnique({
-      where: { id: businessId },
-      include: BUSINESS_PROMPT_INCLUDE,
-    });
+    return this.businesses.promptProfile(businessId);
   }
 
   /** Active notes of the business, newest first (`exceptId`: the note being applied now). */
   standingNotes(businessId: string, exceptId?: string) {
-    return this.prisma.businessNote.findMany({
-      where: {
-        businessId,
-        isActive: true,
-        status: { not: 'FAILED' },
-        ...(exceptId ? { id: { not: exceptId } } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      select: { text: true },
-    });
+    return this.businesses.standingNotes(businessId, exceptId);
   }
 
   /** The topic's active APPROVED profile with its traits, or null. */

@@ -4,6 +4,7 @@ import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
 import type { AiAlertsService } from './ai-alerts.service';
 import { BudgetService } from './budget.service';
+import { BusinessApi } from '../businesses/business-api';
 
 const NOW = new Date('2026-10-14T10:00:00Z'); // 22 Mehr 1405: month 2026-09-22T20:30Z .. 2026-10-22T20:30Z
 
@@ -62,6 +63,7 @@ function setup(jobs: Job[], settings?: Partial<BudgetSettings>) {
     prisma as unknown as PrismaService,
     audit,
     { send } as unknown as AiAlertsService,
+    new BusinessApi(prisma as unknown as PrismaService),
   );
   return { svc, send, store };
 }

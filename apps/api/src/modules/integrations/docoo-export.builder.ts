@@ -8,21 +8,9 @@ import {
   type BusinessAssetAnalysis,
   type DocooBusinessExport,
 } from '@contenter/shared';
+import type { ExportRow } from '../businesses/business-api';
 
-/** What the export reads from the database (one query, see DocooExportService). */
-export const EXPORT_INCLUDE = {
-  sections: true,
-  facts: { orderBy: [{ category: 'asc' }, { createdAt: 'asc' }] },
-  terms: { orderBy: { createdAt: 'asc' } },
-  notes: { orderBy: { createdAt: 'desc' }, take: 50 },
-  references: { orderBy: { createdAt: 'asc' } },
-  assets: { orderBy: { createdAt: 'desc' }, take: 200 },
-  audits: { where: { status: 'READY' }, orderBy: { createdAt: 'desc' }, take: 1 },
-  topics: { select: { id: true, title: true, status: true }, orderBy: { updatedAt: 'desc' } },
-  _count: { select: { suggestions: { where: { status: 'PENDING' } } } },
-} satisfies Prisma.BusinessInclude;
-
-export type ExportRow = Prisma.BusinessGetPayload<{ include: typeof EXPORT_INCLUDE }>;
+export type { ExportRow };
 
 const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);

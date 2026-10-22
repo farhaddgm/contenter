@@ -32,6 +32,7 @@ import { TopicScoped } from '../../common/access';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { BusinessApi } from '../businesses/business-api';
 import { SettingsService } from '../settings/settings.module';
 
 const WITH_TRAITS = {
@@ -45,6 +46,7 @@ export class ProfilesService {
     private readonly jobs: AiJobsService,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async list(topicId: string) {
@@ -69,7 +71,7 @@ export class ProfilesService {
 
   async build(topicId: string, input: BuildProfileInput, user: AuthUser) {
     const { maxSamplesPerProfile } = await this.settings.getAi();
-    const [analyzed, brandDocs, businessSections, businessDocs] = await Promise.all([
+    const [analyzed, brandDocs, material] = await Promise.all([
       this.prisma.sampleContent.count({
         where: {
           topicId,
@@ -78,19 +80,9 @@ export class ProfilesService {
         },
       }),
       this.prisma.brandDocument.count({ where: { topicId, isActive: true } }),
-      this.prisma.businessSection.count({
-        where: { business: { topics: { some: { id: topicId } } }, content: { not: '' } },
-      }),
-      this.prisma.businessReference.count({
-        where: {
-          business: { topics: { some: { id: topicId } } },
-          status: 'READY',
-          isActive: true,
-          content: { not: '' },
-        },
-      }),
+      this.businesses.materialForTopic(topicId),
     ]);
-    if (!analyzed && !brandDocs && !businessSections && !businessDocs)
+    if (!analyzed && !brandDocs && !material.filledSections && !material.readableReferences)
       throw new BadRequestException(
         'Analyze at least one sample, add a brand document, or link a business with a filled profile or reference documents before building a profile with AI',
       );

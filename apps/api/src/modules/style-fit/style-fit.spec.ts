@@ -3,6 +3,7 @@ import type { AccessService } from '../../common/access';
 import type { AuthUser } from '../../common/auth.decorators';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import { StyleFitService } from './style-fit.module';
+import { BusinessApi } from '../businesses/business-api';
 
 const admin = { id: 'a', role: 'ADMIN' } as AuthUser;
 
@@ -40,6 +41,7 @@ function setup(opts: { samples?: string[]; ig?: unknown; denyBusiness?: boolean 
     svc: new StyleFitService(
       prisma as unknown as PrismaService,
       access as unknown as AccessService,
+      new BusinessApi(prisma as unknown as PrismaService),
     ),
     sampleFind,
     refFind,

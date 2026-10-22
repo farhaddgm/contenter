@@ -5,6 +5,7 @@ import type { AuthUser } from '../../common/auth.decorators';
 import type { AccessService } from '../../common/access';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
+import type { BusinessApi } from '../businesses/business-api';
 import { TopicsService } from './topics.module';
 
 const admin = { id: 'u1', email: 'a@x.test', role: 'ADMIN' } as AuthUser;
@@ -22,6 +23,7 @@ function setup(samplesSkippedAt: Date | null | undefined) {
     { topic: { findUnique: async () => row, update } } as unknown as PrismaService,
     { log } as unknown as AuditService,
     access,
+    {} as unknown as BusinessApi,
   );
   return { svc, update, log };
 }
