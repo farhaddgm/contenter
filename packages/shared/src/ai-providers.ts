@@ -23,6 +23,7 @@ export const AI_MODEL_CATALOG: readonly AiModelInfo[] = [
   { provider: 'anthropic', id: 'claude-fable-5-1' },
   { provider: 'anthropic', id: 'claude-sonnet-5' },
   { provider: 'anthropic', id: 'claude-haiku-4-5' },
+  { provider: 'openai', id: 'gpt-6.1-sol' },
   { provider: 'openai', id: 'gpt-6-sol' },
   { provider: 'openai', id: 'gpt-6-luna' },
   { provider: 'openai', id: 'gpt-5.6-sol' },
