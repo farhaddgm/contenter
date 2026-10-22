@@ -11,7 +11,6 @@ import {
   type AiSettings,
   type AiSettingsResponse,
 } from '@contenter/shared';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Field, Input, Select } from '@/components/ui/form-controls';
@@ -28,6 +27,7 @@ import { VariantSettingsCard } from '@/features/settings/components/variants-car
 import { GoldenSettingsCard } from '@/features/settings/components/golden-card';
 import { SimilaritySettingsCard } from '@/features/settings/components/similarity-card';
 import { ReadabilitySettingsCard } from '@/features/settings/components/readability-card';
+import { AiKeyRow } from '@/features/settings/components/ai-key-row';
 import { AiRoutingCard } from '@/features/settings/components/ai-routing-card';
 import { BudgetCard } from '@/features/settings/components/budget-card';
 import { WorkflowCard } from '@/features/settings/components/workflow-card';
@@ -140,12 +140,7 @@ function SettingsForm({ data }: { data: AiSettingsResponse }) {
             <CardBody className="space-y-4">
               <ul className="space-y-2">
                 {data.providers.map((p) => (
-                  <li key={p.name} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="font-medium">{PROVIDER_LABEL[p.name]}</span>
-                    <Badge tone={p.configured ? 'success' : 'neutral'}>
-                      {p.configured ? t('settings.connected') : t('settings.noKey')}
-                    </Badge>
-                  </li>
+                  <AiKeyRow key={p.name} status={p} label={PROVIDER_LABEL[p.name]} />
                 ))}
               </ul>
               <p className="text-xs text-muted-foreground">

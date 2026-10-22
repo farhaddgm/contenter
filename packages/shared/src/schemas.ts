@@ -574,10 +574,26 @@ export const AiSettingsSchema = z.object({
 });
 export type AiSettings = z.infer<typeof AiSettingsSchema>;
 
+/**
+ * Set (string) or remove (null) a vendor API key from the admin page. The key is sealed in the
+ * database, shown to nobody afterwards, and wins over the server environment (docs/62).
+ */
+export const AiKeyInputSchema = z.object({
+  provider: z.enum(AiProviderName),
+  key: z.union([z.string().trim().min(20).max(400).regex(/^\S+$/), z.null()]),
+});
+export type AiKeyInput = z.infer<typeof AiKeyInputSchema>;
+
+export type AiKeySource = 'database' | 'env';
+
 export interface AiProviderStatus {
   name: AiProviderName;
-  /** API key present in the server environment. */
+  /** An API key is available (saved in the admin page or in the server environment). */
   configured: boolean;
+  /** Where the key in use comes from; null when there is none. */
+  keySource?: AiKeySource | null;
+  /** Last characters of the saved key, so the admin can tell keys apart; never the key. */
+  keyHint?: string | null;
   /** Text models the vendor's API currently lists (live, cached); absent when unavailable. */
   models?: string[];
 }

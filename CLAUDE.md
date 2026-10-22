@@ -108,6 +108,9 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 - Semantic retrieval: embeddings are made only by the `EMBED_REFERENCE` job; `SemanticRetriever` picks chunks with cosine in code and falls back to the equal-share text whenever anything is missing. No pgvector on purpose (docs/60 §4).
 - Browser tests live in `e2e/`; each test signs in on its own (refresh tokens rotate; a shared saved session breaks).
 
+## AI keys in the admin page (docs/62)
+- Vendor keys saved at `PUT /admin/settings/ai-keys` live sealed (`SecretBox`, purpose `ai-keys`) in `SystemSetting` `ai-keys` and win over `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`. `AiProviderRegistry` reloads them every 15 s (API and worker are separate processes) via `setApiKey` on the providers. The plain key must never reach a response, log or audit row — only `keySource` and the last four characters (`keyHint`).
+
 ## Occasions, language register, stale content (docs/61)
 - Occasions are `occasionsBetween` (shared, pure, `Intl` — no hand-written converter), computed in the browser. Islamic-calendar days are `approximate` (±1–2 days); never present them as official dates. A `MOURNING` occasion must not be paired with promotional wording. The ideate link only fills the `direction` field (`?direction=`); never edit the ideate prompt for it.
 - `Business.register` (`LanguageRegister`, null = unset) adds one line to the `business` prompt variable (`registerInstruction`) and drives two `info` notes in the quality gate (`REGISTER_COLLOQUIAL` / `REGISTER_STIFF` from `registerMarkers`). They never become `warn`, never touch the checklist's `QUALITY_CLEAN`, and the model never judges register. `register-enum.ts` is separate from `register.ts` to avoid an import cycle with `business.ts`.

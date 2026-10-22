@@ -5,6 +5,7 @@ import type {
   GoldenSettings,
   SimilaritySettings,
   ReadabilitySettings,
+  AiKeyInput,
   AiSettings,
   AiSettingsResponse,
   AuditLog,
@@ -201,6 +202,14 @@ export function useUpdateAiSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: AiSettings) => api.put<AiSettingsResponse>('/admin/settings/ai', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  });
+}
+
+export function useSetAiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AiKeyInput) => api.put<AiSettingsResponse>('/admin/settings/ai-keys', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   });
 }

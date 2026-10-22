@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Global, Inject, Injectable, Module, Put } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  AiKeyInputSchema,
   AiSettingsSchema,
   DEFAULT_GOLDEN_SETTINGS,
   DEFAULT_READABILITY_SETTINGS,
@@ -15,6 +16,7 @@ import {
   WorkflowSettingsSchema,
   type AiEffort,
   type AiJobType,
+  type AiKeyInput,
   type AiSettings,
   type AiSettingsResponse,
   type GoldenSettings,
@@ -28,6 +30,7 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
+import { AiKeysService } from '../ai/provider/ai-keys.service';
 import { AiProviderRegistry } from '../ai/provider/provider-registry';
 
 const AI_KEY = 'ai';
@@ -246,7 +249,19 @@ export class SettingsController {
   constructor(
     private readonly settings: SettingsService,
     private readonly providers: AiProviderRegistry,
+    private readonly keys: AiKeysService,
   ) {}
+
+  /** Save or remove a vendor API key. Takes effect at once here and within seconds in the worker. */
+  @Put('ai-keys')
+  async setAiKey(
+    @Body(new ZodValidationPipe(AiKeyInputSchema)) body: AiKeyInput,
+    @CurrentUser() user: AuthUser,
+  ): Promise<AiSettingsResponse> {
+    await this.keys.set(body.provider, body.key, user.id);
+    await this.providers.refreshKeys();
+    return this.withStatus(await this.settings.getAi());
+  }
 
   @Get('ai')
   async getAi(): Promise<AiSettingsResponse> {

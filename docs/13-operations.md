@@ -106,7 +106,7 @@ df -h /
 | `OPENAI_API_KEY` | کلید OpenAI (فعلاً همهٔ کارهای AI با OpenAI انجام می‌شود) |
 | `SEMANTIC_RETRIEVAL` | `auto` (پیش‌فرض: با کلید OpenAI روشن)، `on` یا `off`؛ انتخاب معنایی بخش‌های مراجع بزرگ ([60](60-reliability-and-cost.md)) |
 | `EMBEDDING_MODEL` | مدل تعبیه، `provider:model`؛ پیش‌فرض `openai:text-embedding-3-small` |
-| `ANTHROPIC_API_KEY` | کلید Claude؛ بعد از گذاشتن، در سایت ← تنظیمات مدل‌ها را به Claude تغییر دهید |
+| `ANTHROPIC_API_KEY` | کلید Claude؛ بعد از گذاشتن، در سایت ← تنظیمات مدل‌ها را به Claude تغییر دهید. کلید را می‌توان مستقیم از تنظیمات سایت هم ثبت کرد (اولویت با آن است، docs/62) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ورود با جیمیل ([11-google-login.md](11-google-login.md)) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | کلیدهای امنیتی ورود؛ هرگز پاک یا عوض نکنید مگر عمداً |
 | `INTEGRATION_TOKEN` | توکن خواندن کسب‌وکارها برای Docoo ([18-docoo-integration.md](18-docoo-integration.md)). خالی = خاموش؛ حداقل ۳۲ نویسه |

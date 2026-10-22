@@ -47,11 +47,24 @@ const MODELS_TTL_MS = 60 * 60 * 1000;
 export class OpenAiProvider implements AiProvider, BatchProvider, EmbeddingProvider {
   readonly name = 'openai';
   private readonly logger = new Logger(OpenAiProvider.name);
-  private readonly client: OpenAI | null;
+  private client: OpenAI | null;
 
-  constructor(apiKey: string | undefined, baseURL?: string) {
+  constructor(
+    apiKey: string | undefined,
+    private readonly baseURL?: string,
+  ) {
+    this.client = this.build(apiKey);
+  }
+
+  private build(apiKey: string | undefined): OpenAI | null {
     const key = apiKey || process.env.OPENAI_API_KEY;
-    this.client = key ? new OpenAI({ apiKey: key, baseURL, maxRetries: 2 }) : null;
+    return key ? new OpenAI({ apiKey: key, baseURL: this.baseURL, maxRetries: 2 }) : null;
+  }
+
+  /** Swap the key at runtime (saved in the admin page); undefined goes back to the environment. */
+  setApiKey(apiKey: string | undefined): void {
+    this.client = this.build(apiKey);
+    this.modelsCache = null;
   }
 
   get configured(): boolean {
