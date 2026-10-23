@@ -49,6 +49,7 @@ export type BusinessVia =
   | 'businessTerm'
   | 'businessAudit'
   | 'businessStyle'
+  | 'businessOffering'
   | 'styleSource';
 
 export interface AccessScopeMeta {
@@ -207,6 +208,8 @@ export class AccessService {
         return business(await p.businessAudit.findUnique({ where: { id }, ...bsel }));
       case 'businessStyle':
         return business(await p.businessStyle.findUnique({ where: { id }, ...bsel }));
+      case 'businessOffering':
+        return business(await p.businessOffering.findUnique({ where: { id }, ...bsel }));
       case 'styleSource': {
         const s = await p.styleSource.findUnique({
           where: { id },

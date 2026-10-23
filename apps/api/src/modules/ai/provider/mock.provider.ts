@@ -4,6 +4,7 @@ import {
   type BusinessBuildResult,
   type BusinessDiscoveryResult,
   type BusinessAssetAnalysis,
+  type OfferingsExtract,
   type StyleBuild,
   type BusinessAuditResult,
   type BusinessReviseResult,
@@ -268,6 +269,38 @@ export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvide
             'با یک سؤال دربارهٔ مشکل مخاطب شروع کن. جمله‌ها را کوتاه و هر خط را یک ایده نگه دار. لحن صمیمی و مطمئن باشد. در پایان یک دعوت ساده بگذار. (mock)',
           caveats: ['این خروجی آزمایشی (mock) است و از منبع واقعی ساخته نشده.'],
         } satisfies StyleBuild;
+      case 'BUSINESS_OFFERINGS_EXTRACT': {
+        // proposes the first line of the first source, so the quote can be found in the sources
+        const sources = /<sources>\n([\s\S]*?)\n<\/sources>/.exec(req.user)?.[1] ?? '';
+        const line = sources
+          .split('\n')
+          .map((l) => l.trim())
+          .find((l) => l && !/^\[[SR]\d+\]/.test(l));
+        const quote = (line ?? '')
+          .replace(/^[-*#\s]+/, '')
+          .replace(/\*\*/g, '')
+          .slice(0, 80);
+        const name = quote.split(/\s+/).slice(0, 2).join(' ');
+        return {
+          offerings: quote
+            ? [
+                {
+                  name,
+                  aliases: [],
+                  kind: 'SERVICE' as const,
+                  summary: '',
+                  features: [],
+                  priceAmount: '',
+                  priceCurrency: 'NONE' as const,
+                  priceFrom: false,
+                  priceUnit: '',
+                  evidence: quote,
+                },
+              ]
+            : [],
+          notes: 'خروجی آزمایشی (mock).',
+        } satisfies OfferingsExtract;
+      }
       case 'BUSINESS_ASSET_ANALYZE':
         return {
           summary: 'تحلیل آزمایشی (mock): یک قطعهٔ تبلیغاتی ساده با پیام اصلی روشن.',

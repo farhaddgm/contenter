@@ -1,6 +1,6 @@
 # کاتالوگ ساختاریافتهٔ محصولات و خدمات (docs/67)
 
-> **وضعیت: طرح و بنچ‌مارک.** کدی ساخته نشده و منتظر تأیید مالک است. نمای کلی: [65-business-next-steps.md](65-business-next-steps.md).
+> **وضعیت: ساخته شد** (فاز اول: کاتالوگ، `[CATALOG]`، بررسی قیمت، رابط، صادرات Docoo، پیشنهاد AI). فاز دوم (بخش ۴.۸: پیوند محتوا به محصول و پوشش) ساخته نشده. نمای کلی: [65-business-next-steps.md](65-business-next-steps.md). تفاوت‌های ساخت با طرح در بخش ۹.
 
 هر محصول، خدمت یا طرح کسب‌وکار یک ردیف ساختاریافته دارد (نام و نام‌های دیگر، وضعیت، قیمت و اعتبار قیمت، ویژگی‌ها، اولویت). مدل آن را در بلوک `[CATALOG]` می‌خواند و **دروازهٔ کیفیت با کد** قیمت نوشته‌شده در متن را با قیمت ثبت‌شده می‌سنجد.
 
@@ -148,3 +148,21 @@ write around a missing price. Do not promote items marked NOT AVAILABLE.
 
 ## ۸. تلاش و ترتیب ساخت
 M. ترتیب: مدل + Zod + CRUD ← `[CATALOG]` ← بررسی قیمت ← رابط ← صادرات Docoo ← استخراج AI. بهتر است بعد از [66](66-business-context-preview.md) ساخته شود تا اندازهٔ بلوک تازه دیده شود.
+
+## ۹. آنچه ساخته شد و تفاوت با طرح
+
+**کد:** `packages/shared/src/business-catalog.ts` (اسکیماها، `formatOfferingPrice`، `isOfferingAvailable`، `resolveOfferingProposals`)، `extractPrices` و `comparePrice` و دو کد تازه در `quality.ts`، `OfferingsService` و `OfferingsController` در `modules/businesses`، `formatBusinessCatalog` در `ai/context.ts`، رانر `business-offerings.runner.ts`، پرامپت `business_offerings_extract`، و برگهٔ «محصولات و خدمات» (`offerings-panel.tsx`). migration: `20261022150000_business_offerings` (جدول، دو enum و مقدار تازهٔ `AiJobType`).
+
+**تفاوت‌ها با طرح:**
+- **بلوک `[CATALOG]` بعد از `[FACTS]` و پیش از `[TERMINOLOGY]`** می‌آید و در پیش‌نمایش docs/66 بلوک جدا (`CATALOG`) است. فقط ردیف **فعال و تأییدشده** (`isActive && verified`) به پرامپت، بررسی کیفیت و خروجی می‌رسد؛ در خروجی Docoo همهٔ ردیف‌ها (با `verified` و `isActive`) هست.
+- **قیمت منقضی** در پرامپت نمی‌آید و «price not available» جایش می‌نشیند؛ در بررسی کیفیت همان کد `FACT_EXPIRED` (نه کد تازه) برای قیمت منقضی استفاده می‌شود تا ردیاب محتوای کهنه (docs/61) بدون تغییر کار کند.
+- **دو کد تازه:** `OFFERING_PRICE_MISMATCH` و `OFFERING_UNAVAILABLE` (به انتهای `QualityIssueCode`)، هر دو `warn`. فقط `OFFERING_PRICE_MISMATCH` به `STALE_CODES` اضافه شد. تطبیق نام با همان `mentionsLabel` است؛ «عدد قیمتی» فقط عددی است که کنار واژهٔ ارز (تومان/ریال/دلار/یورو، نماد $ و €) بیاید، با مقیاس «هزار/میلیون/میلیارد» و پسوند «ی» («تومانی»). برای «قیمت از …» هر قیمت برابر یا بیشتر پذیرفته می‌شود.
+- **قیمت‌گذاری با Decimal:** `BusinessOffering.priceAmount` از نوع `Decimal(18,2)` است و در API رشته می‌رود (مثلاً `"199000"`)؛ ارقام فارسی و جداکننده‌ها را `OfferingPriceAmount` به شکل استاندارد درمی‌آورد. پاک کردن قیمت، واحد پول و جزئیات قیمت را هم پاک می‌کند.
+- **ردیف AI:** با `source: AI`، `verified: false`، `isActive: false` ذخیره می‌شود و تا «تأیید و فعال‌سازی» استفاده نمی‌شود؛ روشن کردن ردیف تأییدنشده ۴۰۰ می‌دهد. اگر نام ردیف AI همان لحظه با یک ردیف ادمین یکی شد، ردیف ادمین می‌ماند.
+- **استخراج:** منبع‌ها بخش `SERVICES`، واقعیت‌های فعال و رفرنس‌های خواندنی هستند (بخش‌ها و رفرنس‌ها بریده می‌شوند و شاهد با همان متن بریده‌شده سنجیده می‌شود). `resolveOfferingProposals` ردیف بدون نقل‌قول یافت‌شده، با نامی که در منابع نیست، تکراری یا بیش از ظرفیت را حذف می‌کند و قیمت را فقط وقتی نگه می‌دارد که همان نقل مبلغ و ارز را بگوید (تومان و ریال با ×۱۰ برابر شمرده می‌شوند). فقط یک استخراج هم‌زمان برای هر کسب‌وکار.
+- **مرز ماژول:** delegate `businessOffering` به regex قانون ESLint اضافه شد و رانر در فهرست استثنا است (docs/63 §5). `BusinessScoped('businessOffering')` در `access.ts`.
+- **Docoo/Researcher:** آرایهٔ `offerings` افزوده شد (بدون `note`، `evidence`، `jobId` و افراد، با ترتیب `push`، `sortOrder`، نام، `id`)؛ `DOCOO_EXPORT_SCHEMA_VERSION` تغییر نکرد.
+
+**ساخته نشد (بخش ۴.۸):** `Idea.offeringId` / `Content.offeringId`، `offeringCoverage` و پیشنهاد اولویت از `GOALS`.
+
+**تست‌ها:** `business-catalog.spec.ts` (shared: قیمت‌ها، مقایسه، دروازهٔ کیفیت، اسکیما، پیشنهاد AI)، `stale.spec.ts` (shared و API)، `offerings.spec.ts` (قالب `[CATALOG]`، سرویس، رانر)، `docoo-export.spec.ts`، `offerings.test.tsx` (رابط). راستی‌آزمایی دستی با API و PGlite و AI ساختگی: ساخت ردیف با قیمت فارسی، نام تکراری ← ۴۰۰، قیمت بدون ارز ← ۴۰۰، حضور بلوک در پیش‌نمایش، استخراج ← ردیف غیرفعال، تأیید، و `OFFERING_PRICE_MISMATCH` روی یک محتوای واقعی (قیمت درست بی‌هشدار، قیمت غلط هشدار).

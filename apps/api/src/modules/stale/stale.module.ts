@@ -23,8 +23,11 @@ export class StaleService {
   ) {}
 
   async forBusiness(businessId: string, user: AuthUser): Promise<StaleReport> {
-    const facts = await this.businesses.activeFacts(businessId);
-    if (!facts.length) return { checked: 0, truncated: false, items: [] };
+    const [facts, offerings] = await Promise.all([
+      this.businesses.activeFacts(businessId),
+      this.businesses.offeringsForQuality(businessId),
+    ]);
+    if (!facts.length && !offerings.length) return { checked: 0, truncated: false, items: [] };
     const visible = this.access.visibleTopics(user);
     const rows = await this.prisma.content.findMany({
       where: {
@@ -69,6 +72,8 @@ export class StaleService {
           : [],
       ),
       facts,
+      new Date(),
+      offerings,
     );
     return { checked: used.length, truncated, items };
   }

@@ -56,6 +56,7 @@ import { GoldenExamplesCard } from '@/features/golden/components/golden-examples
 import { ChecklistsCard } from '@/features/businesses/components/checklists-card';
 import { ContextPreviewPanel } from '@/features/businesses/components/context-preview-panel';
 import { NotesCard } from '@/features/businesses/components/notes-card';
+import { OfferingsPanel } from '@/features/businesses/components/offerings-panel';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
 import { StylesPanel } from '@/features/businesses/components/styles-panel';
 import { SectionCard } from '@/features/businesses/components/section-card';
@@ -69,6 +70,7 @@ const TABS = [
   'references',
   'assets',
   'styles',
+  'offerings',
   'context',
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -311,6 +313,7 @@ export default function BusinessRoute() {
             {tab === 'references' && <ReferencesCard businessId={business.id} />}
             {tab === 'assets' && <AssetsPanel businessId={business.id} />}
             {tab === 'styles' && <StylesPanel businessId={business.id} />}
+            {tab === 'offerings' && <OfferingsPanel businessId={business.id} />}
             {tab === 'context' && (
               <ContextPreviewPanel businessId={business.id} topics={business.topics ?? []} />
             )}

@@ -78,6 +78,37 @@ function row(overrides: Partial<ExportRow> = {}): ExportRow {
         updatedAt: at(2),
       },
     ],
+    offerings: [
+      {
+        id: 'o1',
+        businessId: 'biz1',
+        name: 'کارت طلایی',
+        aliases: ['Gold card'],
+        kind: 'PLAN',
+        status: 'ACTIVE',
+        push: 2,
+        summary: 'کارت بدون کارمزد صدور',
+        features: ['بدون کارمزد صدور'],
+        priceAmount: { toString: () => '199000' },
+        priceCurrency: 'IRT',
+        priceFrom: false,
+        priceUnit: 'ماهانه',
+        priceValidUntil: at(9),
+        availableFrom: null,
+        availableUntil: null,
+        url: 'https://example.com/gold',
+        note: 'یادداشت داخلی کارت',
+        source: 'AI',
+        verified: true,
+        isActive: true,
+        evidence: 'نقل داخلی از منبع',
+        sortOrder: 0,
+        jobId: 'job-secret',
+        updatedById: 'person-77',
+        createdAt: at(1),
+        updatedAt: at(2),
+      },
+    ],
     terms: [
       {
         id: 't1',
@@ -212,6 +243,30 @@ describe('Docoo export (docs/18)', () => {
         validUntil: at(9).toISOString(),
       }),
     ]);
+    expect(out.offerings).toEqual([
+      {
+        id: 'o1',
+        name: 'کارت طلایی',
+        aliases: ['Gold card'],
+        kind: 'PLAN',
+        status: 'ACTIVE',
+        push: 2,
+        summary: 'کارت بدون کارمزد صدور',
+        features: ['بدون کارمزد صدور'],
+        priceAmount: '199000',
+        priceCurrency: 'IRT',
+        priceFrom: false,
+        priceUnit: 'ماهانه',
+        priceValidUntil: at(9).toISOString(),
+        availableFrom: null,
+        availableUntil: null,
+        url: 'https://example.com/gold',
+        source: 'AI',
+        verified: true,
+        isActive: true,
+        updatedAt: at(2).toISOString(),
+      },
+    ]);
     expect(out.terms[0]).toMatchObject({
       term: 'ویپاد',
       kind: 'USE',
@@ -250,6 +305,9 @@ describe('Docoo export (docs/18)', () => {
       'person-77',
       'updatedById',
       'storageKey',
+      'یادداشت داخلی کارت',
+      'نقل داخلی از منبع',
+      'job-secret',
     ]) {
       expect(text).not.toContain(secret);
     }

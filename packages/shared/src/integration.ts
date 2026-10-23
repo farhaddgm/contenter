@@ -79,6 +79,30 @@ export interface DocooBusinessExport {
     isActive: boolean;
     updatedAt: string;
   }[];
+  /** The catalog (docs/67); rows sorted by push level, the admin's order, name and id. */
+  offerings: {
+    id: string;
+    name: string;
+    aliases: string[];
+    kind: string;
+    status: string;
+    push: number;
+    summary: string;
+    features: string[];
+    /** Decimal as text, with `priceCurrency`; null = no price. */
+    priceAmount: string | null;
+    priceCurrency: string | null;
+    priceFrom: boolean;
+    priceUnit: string;
+    priceValidUntil: string | null;
+    availableFrom: string | null;
+    availableUntil: string | null;
+    url: string;
+    source: 'ADMIN' | 'AI';
+    verified: boolean;
+    isActive: boolean;
+    updatedAt: string;
+  }[];
   terms: {
     id: string;
     term: string;

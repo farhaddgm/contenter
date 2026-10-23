@@ -53,6 +53,7 @@ model User {
   businessSections    BusinessSection[]         @relation("SectionUpdatedBy")
   reviewedSections    BusinessSection[]         @relation("SectionReviewedBy")
   businessFacts       BusinessFact[]
+  businessOfferings   BusinessOffering[]        @relation("OfferingUpdatedBy")
   sectionRevisions    BusinessSectionRevision[]
   businessDiscovery   BusinessDiscovery[]
   blockedSources      BlockedSource[]
@@ -192,6 +193,7 @@ model Business {
   checklists  ChecklistTemplate[]
   pillars     ContentPillar[]
   styles      BusinessStyle[]
+  offerings   BusinessOffering[]
 
   @@index([status, updatedAt])
 }
@@ -542,6 +544,64 @@ model BusinessAudit {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, createdAt])
+}
+
+enum OfferingKind {
+  PRODUCT
+  SERVICE
+  PLAN
+  BUNDLE
+}
+
+enum OfferingStatus {
+  ACTIVE
+  SEASONAL
+  PAUSED
+  DISCONTINUED
+}
+
+/// A product, service, plan or bundle of the business with its price (docs/67). Active, verified rows
+/// reach the `[CATALOG]` prompt block, the quality gate's price check and the integrations' export.
+model BusinessOffering {
+  id              String         @id @default(cuid())
+  businessId      String
+  name            String
+  /// Other spellings that count as this offering in the quality check
+  aliases         String[]
+  kind            OfferingKind   @default(PRODUCT)
+  status          OfferingStatus @default(ACTIVE)
+  /// 0 = do not promote · 1 = normal · 2 = priority · 3 = hero
+  push            Int            @default(1)
+  summary         String         @default("")
+  features        String[]
+  priceAmount     Decimal?       @db.Decimal(18, 2)
+  /// IRT (toman) | IRR (rial) | USD | EUR — always given with a price, never converted
+  priceCurrency   String?
+  priceFrom       Boolean        @default(false)
+  priceUnit       String         @default("")
+  priceValidUntil DateTime?
+  availableFrom   DateTime?
+  availableUntil  DateTime?
+  url             String         @default("")
+  /// Internal note; never sent to a model or an integration
+  note            String         @default("")
+  source          SectionSource  @default(ADMIN)
+  /// Rows the admin types are verified; AI-proposed ones start unverified and inactive
+  verified        Boolean        @default(true)
+  isActive        Boolean        @default(true)
+  /// The text in a source that backs an AI-proposed row (checked by code)
+  evidence        String         @default("")
+  sortOrder       Int            @default(0)
+  jobId           String?
+  updatedById     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User?    @relation("OfferingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, name])
+  @@index([businessId, status])
 }
 
 enum SourceBlockKind {
@@ -1337,6 +1397,8 @@ enum AiJobType {
   EMBED_REFERENCE
   /// Reads the sources of an imitation style and writes its guide (docs/64)
   BUSINESS_STYLE_BUILD
+  /// Proposes catalog rows from the profile and references; code checks each against its quote (docs/67)
+  BUSINESS_OFFERINGS_EXTRACT
 }
 
 enum AiJobStatus {

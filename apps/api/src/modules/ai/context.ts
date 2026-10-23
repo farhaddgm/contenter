@@ -19,12 +19,18 @@ import {
   BUSINESS_SECTION_META,
   BUSINESS_SECTION_SPEC,
   BusinessSectionKey,
+  formatOfferingPrice,
+  hasValidPrice,
   isFactExpired,
+  isOfferingAvailable,
   isRegister,
+  MAX_CATALOG_TEXT,
+  priceText,
   registerInstruction,
   type ContextBlock,
   type ContextBlockId,
   type FetchedMedia,
+  type OfferingCore,
   type SampleAnalysisResult,
 } from '@contenter/shared';
 
@@ -142,8 +148,12 @@ export type BusinessForPrompt = Pick<
   /** The imitation style the project chose (docs/64): reviewed and built only; drafts only. */
   style?: StyleForPrompt | null;
   facts?: FactForPrompt[];
+  /** Active, confirmed catalog rows, in prompt order (docs/67). */
+  offerings?: OfferingForPrompt[];
   terms?: TermForPrompt[];
 };
+
+export type OfferingForPrompt = OfferingCore;
 
 export type FactForPrompt = {
   label: string;
@@ -195,6 +205,41 @@ export function formatBusinessFacts(facts: FactForPrompt[], now = new Date()): s
     '### Key facts [FACTS]',
     'Exact values maintained by the admin. Quote them exactly as written. Never state a price, fee, rate, limit, number, date or contact detail of this business that is not listed here or in the sections above; if one is needed and missing, write around it.',
     ...budgeted(lines, MAX_FACTS_TEXT),
+  ].join('\n');
+}
+
+/**
+ * What the business sells (docs/67-business-catalog.md), in the order they arrive (push level, then
+ * the admin's order). A price shows only while it is valid; an offering that cannot be sold today is
+ * listed as NOT AVAILABLE, without its features, so the model does not promote it.
+ */
+export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new Date()): string {
+  if (!offerings.length) return '';
+  const lines = offerings.map((o) => {
+    const available = isOfferingAvailable(o, now);
+    const tags = [o.kind, o.status === 'SEASONAL' ? 'SEASONAL' : null, o.push > 1 ? `push ${o.push}` : null]
+      .concat(!available ? ['NOT AVAILABLE'] : o.push === 0 ? ['do not promote'] : [])
+      .filter(Boolean)
+      .join(' · ');
+    const price = hasValidPrice(o, now)
+      ? formatOfferingPrice(o)
+      : priceText(o.priceAmount)
+        ? 'price not available'
+        : '';
+    const until = o.priceValidUntil && hasValidPrice(o, now)
+      ? ` (valid until ${new Date(o.priceValidUntil).toISOString().slice(0, 10)})`
+      : '';
+    const head = `- [${tags}] ${o.name}${price ? ` — ${price}${until}` : ''}`;
+    if (!available) return head;
+    const alias = o.aliases.length ? `\n  Also written: ${o.aliases.join(' | ')}` : '';
+    const summary = o.summary.trim() ? `\n  ${o.summary.trim()}` : '';
+    const features = o.features.length ? `\n  Features: ${o.features.join('; ')}` : '';
+    return `${head}${alias}${summary}${features}`;
+  });
+  return [
+    '### Offerings [CATALOG]',
+    'What the business sells. Use these names and prices exactly as written. A price is valid only if it is shown here; if one is missing, write around it. Never promote an item marked NOT AVAILABLE or "do not promote". Prices listed here are valid in addition to [FACTS].',
+    ...budgeted(lines, MAX_CATALOG_TEXT),
   ].join('\n');
 }
 
@@ -449,6 +494,7 @@ export function buildBusinessParts(
   }
   const rest: [ContextBlockId, string][] = [
     ['FACTS', b.facts?.length ? formatBusinessFacts(b.facts) : ''],
+    ['CATALOG', b.offerings?.length ? formatBusinessCatalog(b.offerings) : ''],
     ['TERMS', b.terms?.length ? formatBusinessTerms(b.terms) : ''],
     ['ASSETS', b.assets?.length ? formatBusinessAssets(b.assets) : ''],
     ['DOCUMENTS', b.documents?.length ? formatBusinessDocuments(b.documents) : ''],
