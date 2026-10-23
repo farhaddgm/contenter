@@ -1,6 +1,6 @@
 # رقبای ساختاریافته (docs/70)
 
-> **وضعیت: طرح و بنچ‌مارک؛ ساخت فازبندی‌شده.** کدی ساخته نشده. این طرح جایگزین بخش «رصد رقبا» (گام ۳۰) در [docs/29-steps/06-data-and-reports.md](29-steps/06-data-and-reports.md) می‌شود (بخش ۴.۷). نمای کلی: [65-business-next-steps.md](65-business-next-steps.md).
+> **وضعیت: فاز ۱ (کارت دستی) و فاز ۲ (منبع و مقایسه) ساخته شد؛ `COMPETITOR_BRIEF` و اسنپ‌شات ساخته نشده.** جزئیات در بخش‌های ۹ و ۱۰. این طرح جایگزین بخش «رصد رقبا» (گام ۳۰) در [docs/29-steps/06-data-and-reports.md](29-steps/06-data-and-reports.md) می‌شود (بخش ۴.۷). نمای کلی: [65-business-next-steps.md](65-business-next-steps.md).
 
 ادمین فهرست کوچکی از رقبا را ثبت می‌کند (سایت، صفحهٔ اینستاگرام با داده‌ٔ دستی یا Graph API، متن چسبانده). **کد** آن‌ها را می‌خواند و با آمار خود برند مقایسه می‌کند؛ مدل فقط آمار را تفسیر می‌کند و خروجی‌اش `BusinessSuggestion` برای بخش `COMPETITORS` است، نه نوشتن مستقیم.
 
@@ -91,3 +91,26 @@
 
 ## ۸. تلاش
 L در کل؛ فاز ۱ و ۲ هر کدام M. به خاطر نیاز به کار دستی و نبود Graph API، پیشنهاد می‌شود فاز ۱ ساخته شود و فاز ۲ بعد از دیدن استفاده.
+
+## ۹. آنچه ساخته شد (فاز ۱، کارت دستی)
+
+**کد:** `packages/shared/src/business-competitors.ts` (اسکیما، `competitorsSectionBlock`، `mergeCompetitorsBlock`)، `CompetitorsService` / `CompetitorsController` در `modules/businesses`، `competitors-panel.tsx` و برگهٔ «رقبا» در صفحهٔ کسب‌وکار. migration: `20261023120000_business_competitors`.
+
+**تفاوت با طرح:**
+- جدول `BusinessCompetitor` (نه `Competitor`)، تا قانون مرز کسب‌وکار (docs/63) و `BusinessScoped('businessCompetitor')` با همان الگوی نام‌ها بخورد؛ `Competitor` به regex ESLint اضافه شد.
+- به‌جای ردیف منبع، **فیلدهای ساختاریافتهٔ دستی** دارد: نوع (`DIRECT | INDIRECT | REFERENCE`)، سایت، اینستاگرام (فقط یادآوری؛ برنامه آن را باز نمی‌کند)، جایگاه‌یابی، سطح قیمت (متن آزاد؛ کد مقایسه‌اش نمی‌کند)، نقاط قوت و ضعف (≤ ۶)، «تفاوت ما با او» و یادداشت داخلی. سقف ۸ رقیب.
+- **قاعدهٔ نشت (بخش ۴.۵) رعایت شد:** کارت‌ها در `BUSINESS_PROMPT_INCLUDE`، `EXPORT_INCLUDE`، `[DOCUMENTS]`، خروجی Docoo/Researcher و شباهت‌سنجی نیستند (تست نگهبان در `competitors.spec.ts`). تنها راه رسیدن به AI دکمهٔ «افزودن به پروفایل» است (`POST /businesses/:id/competitors/add-to-profile`): خلاصهٔ کارت‌های **فعال** بین دو نشانگر `<!-- competitors:start/end -->` در بخش `COMPETITORS` نوشته می‌شود (متن دستی ادمین دور آن می‌ماند و اجرای بعدی فقط همین بلوک را عوض می‌کند). نوشتن از `writeSection` با `actor` کاربر می‌گذرد، پس قفل بخش (docs/69) اعمال می‌شود. یادداشت داخلی هرگز در متن نمی‌آید.
+
+**ساخته نشد:** `CompetitorSource` / `CompetitorSnapshot` و خواندن سایت، اینستاگرام و متن چسبانده (فاز ۱ در طرح و فاز ۲)، `compareBrands`، `COMPETITOR_BRIEF`. دلیل: خواندن منابع به‌جز بازآرایی `StylesService` به خوانندهٔ مشترک `OtherBrandReader` نمی‌شود و سؤال بازِ مالک (چند رقیب، ورود دستی اینستاگرام) هنوز پاسخ ندارد.
+
+## ۱۰. آنچه ساخته شد (فاز ۲: منبع و مقایسه)
+
+**کد:** `BusinessCompetitorSource` (migration `20261023160000_competitor_sources`)، `CompetitorSourcesService` در `modules/businesses`، `compareBrands` و `AddCompetitorSourceSchema` در `packages/shared/src/brand-compare.ts`، `competitor-sources.tsx` و `competitor-compare-card.tsx` در برگهٔ «رقبا».
+
+**تصمیم‌ها (هماهنگ با docs/00 §۴ مورد ۴):**
+- **جدول منبع جدا برای کارت** (نه نسخهٔ سومِ منطق خواندن): همان قالب `StyleSource` (`kind`، `url`، `content`، `analysis`، `status`) و همان ورودی (`AddStyleSourceSchema`)؛ خواندن فقط از `SourceReader`. برای اینکه `add/refresh` برای سومین بار کپی نشود، `SourceReader.snapshot()` اضافه شد (می‌خواند و یا رکورد ذخیرنی یا شکست برمی‌گرداند). `StylesService` و `ReferencesService` هنوز نسخهٔ خودشان را دارند و می‌توانند بعداً به همین متد بروند.
+- قواعد docs/28: هرگز `instagram.com` واکشی نمی‌شود (Graph API یا داده‌ای که ادمین وارد می‌کند، `provider: MANUAL`)، ورود/صفحهٔ ورود ذخیره نمی‌شود، سایت با robots.txt و ≤ ۱۰ صفحه، نظر و فهرست دنبال‌کننده خوانده نمی‌شود. سقف ۳ منبع برای هر رقیب؛ منبع دستی و متن «تازه‌سازی» ندارد. حذف رقیب منابعش را هم پاک می‌کند (cascade).
+- **قاعدهٔ نشت (۴.۵) همچنان برقرار است:** منبع رقیب در `BUSINESS_PROMPT_INCLUDE`، `EXPORT_INCLUDE`، `[DOCUMENTS]`، خروجی‌ها و شباهت‌سنجی نیست (تست نگهبان: هیچ کلید `competitor` در آن includeها نیست). تنها راه به پرامپت همان «افزودن به پروفایل» کارت است.
+- **مقایسه** (`GET /businesses/:id/competitors/compare`): آمار اینستاگرام کسب‌وکار (`BusinessApi.instagramStats`) کنار آمار آخرین منبع اینستاگرامِ خواندنی هر رقیب فعال. هشت معیار (پست در هفته، طول کپشن، ایموجی، هشتگ، سهم دعوت به اقدام، سهم پرسش، سهم حروف فارسی، نرخ تعامل)، کمینه/بیشینهٔ رقبا، و هم‌پوشانی هشتگ‌ها (ژاکارد روی هشتگ‌های پرتکرار؛ «مشترک» و «فقط آن‌ها دارند»). زیر `MIN_INSTAGRAM_POSTS` (۶) هیچ عددی نشان داده نمی‌شود («داده کافی نیست»)؛ نرخ تعامل فقط وقتی هر دو طرف نرخ مبتنی بر دنبال‌کننده دارند و با برچسب «وابسته به تعداد دنبال‌کننده» می‌آید. هیچ ادعایی دربارهٔ مخاطب نمی‌شود.
+
+**ساخته نشد:** `COMPETITOR_BRIEF` (فاز ۳؛ AI فقط تفسیر آمار و پیشنهاد برای بخش `COMPETITORS` با شاهد-نقل‌قول) و `CompetitorSnapshot` / روند زمانی (فاز ۴، وابسته به Graph API و گام ۲۹). سؤال باز مالک (چند رقیب، ورود دستی اینستاگرام) و بازبینی حقوقی هنوز پاسخ ندارد.

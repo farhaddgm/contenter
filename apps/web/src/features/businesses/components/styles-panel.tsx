@@ -21,6 +21,7 @@ import {
   STYLE_SOURCE_LIMIT,
   instagramProfileUrl,
   parseInstagramHandle,
+  type AddStyleSourceInput,
   type BusinessStyleDetail,
   type BusinessStyleSummary,
   type StyleSourceKind,
@@ -366,7 +367,7 @@ function StyleDetail({ businessId, id }: { businessId: string; id: string }) {
         />
       )}
       {adding && (
-        <AddSourceDialog businessId={businessId} styleId={id} onOpenChange={setAdding} />
+        <AddStyleSourceDialog businessId={businessId} styleId={id} onOpenChange={setAdding} />
       )}
       {viewing && <SourceTextDialog source={viewing} onOpenChange={() => setViewing(null)} />}
     </div>
@@ -761,8 +762,7 @@ function EditStyleDialog({
   );
 }
 
-/** One source of another brand: a page, a whole site, an Instagram account or a text. Mounted only while open. */
-function AddSourceDialog({
+function AddStyleSourceDialog({
   businessId,
   styleId,
   onOpenChange,
@@ -771,8 +771,36 @@ function AddSourceDialog({
   styleId: string;
   onOpenChange: (v: boolean) => void;
 }) {
-  const t = useT();
   const add = useAddStyleSource(businessId, styleId);
+  return <AddSourceDialog add={add} onOpenChange={onOpenChange} />;
+}
+
+/** What `AddSourceDialog` needs from the mutation that stores the source (a style's or a competitor's). */
+export interface AddSourceMutation {
+  isPending: boolean;
+  mutate: (
+    input: AddStyleSourceInput,
+    options: { onSuccess: (source: StyleSourceSummary) => void; onError: (e: Error) => void },
+  ) => void;
+}
+
+/**
+ * One source of another brand: a page, a whole site, an Instagram account or a text. Shared by the
+ * imitation styles and the competitor cards. Mounted only while open.
+ */
+export function AddSourceDialog({
+  add,
+  onOpenChange,
+  title: dialogTitle,
+  description,
+}: {
+  add: AddSourceMutation;
+  onOpenChange: (v: boolean) => void;
+  /** Overrides the imitation-style wording (a competitor's source is not a style source). */
+  title?: string;
+  description?: string;
+}) {
+  const t = useT();
   const { data: igStatus } = useInstagramStatus();
   const [tab, setTab] = useState<'link' | 'site' | 'instagram' | 'text'>('link');
   const [url, setUrl] = useState('');
@@ -820,8 +848,8 @@ function AddSourceDialog({
     <Dialog
       open
       onOpenChange={onOpenChange}
-      title={t('businesses.styles.addSourceTitle')}
-      description={t('businesses.styles.addSourceSubtitle')}
+      title={dialogTitle ?? t('businesses.styles.addSourceTitle')}
+      description={description ?? t('businesses.styles.addSourceSubtitle')}
       descriptionAsTip
       footer={
         <>

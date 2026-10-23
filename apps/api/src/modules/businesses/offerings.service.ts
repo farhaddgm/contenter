@@ -3,6 +3,8 @@ import type { BusinessOffering as OfferingRow, Prisma } from '@prisma/client';
 import {
   BUSINESS_OFFERING_LIMIT,
   CreateBusinessOfferingSchema,
+  normalizeMonths,
+  parseClaims,
   UpdateBusinessOfferingSchema,
   offeringProblems,
   priceText,
@@ -29,8 +31,13 @@ export const offeringOf = (r: OfferingRow): BusinessOffering => ({
   kind: r.kind,
   status: r.status,
   push: r.push,
+  stock: r.stock,
+  peakMonths: r.peakMonths,
+  complementIds: r.complementIds,
+  substituteIds: r.substituteIds,
   summary: r.summary,
   features: r.features,
+  claims: parseClaims(r.claims),
   priceAmount: priceText(r.priceAmount),
   priceCurrency: (r.priceCurrency as PriceCurrency | null) ?? null,
   priceFrom: r.priceFrom,
@@ -104,6 +111,18 @@ export class OfferingsService {
     if (clash) throw new BadRequestException('An offering with this name already exists');
   }
 
+  /** Related offerings must be other offerings of the same business (a deleted one just drops out later). */
+  private async assertRelated(businessId: string, ids: string[], selfId?: string) {
+    if (!ids.length) return;
+    if (selfId && ids.includes(selfId)) {
+      throw new BadRequestException('An offering cannot be related to itself');
+    }
+    const found = await this.prisma.businessOffering.count({ where: { businessId, id: { in: ids } } });
+    if (found !== new Set(ids).size) {
+      throw new BadRequestException('Related offerings must belong to the same business');
+    }
+  }
+
   async create(businessId: string, input: CreateBusinessOfferingInput, user: AuthUser) {
     const data = CreateBusinessOfferingSchema.parse(input);
     const business = await this.prisma.business.findUnique({
@@ -115,6 +134,7 @@ export class OfferingsService {
       throw new BadRequestException(`A business can have at most ${BUSINESS_OFFERING_LIMIT} offerings`);
     }
     await this.assertNameFree(businessId, data.name);
+    await this.assertRelated(businessId, [...data.complementIds, ...data.substituteIds]);
     const row = await this.prisma.businessOffering.create({
       data: {
         businessId,
@@ -123,8 +143,13 @@ export class OfferingsService {
         kind: data.kind,
         status: data.status,
         push: data.push,
+        stock: data.stock,
+        peakMonths: normalizeMonths(data.peakMonths),
+        complementIds: data.complementIds,
+        substituteIds: data.substituteIds,
         summary: data.summary,
         features: data.features,
+        claims: data.claims,
         priceAmount: data.priceAmount,
         priceCurrency: data.priceAmount ? data.priceCurrency : null,
         priceFrom: data.priceAmount ? data.priceFrom : false,
@@ -154,6 +179,11 @@ export class OfferingsService {
     if (data.name !== undefined && data.name.toLowerCase() !== row.name.toLowerCase()) {
       await this.assertNameFree(row.businessId, data.name, id);
     }
+    await this.assertRelated(
+      row.businessId,
+      [...(data.complementIds ?? []), ...(data.substituteIds ?? [])],
+      id,
+    );
     // the cross-field rules apply to the row as it will be, not only to the fields sent
     const price = data.priceAmount !== undefined ? data.priceAmount : priceText(row.priceAmount);
     // clearing the price clears its currency too, unless a currency is sent explicitly
@@ -183,8 +213,13 @@ export class OfferingsService {
         ...(data.kind !== undefined ? { kind: data.kind } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.push !== undefined ? { push: data.push } : {}),
+        ...(data.stock !== undefined ? { stock: data.stock } : {}),
+        ...(data.peakMonths !== undefined ? { peakMonths: normalizeMonths(data.peakMonths) } : {}),
+        ...(data.complementIds !== undefined ? { complementIds: data.complementIds } : {}),
+        ...(data.substituteIds !== undefined ? { substituteIds: data.substituteIds } : {}),
         ...(data.summary !== undefined ? { summary: data.summary } : {}),
         ...(data.features !== undefined ? { features: data.features } : {}),
+        ...(data.claims !== undefined ? { claims: data.claims } : {}),
         priceAmount: hasPrice ? price : null,
         priceCurrency: hasPrice ? currency : null,
         priceFrom: hasPrice ? (data.priceFrom ?? row.priceFrom) : false,

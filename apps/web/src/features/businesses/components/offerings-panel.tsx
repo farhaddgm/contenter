@@ -5,12 +5,19 @@ import {
   OfferingKind,
   OfferingPriceAmount,
   OfferingStatus,
+  OfferingStock,
+  OFFERING_CLAIMS_MAX,
+  OFFERING_RELATED_MAX,
   OFFERING_PUSH_MAX,
   PriceCurrency,
   hasValidPrice,
   isOfferingAvailable,
+  isPeakNow,
+  peakingSoon,
   priceText,
+  unprovenClaims,
   type BusinessOffering,
+  type OfferingClaim,
   type CreateBusinessOfferingInput,
 } from '@contenter/shared';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -76,6 +83,7 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
   const confirmed = (rows ?? []).filter((o) => o.verified);
   const full = (rows?.length ?? 0) >= BUSINESS_OFFERING_LIMIT;
   const running = tracker.isRunning && !!jobId;
+  const soon = peakingSoon(confirmed.filter((o) => o.isActive));
 
   const propose = () =>
     extract.mutate(undefined, {
@@ -123,6 +131,11 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
             title={t('businesses.offerings.extracting')}
             hint={t('businesses.offerings.extractingHint')}
           />
+        )}
+        {soon.length > 0 && (
+          <p className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm" dir="auto">
+            {t('businesses.offerings.peakSoon', { names: soon.map((o) => o.name).join('، ') })}
+          </p>
         )}
         {isLoading ? (
           <div className="flex justify-center py-8">
@@ -178,6 +191,7 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
         <OfferingDrawer
           businessId={businessId}
           offering={editing === 'new' ? null : editing}
+          others={(rows ?? []).filter((o) => editing === 'new' || o.id !== editing.id)}
           onOpenChange={(open) => !open && setEditing(null)}
         />
       )}
@@ -214,6 +228,10 @@ function OfferingRow({
             <Badge tone={sellable ? STATUS_TONE[o.status] : 'warning'}>
               {t(`enums.offeringStatus.${o.status}`)}
             </Badge>
+            {o.stock !== 'IN_STOCK' && (
+              <Badge tone={o.stock === 'OUT' ? 'danger' : 'warning'}>{t(`enums.offeringStock.${o.stock}`)}</Badge>
+            )}
+            {isPeakNow(o) && <Badge tone="primary">{t('businesses.offerings.peakNow')}</Badge>}
             {o.push === 0 && <Badge tone="neutral">{t('businesses.offerings.push.none')}</Badge>}
             {o.push >= 2 && (
               <Badge tone="primary">{t(`businesses.offerings.push.${PUSH_KEY[o.push] ?? 'normal'}`)}</Badge>
@@ -236,6 +254,16 @@ function OfferingRow({
                   from: o.availableFrom ? formatDate(o.availableFrom, false) : '—',
                   until: o.availableUntil ? formatDate(o.availableUntil, false) : '—',
                 })}`}
+            </p>
+          )}
+          {o.claims.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t('businesses.offerings.claimsCount', { count: formatNumber(o.claims.length) })}
+              {unprovenClaims(o.claims) > 0 && (
+                <Badge tone="warning" className="ms-2">
+                  {t('businesses.offerings.unproven', { count: formatNumber(unprovenClaims(o.claims)) })}
+                </Badge>
+              )}
             </p>
           )}
           {o.summary && (
@@ -303,8 +331,13 @@ interface FormState {
   kind: string;
   status: string;
   push: string;
+  stock: string;
+  peakMonths: number[];
+  complementIds: string[];
+  substituteIds: string[];
   summary: string;
   features: string;
+  claims: string;
   priceAmount: string;
   priceCurrency: string;
   priceFrom: boolean;
@@ -322,6 +355,14 @@ const lines = (text: string) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
+/** One claim per line: "feature | benefit | proof" (the last two may be left out). */
+const claimToLine = (c: OfferingClaim) =>
+  [c.feature, c.benefit, c.proof].join(' | ').replace(/( \| )+$/, '');
+function lineToClaim(line: string): OfferingClaim {
+  const [feature = '', benefit = '', proof = ''] = line.split('|').map((p) => p.trim());
+  return { feature, benefit, proof };
+}
+
 function toForm(o: BusinessOffering | null): FormState {
   return {
     name: o?.name ?? '',
@@ -329,8 +370,13 @@ function toForm(o: BusinessOffering | null): FormState {
     kind: o?.kind ?? 'PRODUCT',
     status: o?.status ?? 'ACTIVE',
     push: String(o?.push ?? 1),
+    stock: o?.stock ?? 'IN_STOCK',
+    peakMonths: o?.peakMonths ?? [],
+    complementIds: o?.complementIds ?? [],
+    substituteIds: o?.substituteIds ?? [],
     summary: o?.summary ?? '',
     features: o?.features.join('\n') ?? '',
+    claims: o?.claims.map(claimToLine).join('\n') ?? '',
     priceAmount: priceText(o?.priceAmount) ?? '',
     priceCurrency: o?.priceCurrency ?? 'IRT',
     priceFrom: o?.priceFrom ?? false,
@@ -352,8 +398,13 @@ function toInput(f: FormState): CreateBusinessOfferingInput {
     kind: f.kind as (typeof OfferingKind)[number],
     status: f.status as (typeof OfferingStatus)[number],
     push: Number(f.push),
+    stock: f.stock as (typeof OfferingStock)[number],
+    peakMonths: f.peakMonths,
+    complementIds: f.complementIds,
+    substituteIds: f.substituteIds,
     summary: f.summary,
     features: lines(f.features),
+    claims: lines(f.claims).map(lineToClaim),
     priceAmount: f.priceAmount,
     priceCurrency: priced ? (f.priceCurrency as (typeof PriceCurrency)[number]) : null,
     priceFrom: priced && f.priceFrom,
@@ -371,10 +422,13 @@ type Errors = Partial<Record<'name' | 'priceAmount' | 'season', string>>;
 function OfferingDrawer({
   businessId,
   offering,
+  others,
   onOpenChange,
 }: {
   businessId: string;
   offering: BusinessOffering | null;
+  /** The other offerings of the business, to pick complements and substitutes from. */
+  others: BusinessOffering[];
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useT();
@@ -493,6 +547,62 @@ function OfferingDrawer({
             )}
           </Field>
         </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field
+            label={t('businesses.offerings.fields.stock')}
+            hint={t('businesses.offerings.fields.stockHint')}
+          >
+            {(id) => (
+              <Select
+                id={id}
+                value={f.stock}
+                onChange={(e) => set('stock', e.target.value)}
+                options={OfferingStock.map((v) => ({ value: v, label: t(`enums.offeringStock.${v}`) }))}
+              />
+            )}
+          </Field>
+        </div>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">{t('businesses.offerings.fields.peakMonths')}</legend>
+          <p className="text-xs text-muted-foreground">{t('businesses.offerings.fields.peakMonthsHint')}</p>
+          <div className="flex flex-wrap gap-2">
+            {MONTHS.map((m) => {
+              const on = f.peakMonths.includes(m);
+              return (
+                <Button
+                  key={m}
+                  type="button"
+                  size="sm"
+                  variant={on ? 'default' : 'outline'}
+                  aria-pressed={on}
+                  onClick={() =>
+                    set('peakMonths', on ? f.peakMonths.filter((x) => x !== m) : [...f.peakMonths, m].sort((a, b) => a - b))
+                  }
+                >
+                  {t(`businesses.offerings.months.m${m}`)}
+                </Button>
+              );
+            })}
+          </div>
+        </fieldset>
+        {others.length > 0 && (
+          <>
+            <RelatedPicker
+              label={t('businesses.offerings.fields.complements')}
+              hint={t('businesses.offerings.fields.complementsHint')}
+              options={others}
+              value={f.complementIds}
+              onChange={(v) => set('complementIds', v)}
+            />
+            <RelatedPicker
+              label={t('businesses.offerings.fields.substitutes')}
+              hint={t('businesses.offerings.fields.substitutesHint')}
+              options={others}
+              value={f.substituteIds}
+              onChange={(v) => set('substituteIds', v)}
+            />
+          </>
+        )}
         <Field label={t('businesses.offerings.fields.summary')}>
           {(id) => (
             <Textarea
@@ -516,6 +626,21 @@ function OfferingDrawer({
               rows={3}
               value={f.features}
               onChange={(e) => set('features', e.target.value)}
+            />
+          )}
+        </Field>
+
+        <Field
+          label={t('businesses.offerings.fields.claims')}
+          hint={t('businesses.offerings.fields.claimsHint', { count: formatNumber(OFFERING_CLAIMS_MAX) })}
+        >
+          {(id) => (
+            <Textarea
+              id={id}
+              dir="auto"
+              rows={4}
+              value={f.claims}
+              onChange={(e) => set('claims', e.target.value)}
             />
           )}
         </Field>
@@ -642,5 +767,51 @@ function OfferingDrawer({
         </Field>
       </div>
     </Drawer>
+  );
+}
+
+/** Persian months 1–12 (Farvardin … Esfand). */
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
+/** Pick up to OFFERING_RELATED_MAX other offerings by name. */
+function RelatedPicker({
+  label,
+  hint,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  options: BusinessOffering[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const t = useT();
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">{label}</legend>
+      <p className="text-xs text-muted-foreground">
+        {hint} {t('businesses.offerings.fields.relatedMax', { count: formatNumber(OFFERING_RELATED_MAX) })}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const on = value.includes(o.id);
+          return (
+            <Button
+              key={o.id}
+              type="button"
+              size="sm"
+              variant={on ? 'default' : 'outline'}
+              aria-pressed={on}
+              disabled={!on && value.length >= OFFERING_RELATED_MAX}
+              onClick={() => onChange(on ? value.filter((x) => x !== o.id) : [...value, o.id])}
+            >
+              {o.name}
+            </Button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
