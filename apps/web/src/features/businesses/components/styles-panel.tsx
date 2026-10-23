@@ -21,6 +21,7 @@ import {
   STYLE_SOURCE_LIMIT,
   instagramProfileUrl,
   parseInstagramHandle,
+  type AddStyleSourceInput,
   type BusinessStyleDetail,
   type BusinessStyleSummary,
   type StyleSourceKind,
@@ -167,7 +168,7 @@ function StyleRow({
         className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg px-4 py-3 text-start hover:bg-muted/40"
       >
         <span className="min-w-0 space-y-1">
-          <span className="block truncate font-semibold" dir="auto">
+          <span className="block truncate font-semibold" data-bidi="">
             {style.name}
           </span>
           <span className="block text-xs text-muted-foreground">
@@ -234,7 +235,7 @@ function StyleDetail({ businessId, id }: { businessId: string; id: string }) {
           <div>
             <p className="font-medium">{t('businesses.styles.buildFailed')}</p>
             {style.buildError && (
-              <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+              <p className="mt-1 text-xs text-muted-foreground" data-bidi="">
                 {style.buildError}
               </p>
             )}
@@ -243,7 +244,7 @@ function StyleDetail({ businessId, id }: { businessId: string; id: string }) {
       )}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-sm leading-7 text-muted-foreground" dir="auto">
+        <p className="min-w-0 flex-1 text-sm leading-7 text-muted-foreground" data-bidi="">
           {style.direction || t('businesses.styles.directionHint')}
         </p>
         {canEdit && (
@@ -366,7 +367,7 @@ function StyleDetail({ businessId, id }: { businessId: string; id: string }) {
         />
       )}
       {adding && (
-        <AddSourceDialog businessId={businessId} styleId={id} onOpenChange={setAdding} />
+        <AddStyleSourceDialog businessId={businessId} styleId={id} onOpenChange={setAdding} />
       )}
       {viewing && <SourceTextDialog source={viewing} onOpenChange={() => setViewing(null)} />}
     </div>
@@ -410,7 +411,7 @@ function BuiltStyle({
 
       <section className="space-y-1">
         <h4 className="text-sm font-semibold">{t('businesses.styles.summary')}</h4>
-        <p className="text-sm leading-7" dir="auto">
+        <p className="text-sm leading-7" data-bidi="">
           {style.summary}
         </p>
       </section>
@@ -421,10 +422,10 @@ function BuiltStyle({
           {style.traits.map((trait, i) => (
             <li key={i} className="space-y-1 rounded-lg border p-3 text-sm">
               <Badge tone="outline">{t(`enums.styleTrait.${trait.category}`)}</Badge>
-              <p className="font-medium" dir="auto">
+              <p className="font-medium" data-bidi="">
                 {trait.name}
               </p>
-              <p className="text-xs leading-6 text-muted-foreground" dir="auto">
+              <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
                 {trait.description}
               </p>
             </li>
@@ -442,7 +443,7 @@ function BuiltStyle({
           )}
         </div>
         <pre
-          dir="auto"
+          data-bidi=""
           className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-4 text-sm leading-7"
         >
           {style.guide}
@@ -455,7 +456,7 @@ function BuiltStyle({
           <h4 className="text-sm font-semibold">{t('businesses.styles.caveats')}</h4>
           <ul className="list-disc space-y-1 ps-5 text-sm text-muted-foreground">
             {style.caveats.map((c, i) => (
-              <li key={i} dir="auto">
+              <li key={i} data-bidi="">
                 {c}
               </li>
             ))}
@@ -489,7 +490,7 @@ function SourceRow({
       <div className="flex min-w-0 items-center gap-2">
         <Icon className="size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium" dir="auto">
+          <p className="truncate text-sm font-medium" data-bidi="">
             {source.title || source.url || t(`enums.styleSourceKind.${source.kind}`)}
           </p>
           <p className="text-xs text-muted-foreground">
@@ -498,7 +499,7 @@ function SourceRow({
             {source.fetchedAt && ` · ${formatDate(source.fetchedAt)}`}
           </p>
           {source.status === 'FAILED' && source.error && (
-            <p className="text-xs text-destructive" dir="auto">
+            <p className="text-xs text-destructive" data-bidi="">
               {source.error}
             </p>
           )}
@@ -573,7 +574,7 @@ function SourceTextDialog({
         </div>
       ) : (
         <pre
-          dir="auto"
+          data-bidi=""
           className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-4 text-xs leading-6"
         >
           {data.content}
@@ -737,7 +738,7 @@ function EditStyleDialog({
                 id={id}
                 rows={3}
                 maxLength={1200}
-                dir="auto"
+                data-bidi=""
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
               />
@@ -749,7 +750,7 @@ function EditStyleDialog({
                 id={id}
                 rows={12}
                 maxLength={STYLE_GUIDE_MAX_CHARS}
-                dir="auto"
+                data-bidi=""
                 value={guide}
                 onChange={(e) => setGuide(e.target.value)}
               />
@@ -761,8 +762,7 @@ function EditStyleDialog({
   );
 }
 
-/** One source of another brand: a page, a whole site, an Instagram account or a text. Mounted only while open. */
-function AddSourceDialog({
+function AddStyleSourceDialog({
   businessId,
   styleId,
   onOpenChange,
@@ -771,8 +771,36 @@ function AddSourceDialog({
   styleId: string;
   onOpenChange: (v: boolean) => void;
 }) {
-  const t = useT();
   const add = useAddStyleSource(businessId, styleId);
+  return <AddSourceDialog add={add} onOpenChange={onOpenChange} />;
+}
+
+/** What `AddSourceDialog` needs from the mutation that stores the source (a style's or a competitor's). */
+export interface AddSourceMutation {
+  isPending: boolean;
+  mutate: (
+    input: AddStyleSourceInput,
+    options: { onSuccess: (source: StyleSourceSummary) => void; onError: (e: Error) => void },
+  ) => void;
+}
+
+/**
+ * One source of another brand: a page, a whole site, an Instagram account or a text. Shared by the
+ * imitation styles and the competitor cards. Mounted only while open.
+ */
+export function AddSourceDialog({
+  add,
+  onOpenChange,
+  title: dialogTitle,
+  description,
+}: {
+  add: AddSourceMutation;
+  onOpenChange: (v: boolean) => void;
+  /** Overrides the imitation-style wording (a competitor's source is not a style source). */
+  title?: string;
+  description?: string;
+}) {
+  const t = useT();
   const { data: igStatus } = useInstagramStatus();
   const [tab, setTab] = useState<'link' | 'site' | 'instagram' | 'text'>('link');
   const [url, setUrl] = useState('');
@@ -820,8 +848,8 @@ function AddSourceDialog({
     <Dialog
       open
       onOpenChange={onOpenChange}
-      title={t('businesses.styles.addSourceTitle')}
-      description={t('businesses.styles.addSourceSubtitle')}
+      title={dialogTitle ?? t('businesses.styles.addSourceTitle')}
+      description={description ?? t('businesses.styles.addSourceSubtitle')}
       descriptionAsTip
       footer={
         <>
@@ -916,7 +944,7 @@ function AddSourceDialog({
                 <Textarea
                   id={id}
                   rows={10}
-                  dir="auto"
+                  data-bidi=""
                   value={text}
                   maxLength={BUSINESS_REFERENCE_MAX_CHARS}
                   onChange={(e) => setText(e.target.value)}

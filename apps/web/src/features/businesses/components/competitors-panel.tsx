@@ -17,6 +17,8 @@ import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { formatNumber } from '@/utils/format';
 import { useCanEditBusiness } from '../api/businesses';
+import { CompetitorCompareCard } from './competitor-compare-card';
+import { CompetitorSources } from './competitor-sources';
 import {
   useAddCompetitorsToProfile,
   useCompetitors,
@@ -45,75 +47,78 @@ export function CompetitorsPanel({ businessId }: { businessId: string }) {
   const hasActive = (rows ?? []).some((c) => c.isActive);
 
   return (
-    <Card>
-      <CardHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Swords className="size-4" />
-            {t('businesses.competitors.title')}
-          </span>
-        }
-        description={t('businesses.competitors.hint')}
-        descriptionAsTip
-        actions={
-          canEdit && (
-            <>
-              <Button size="sm" icon={<Plus />} disabled={full} onClick={() => setEditing('new')}>
-                {t('businesses.competitors.new')}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                icon={<FileInput />}
-                disabled={!hasActive}
-                isLoading={addToProfile.isPending}
-                onClick={() =>
-                  addToProfile.mutate(undefined, {
-                    onSuccess: () => notify.success(t('businesses.competitors.addedToProfile')),
-                    onError: (e) => notify.error(t('common.error'), e.message),
-                  })
-                }
-              >
-                {t('businesses.competitors.addToProfile')}
-              </Button>
-            </>
-          )
-        }
-      />
-      <CardBody className="space-y-3">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Spinner />
-          </div>
-        ) : !rows?.length ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            {t('businesses.competitors.empty')}
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {rows.map((c) => (
-              <CompetitorRow
-                key={c.id}
-                businessId={businessId}
-                competitor={c}
-                canEdit={canEdit}
-                onEdit={() => setEditing(c)}
-              />
-            ))}
-          </ul>
-        )}
-        <p className="text-xs text-muted-foreground">
-          {t('businesses.competitors.limit', { count: formatNumber(BUSINESS_COMPETITOR_LIMIT) })}
-        </p>
-      </CardBody>
-      {editing && (
-        <CompetitorDrawer
-          businessId={businessId}
-          competitor={editing === 'new' ? null : editing}
-          onOpenChange={(open) => !open && setEditing(null)}
+    <>
+      <Card>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-2">
+              <Swords className="size-4" />
+              {t('businesses.competitors.title')}
+            </span>
+          }
+          description={t('businesses.competitors.hint')}
+          descriptionAsTip
+          actions={
+            canEdit && (
+              <>
+                <Button size="sm" icon={<Plus />} disabled={full} onClick={() => setEditing('new')}>
+                  {t('businesses.competitors.new')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={<FileInput />}
+                  disabled={!hasActive}
+                  isLoading={addToProfile.isPending}
+                  onClick={() =>
+                    addToProfile.mutate(undefined, {
+                      onSuccess: () => notify.success(t('businesses.competitors.addedToProfile')),
+                      onError: (e) => notify.error(t('common.error'), e.message),
+                    })
+                  }
+                >
+                  {t('businesses.competitors.addToProfile')}
+                </Button>
+              </>
+            )
+          }
         />
-      )}
-    </Card>
+        <CardBody className="space-y-3">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner />
+            </div>
+          ) : !rows?.length ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              {t('businesses.competitors.empty')}
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {rows.map((c) => (
+                <CompetitorRow
+                  key={c.id}
+                  businessId={businessId}
+                  competitor={c}
+                  canEdit={canEdit}
+                  onEdit={() => setEditing(c)}
+                />
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {t('businesses.competitors.limit', { count: formatNumber(BUSINESS_COMPETITOR_LIMIT) })}
+          </p>
+        </CardBody>
+        {editing && (
+          <CompetitorDrawer
+            businessId={businessId}
+            competitor={editing === 'new' ? null : editing}
+            onOpenChange={(open) => !open && setEditing(null)}
+          />
+        )}
+      </Card>
+      <CompetitorCompareCard businessId={businessId} hasCompetitors={(rows?.length ?? 0) > 0} />
+    </>
   );
 }
 
@@ -136,35 +141,41 @@ function CompetitorRow({
     <li className="rounded-lg border px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="flex flex-wrap items-center gap-2 font-semibold" dir="auto">
+          <p className="flex flex-wrap items-center gap-2 font-semibold" data-bidi="">
             {c.name}
             <Badge tone={KIND_TONE[c.kind]}>{t(`enums.competitorKind.${c.kind}`)}</Badge>
           </p>
           {c.positioning && (
-            <p className="text-sm text-muted-foreground" dir="auto">
+            <p className="text-sm text-muted-foreground" data-bidi="">
               {c.positioning}
             </p>
           )}
           {c.pricing && (
-            <p className="text-xs text-muted-foreground" dir="auto">
+            <p className="text-xs text-muted-foreground" data-bidi="">
               {t('businesses.competitors.fields.pricing')}: {c.pricing}
             </p>
           )}
           {c.strengths.length > 0 && (
-            <p className="text-xs leading-6" dir="auto">
-              <span className="font-semibold">{t('businesses.competitors.fields.strengths')}: </span>
+            <p className="text-xs leading-6" data-bidi="">
+              <span className="font-semibold">
+                {t('businesses.competitors.fields.strengths')}:{' '}
+              </span>
               {c.strengths.join('، ')}
             </p>
           )}
           {c.weaknesses.length > 0 && (
-            <p className="text-xs leading-6" dir="auto">
-              <span className="font-semibold">{t('businesses.competitors.fields.weaknesses')}: </span>
+            <p className="text-xs leading-6" data-bidi="">
+              <span className="font-semibold">
+                {t('businesses.competitors.fields.weaknesses')}:{' '}
+              </span>
               {c.weaknesses.join('، ')}
             </p>
           )}
           {c.difference && (
-            <p className="text-xs leading-6 text-muted-foreground" dir="auto">
-              <span className="font-semibold">{t('businesses.competitors.fields.difference')}: </span>
+            <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
+              <span className="font-semibold">
+                {t('businesses.competitors.fields.difference')}:{' '}
+              </span>
               {c.difference}
             </p>
           )}
@@ -175,7 +186,10 @@ function CompetitorRow({
               checked={c.isActive}
               label={t('businesses.competitors.fields.active')}
               onCheckedChange={(isActive) =>
-                toggle.mutate({ isActive }, { onError: (e) => notify.error(t('common.error'), e.message) })
+                toggle.mutate(
+                  { isActive },
+                  { onError: (e) => notify.error(t('common.error'), e.message) },
+                )
               }
             />
             <Button size="icon" variant="ghost" aria-label={t('common.edit')} onClick={onEdit}>
@@ -190,12 +204,15 @@ function CompetitorRow({
               body={t('businesses.competitors.deleteBody')}
               isLoading={remove.isPending}
               onConfirm={() =>
-                remove.mutateAsync(c.id).then(() => notify.success(t('businesses.competitors.deleted')))
+                remove
+                  .mutateAsync(c.id)
+                  .then(() => notify.success(t('businesses.competitors.deleted')))
               }
             />
           </div>
         )}
       </div>
+      <CompetitorSources businessId={businessId} competitorId={c.id} canEdit={canEdit} />
     </li>
   );
 }
@@ -277,7 +294,9 @@ function CompetitorDrawer({
     setNameError(undefined);
     const options = {
       onSuccess: () => {
-        notify.success(t(competitor ? 'businesses.competitors.saved' : 'businesses.competitors.created'));
+        notify.success(
+          t(competitor ? 'businesses.competitors.saved' : 'businesses.competitors.created'),
+        );
         onOpenChange(false);
       },
       onError: (e: Error) => notify.error(t('common.error'), e.message),
@@ -286,14 +305,19 @@ function CompetitorDrawer({
     else create.mutate(toInput(f), options);
   };
 
-  const text = (key: keyof FormState, max: number, dir: 'auto' | 'ltr' = 'auto') =>
-    (id: string) => (
-      <Input id={id} dir={dir} maxLength={max} value={f[key]} onChange={(e) => set(key, e.target.value)} />
-    );
+  const text = (key: keyof FormState, max: number, dir?: 'ltr') => (id: string) => (
+    <Input
+      id={id}
+      {...(dir ? { dir } : { 'data-bidi': '' })}
+      maxLength={max}
+      value={f[key]}
+      onChange={(e) => set(key, e.target.value)}
+    />
+  );
   const area = (key: keyof FormState, rows: number, max?: number) => (id: string) => (
     <Textarea
       id={id}
-      dir="auto"
+      data-bidi=""
       rows={rows}
       maxLength={max}
       value={f[key]}
@@ -321,18 +345,26 @@ function CompetitorDrawer({
         <Field label={t('businesses.competitors.fields.name')} error={nameError}>
           {text('name', 120)}
         </Field>
-        <Field label={t('businesses.competitors.fields.kind')} hint={t('businesses.competitors.fields.kindHint')}>
+        <Field
+          label={t('businesses.competitors.fields.kind')}
+          hint={t('businesses.competitors.fields.kindHint')}
+        >
           {(id) => (
             <Select
               id={id}
               value={f.kind}
               onChange={(e) => set('kind', e.target.value)}
-              options={CompetitorKind.map((v) => ({ value: v, label: t(`enums.competitorKind.${v}`) }))}
+              options={CompetitorKind.map((v) => ({
+                value: v,
+                label: t(`enums.competitorKind.${v}`),
+              }))}
             />
           )}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('businesses.competitors.fields.website')}>{text('website', 2000, 'ltr')}</Field>
+          <Field label={t('businesses.competitors.fields.website')}>
+            {text('website', 2000, 'ltr')}
+          </Field>
           <Field
             label={t('businesses.competitors.fields.instagram')}
             hint={t('businesses.competitors.fields.instagramHint')}
@@ -340,20 +372,37 @@ function CompetitorDrawer({
             {text('instagram', 200, 'ltr')}
           </Field>
         </div>
-        <Field label={t('businesses.competitors.fields.positioning')}>{area('positioning', 2, 400)}</Field>
-        <Field label={t('businesses.competitors.fields.pricing')} hint={t('businesses.competitors.fields.pricingHint')}>
+        <Field label={t('businesses.competitors.fields.positioning')}>
+          {area('positioning', 2, 400)}
+        </Field>
+        <Field
+          label={t('businesses.competitors.fields.pricing')}
+          hint={t('businesses.competitors.fields.pricingHint')}
+        >
           {text('pricing', 200)}
         </Field>
-        <Field label={t('businesses.competitors.fields.strengths')} hint={t('businesses.competitors.fields.pointsHint')}>
+        <Field
+          label={t('businesses.competitors.fields.strengths')}
+          hint={t('businesses.competitors.fields.pointsHint')}
+        >
           {area('strengths', 3)}
         </Field>
-        <Field label={t('businesses.competitors.fields.weaknesses')} hint={t('businesses.competitors.fields.pointsHint')}>
+        <Field
+          label={t('businesses.competitors.fields.weaknesses')}
+          hint={t('businesses.competitors.fields.pointsHint')}
+        >
           {area('weaknesses', 3)}
         </Field>
-        <Field label={t('businesses.competitors.fields.difference')} hint={t('businesses.competitors.fields.differenceHint')}>
+        <Field
+          label={t('businesses.competitors.fields.difference')}
+          hint={t('businesses.competitors.fields.differenceHint')}
+        >
           {area('difference', 2, 400)}
         </Field>
-        <Field label={t('businesses.competitors.fields.note')} hint={t('businesses.competitors.fields.noteHint')}>
+        <Field
+          label={t('businesses.competitors.fields.note')}
+          hint={t('businesses.competitors.fields.noteHint')}
+        >
           {area('note', 2, 1000)}
         </Field>
       </div>

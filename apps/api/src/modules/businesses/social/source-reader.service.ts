@@ -112,6 +112,40 @@ export class SourceReader {
     return { title: media.title ?? '', text };
   }
 
+  /**
+   * Reads a source by kind and returns what to store: a snapshot, or a failure (the caller keeps the
+   * previous snapshot, so a failed refresh never erases readable text). `unexpected` marks failures
+   * that are not a plain `FetchError` and deserve a log line.
+   */
+  async snapshot(
+    kind: 'INSTAGRAM' | 'WEBSITE' | 'URL',
+    url: string,
+    title: string,
+  ): Promise<
+    | { status: 'READY'; content: string; title: string; analysis?: ReferenceAnalysis }
+    | { status: 'FAILED'; error: string; unexpected: boolean }
+  > {
+    try {
+      const out =
+        kind === 'INSTAGRAM'
+          ? await this.readInstagram(url)
+          : kind === 'WEBSITE'
+            ? await this.readWebsite(url)
+            : await this.readPage(url);
+      const content = out.text.trim().slice(0, BUSINESS_REFERENCE_MAX_CHARS);
+      if (!content) throw new FetchError('No readable text was found. Paste the text instead.');
+      return {
+        status: 'READY',
+        content,
+        title: title || out.title.slice(0, 300),
+        ...(out.analysis ? { analysis: out.analysis } : {}),
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { status: 'FAILED', error: message.slice(0, 1000), unexpected: !(err instanceof FetchError) };
+    }
+  }
+
   /** Bio, counts and captions the admin typed or took from the account's data export. */
   manualInstagram(input: InstagramManualInput): ManualInstagramRead {
     const manual = InstagramManualSchema.parse(input);

@@ -87,6 +87,7 @@ import { ProfileKnowledgeController } from './profile-knowledge.controller';
 import { StylesController } from './styles.controller';
 import { ProfileQuestionsController } from './profile-questions.controller';
 import { ProfileQuestionsService } from './profile-questions.service';
+import { CompetitorSourcesService } from './competitor-sources.service';
 import { CompetitorsController } from './competitors.controller';
 import { CompetitorsService } from './competitors.service';
 import { OfferingsController } from './offerings.controller';
@@ -1159,6 +1160,7 @@ export class BusinessItemsController {
     StylesService,
     OfferingsService,
     CompetitorsService,
+    CompetitorSourcesService,
     ProfileQuestionsService,
   ],
   exports: [BusinessesService],
