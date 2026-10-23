@@ -1,7 +1,15 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
-import { BUSINESS_OFFERING_LIMIT } from '@contenter/shared';
+import {
+  BUSINESS_OFFERING_LIMIT,
+  CreateBusinessOfferingSchema,
+  nextPersianMonth,
+  normalizeMonths,
+  UpdateBusinessOfferingSchema,
+  peakingSoon,
+  persianMonthOf,
+} from '@contenter/shared';
 import type { AuthUser } from '../../common/auth.decorators';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AiJobsService } from '../ai/ai-jobs.service';
@@ -402,5 +410,129 @@ describe('BusinessOfferingsExtractRunner', () => {
     const { r, execute } = runner({ offerings: [], notes: '' }, { services: '' });
     await expect(r.run(job)).rejects.toThrow(/nothing to read/);
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe('selling points: feature → benefit → proof (docs/67 §4.9)', () => {
+  it('adds no line and keeps the bytes unchanged without claims', () => {
+    const plain = formatBusinessCatalog([offering()]);
+    expect(formatBusinessCatalog([offering({ claims: [] })])).toBe(plain);
+    expect(plain).not.toContain('Selling points');
+  });
+
+  it('tells the model which points have proof and which do not', () => {
+    const out = formatBusinessCatalog([
+      offering({
+        claims: [
+          { feature: 'ارسال سریع', benefit: 'کالا فردا می‌رسد', proof: 'میانگین ۱٫۲ روز در ۱۴۰۴' },
+          { feature: 'ضمانت بازگشت', benefit: '', proof: '' },
+        ],
+      }),
+    ]);
+    expect(out).toContain('Selling points:');
+    expect(out).toContain('- ارسال سریع → کالا فردا می‌رسد (proof: میانگین ۱٫۲ روز در ۱۴۰۴)');
+    expect(out).toContain('- ضمانت بازگشت (no proof — do not state as certain)');
+  });
+
+  it('ignores malformed stored JSON instead of failing the prompt', () => {
+    expect(formatBusinessCatalog([offering({ claims: 'oops' })])).not.toContain('Selling points');
+  });
+
+  it('hides the claims of an offering that cannot be sold today', () => {
+    const out = formatBusinessCatalog([
+      offering({ status: 'PAUSED', claims: [{ feature: 'x', benefit: '', proof: '' }] }),
+    ]);
+    expect(out).toContain('NOT AVAILABLE');
+    expect(out).not.toContain('Selling points');
+  });
+});
+
+describe('OfferingsService claims', () => {
+  it('stores the claims on create and returns them parsed', async () => {
+    const { svc, created } = setup();
+    await svc.create('b1', { name: 'کارت', claims: [{ feature: 'سریع', proof: 'آمار' }] }, user);
+    expect(created[0]).toMatchObject({ claims: [{ feature: 'سریع', benefit: '', proof: 'آمار' }] });
+  });
+
+  it('refuses more than the limit and empty features', async () => {
+    const { svc } = setup();
+    const many = Array.from({ length: 9 }, (_, i) => ({ feature: `f${i}` }));
+    await expect(svc.create('b1', { name: 'x', claims: many }, user)).rejects.toThrow();
+    await expect(svc.create('b1', { name: 'x', claims: [{ feature: ' ' }] }, user)).rejects.toThrow();
+  });
+});
+
+describe('lifecycle: stock, peak season, related offerings (docs/67 §4.10)', () => {
+  // 2026-10-22 is 30 Mehr 1405 (month 7); 2026-10-23 is 1 Aban (month 8)
+  const MEHR = new Date('2026-10-22T10:00:00Z');
+  const ABAN = new Date('2026-10-23T10:00:00Z');
+
+  it('reads the Persian month with Intl', () => {
+    expect(persianMonthOf(MEHR)).toBe(7);
+    expect(persianMonthOf(ABAN)).toBe(8);
+    expect(persianMonthOf(new Date('2027-03-21T10:00:00Z'))).toBe(1);
+    expect(nextPersianMonth(12)).toBe(1);
+  });
+
+  it('changes nothing in the prompt while the new fields are unset', () => {
+    const plain = formatBusinessCatalog([offering()], MEHR);
+    expect(
+      formatBusinessCatalog(
+        [offering({ stock: 'IN_STOCK', peakMonths: [], complementIds: [], substituteIds: [] })],
+        MEHR,
+      ),
+    ).toBe(plain);
+  });
+
+  it('tags low stock and the peak season, and lists complements', () => {
+    const out = formatBusinessCatalog(
+      [
+        offering({ id: 'a', name: 'الف', stock: 'LOW', peakMonths: [8], complementIds: ['b'] }),
+        offering({ id: 'b', name: 'ب' }),
+      ],
+      ABAN,
+    );
+    expect(out).toContain('LOW STOCK · PEAK SEASON NOW');
+    expect(out).toContain('Pairs well with: ب');
+    expect(formatBusinessCatalog([offering({ id: 'a', peakMonths: [8] })], MEHR)).not.toContain('PEAK SEASON');
+  });
+
+  it('treats OUT as not available and names the available substitutes only', () => {
+    const out = formatBusinessCatalog(
+      [
+        offering({ id: 'a', name: 'الف', stock: 'OUT', substituteIds: ['b', 'c'], features: ['x'] }),
+        offering({ id: 'b', name: 'ب' }),
+        offering({ id: 'c', name: 'ج', status: 'PAUSED' }),
+      ],
+      MEHR,
+    );
+    expect(out).toContain('NOT AVAILABLE] الف');
+    expect(out).toContain('Instead offer: ب');
+    expect(out).not.toContain('Instead offer: ب | ج');
+    expect(out).not.toContain('Features: x');
+  });
+
+  it('lists offerings whose peak begins next month, only if they can be sold', () => {
+    const rows = [
+      { peakMonths: [8], status: 'ACTIVE', stock: 'IN_STOCK', availableFrom: null, availableUntil: null },
+      { peakMonths: [7, 8], status: 'ACTIVE', stock: 'IN_STOCK', availableFrom: null, availableUntil: null },
+      { peakMonths: [8], status: 'PAUSED', stock: 'IN_STOCK', availableFrom: null, availableUntil: null },
+      { peakMonths: [8], status: 'ACTIVE', stock: 'OUT', availableFrom: null, availableUntil: null },
+      { peakMonths: [], status: 'ACTIVE', stock: 'IN_STOCK', availableFrom: null, availableUntil: null },
+    ];
+    expect(peakingSoon(rows, MEHR)).toEqual([rows[0]]);
+  });
+
+  it('checks that related offerings belong to the same business and are not the row itself', async () => {
+    const { svc, prisma } = setup();
+    (prisma.businessOffering as { count: () => Promise<number> }).count = async () => 0;
+    await expect(svc.create('b1', { name: 'x', complementIds: ['nope'] }, user)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.update('o1', { substituteIds: ['o1'] }, user)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('keeps months unique and sorted, and an update that omits them leaves them alone', () => {
+    expect(normalizeMonths([9, 2, 9])).toEqual([2, 9]);
+    expect(UpdateBusinessOfferingSchema.parse({ push: 2 })).toEqual({ push: 2 });
+    expect(CreateBusinessOfferingSchema.safeParse({ name: 'x', peakMonths: [13] }).success).toBe(false);
   });
 });

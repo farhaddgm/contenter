@@ -56,6 +56,8 @@ import { GoldenExamplesCard } from '@/features/golden/components/golden-examples
 import { ChecklistsCard } from '@/features/businesses/components/checklists-card';
 import { ContextPreviewPanel } from '@/features/businesses/components/context-preview-panel';
 import { NotesCard } from '@/features/businesses/components/notes-card';
+import { ProfileQuestionsCard } from '@/features/businesses/components/profile-questions-card';
+import { CompetitorsPanel } from '@/features/businesses/components/competitors-panel';
 import { OfferingsPanel } from '@/features/businesses/components/offerings-panel';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
 import { StylesPanel } from '@/features/businesses/components/styles-panel';
@@ -71,6 +73,7 @@ const TABS = [
   'assets',
   'styles',
   'offerings',
+  'competitors',
   'context',
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -314,11 +317,21 @@ export default function BusinessRoute() {
             {tab === 'assets' && <AssetsPanel businessId={business.id} />}
             {tab === 'styles' && <StylesPanel businessId={business.id} />}
             {tab === 'offerings' && <OfferingsPanel businessId={business.id} />}
+            {tab === 'competitors' && <CompetitorsPanel businessId={business.id} />}
             {tab === 'context' && (
               <ContextPreviewPanel businessId={business.id} topics={business.topics ?? []} />
             )}
             {tab === 'profile' && (
               <>
+                <ProfileQuestionsCard
+                  businessId={business.id}
+                  onGoto={(action, q) => {
+                    if (action === 'GOTO_FACTS') return setTab('knowledge');
+                    if (action === 'GOTO_OFFERINGS') return setTab('offerings');
+                    if (action === 'GOTO_COMPETITORS') return setTab('competitors');
+                    return jumpTo(`section-${q.sectionKey}`);
+                  }}
+                />
                 <NotesCard
                   businessId={business.id}
                   hasWebsite={!!business.website}

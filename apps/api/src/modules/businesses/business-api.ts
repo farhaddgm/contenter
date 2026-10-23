@@ -12,6 +12,11 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 
 /** The fields of a catalog row that the prompt and the quality check read (docs/67). */
 export const OFFERING_CORE_SELECT = {
+  id: true,
+  stock: true,
+  peakMonths: true,
+  complementIds: true,
+  substituteIds: true,
   name: true,
   aliases: true,
   kind: true,
@@ -19,6 +24,7 @@ export const OFFERING_CORE_SELECT = {
   push: true,
   summary: true,
   features: true,
+  claims: true,
   priceAmount: true,
   priceCurrency: true,
   priceFrom: true,

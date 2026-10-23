@@ -22,7 +22,10 @@ import {
   formatOfferingPrice,
   hasValidPrice,
   isFactExpired,
+  isClaimProven,
   isOfferingAvailable,
+  isPeakNow,
+  parseClaims,
   isRegister,
   MAX_CATALOG_TEXT,
   priceText,
@@ -30,6 +33,7 @@ import {
   type ContextBlock,
   type ContextBlockId,
   type FetchedMedia,
+  type OfferingClaim,
   type OfferingCore,
   type SampleAnalysisResult,
 } from '@contenter/shared';
@@ -208,16 +212,35 @@ export function formatBusinessFacts(facts: FactForPrompt[], now = new Date()): s
   ].join('\n');
 }
 
+const claimLine = (c: OfferingClaim): string =>
+  `\n  - ${c.feature}${c.benefit ? ` → ${c.benefit}` : ''}${
+    isClaimProven(c) ? ` (proof: ${c.proof})` : ' (no proof — do not state as certain)'
+  }`;
+
 /**
  * What the business sells (docs/67-business-catalog.md), in the order they arrive (push level, then
  * the admin's order). A price shows only while it is valid; an offering that cannot be sold today is
- * listed as NOT AVAILABLE, without its features, so the model does not promote it.
+ * listed as NOT AVAILABLE, without its features, so the model does not promote it — but with the
+ * available substitutes the admin named, so it can point the reader somewhere else. Stock, peak
+ * season and complements (docs/67 §4.10) only add a tag or a line when they are set.
  */
 export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new Date()): string {
   if (!offerings.length) return '';
+  const byId = new Map(offerings.filter((o) => o.id).map((o) => [o.id as string, o]));
+  const names = (ids: string[] | undefined, onlyAvailable: boolean) =>
+    (ids ?? [])
+      .map((id) => byId.get(id))
+      .filter((r): r is OfferingForPrompt => !!r && (!onlyAvailable || isOfferingAvailable(r, now)))
+      .map((r) => r.name);
   const lines = offerings.map((o) => {
     const available = isOfferingAvailable(o, now);
-    const tags = [o.kind, o.status === 'SEASONAL' ? 'SEASONAL' : null, o.push > 1 ? `push ${o.push}` : null]
+    const tags = [
+      o.kind,
+      o.status === 'SEASONAL' ? 'SEASONAL' : null,
+      o.push > 1 ? `push ${o.push}` : null,
+      available && o.stock === 'LOW' ? 'LOW STOCK' : null,
+      available && isPeakNow(o, now) ? 'PEAK SEASON NOW' : null,
+    ]
       .concat(!available ? ['NOT AVAILABLE'] : o.push === 0 ? ['do not promote'] : [])
       .filter(Boolean)
       .join(' · ');
@@ -230,15 +253,22 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
       ? ` (valid until ${new Date(o.priceValidUntil).toISOString().slice(0, 10)})`
       : '';
     const head = `- [${tags}] ${o.name}${price ? ` — ${price}${until}` : ''}`;
-    if (!available) return head;
+    if (!available) {
+      const instead = names(o.substituteIds, true);
+      return instead.length ? `${head}\n  Instead offer: ${instead.join(' | ')}` : head;
+    }
+    const together = names(o.complementIds, true);
+    const pairs = together.length ? `\n  Pairs well with: ${together.join(' | ')}` : '';
     const alias = o.aliases.length ? `\n  Also written: ${o.aliases.join(' | ')}` : '';
     const summary = o.summary.trim() ? `\n  ${o.summary.trim()}` : '';
     const features = o.features.length ? `\n  Features: ${o.features.join('; ')}` : '';
-    return `${head}${alias}${summary}${features}`;
+    const list = parseClaims(o.claims);
+    const claims = list.length ? `\n  Selling points:${list.map(claimLine).join('')}` : '';
+    return `${head}${alias}${summary}${features}${claims}${pairs}`;
   });
   return [
     '### Offerings [CATALOG]',
-    'What the business sells. Use these names and prices exactly as written. A price is valid only if it is shown here; if one is missing, write around it. Never promote an item marked NOT AVAILABLE or "do not promote". Prices listed here are valid in addition to [FACTS].',
+    'What the business sells. Use these names and prices exactly as written. A price is valid only if it is shown here; if one is missing, write around it. Never promote an item marked NOT AVAILABLE or "do not promote". Prices listed here are valid in addition to [FACTS]. A selling point may be stated as certain only when a proof is listed; otherwise soften it or leave it out.',
     ...budgeted(lines, MAX_CATALOG_TEXT),
   ].join('\n');
 }

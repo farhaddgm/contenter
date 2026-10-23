@@ -21,11 +21,16 @@ import { patchOf } from './schemas';
 export const OfferingKind = ['PRODUCT', 'SERVICE', 'PLAN', 'BUNDLE'] as const;
 export type OfferingKind = (typeof OfferingKind)[number];
 
+export const OfferingStock = ['IN_STOCK', 'LOW', 'OUT'] as const;
+export type OfferingStock = (typeof OfferingStock)[number];
+
 export const OfferingStatus = ['ACTIVE', 'SEASONAL', 'PAUSED', 'DISCONTINUED'] as const;
 export type OfferingStatus = (typeof OfferingStatus)[number];
 
 
 export const BUSINESS_OFFERING_LIMIT = 60;
+export const OFFERING_CLAIMS_MAX = 8;
+export const OFFERING_RELATED_MAX = 6;
 export const OFFERING_ALIASES_MAX = 6;
 export const OFFERING_FEATURES_MAX = 8;
 /** Total text of the `[CATALOG]` block in one prompt. */
@@ -66,6 +71,28 @@ const optionalUrl = z
   .optional()
   .default('');
 
+/**
+ * One selling point of an offering: what it has (feature), what the customer gets (benefit) and
+ * what backs it (proof: a number, certificate, sample). A claim without proof is told to the model
+ * as unproven, so content does not state it as certain.
+ */
+export const OfferingClaimSchema = z.object({
+  feature: z.string().trim().min(1).max(160),
+  benefit: z.string().trim().max(240).optional().default(''),
+  proof: z.string().trim().max(240).optional().default(''),
+});
+export type OfferingClaim = z.infer<typeof OfferingClaimSchema>;
+
+/** The stored JSON as claims; anything malformed is dropped rather than shown. */
+export const parseClaims = (raw: unknown): OfferingClaim[] =>
+  z.array(OfferingClaimSchema).catch([]).parse(raw);
+
+/** Claims the model may state as certain (they have a proof). */
+export const isClaimProven = (c: Pick<OfferingClaim, 'proof'>) => c.proof.trim() !== '';
+/** How many claims of an offering have no proof yet. */
+export const unprovenClaims = (claims: readonly Pick<OfferingClaim, 'proof'>[] | undefined) =>
+  (claims ?? []).filter((c) => !isClaimProven(c)).length;
+
 const BusinessOfferingBase = z.object({
   name: z.string().trim().min(1).max(120),
   /** Other spellings (Persian, Latin, short forms) that count as this offering in the quality check. */
@@ -77,12 +104,23 @@ const BusinessOfferingBase = z.object({
   kind: z.enum(OfferingKind).default('PRODUCT'),
   status: z.enum(OfferingStatus).default('ACTIVE'),
   push: z.number().int().min(0).max(OFFERING_PUSH_MAX).default(1),
+  stock: z.enum(OfferingStock).default('IN_STOCK'),
+  /** Persian months (1–12) when demand peaks. */
+  peakMonths: z
+    .array(z.number().int().min(1).max(12))
+    .max(12)
+    .optional()
+    .default([]),
+  /** Other offerings of this business that go well with this one / can replace it. */
+  complementIds: z.array(z.string().trim().min(1).max(64)).max(OFFERING_RELATED_MAX).optional().default([]),
+  substituteIds: z.array(z.string().trim().min(1).max(64)).max(OFFERING_RELATED_MAX).optional().default([]),
   summary: z.string().trim().max(400).optional().default(''),
   features: z
     .array(z.string().trim().min(1).max(160))
     .max(OFFERING_FEATURES_MAX)
     .optional()
     .default([]),
+  claims: z.array(OfferingClaimSchema).max(OFFERING_CLAIMS_MAX).optional().default([]),
   priceAmount: OfferingPriceAmount,
   priceCurrency: z.enum(PriceCurrency).nullish(),
   /** The price is "from …". */
@@ -137,8 +175,13 @@ export interface BusinessOffering {
   kind: OfferingKind;
   status: OfferingStatus;
   push: number;
+  stock: OfferingStock;
+  peakMonths: number[];
+  complementIds: string[];
+  substituteIds: string[];
   summary: string;
   features: string[];
+  claims: OfferingClaim[];
   priceAmount: string | null;
   priceCurrency: PriceCurrency | null;
   priceFrom: boolean;
@@ -165,6 +208,12 @@ export type DecimalLike = string | { toString(): string };
 
 /** The fields the prompt, the quality check and the export read (a database row fits). */
 export interface OfferingCore {
+  /** Needed to resolve `complementIds` / `substituteIds` (absent in hand-made rows). */
+  id?: string;
+  stock?: string;
+  peakMonths?: number[];
+  complementIds?: string[];
+  substituteIds?: string[];
   name: string;
   aliases: string[];
   kind: OfferingKind;
@@ -172,6 +221,8 @@ export interface OfferingCore {
   push: number;
   summary: string;
   features: string[];
+  /** Feature → benefit → proof triples as stored (JSON); read them with `parseClaims`. */
+  claims?: unknown;
   priceAmount: DecimalLike | null;
   priceCurrency: string | null;
   priceFrom: boolean;
@@ -194,10 +245,10 @@ const day = (d: string | Date | null) => (d ? new Date(d).toISOString().slice(0,
  * has one. A seasonal offering without dates counts as available.
  */
 export function isOfferingAvailable(
-  o: Pick<OfferingCore, 'status' | 'availableFrom' | 'availableUntil'>,
+  o: Pick<OfferingCore, 'status' | 'availableFrom' | 'availableUntil' | 'stock'>,
   now = new Date(),
 ): boolean {
-  if (o.status === 'PAUSED' || o.status === 'DISCONTINUED') return false;
+  if (o.status === 'PAUSED' || o.status === 'DISCONTINUED' || o.stock === 'OUT') return false;
   const today = now.toISOString().slice(0, 10);
   const from = day(o.availableFrom);
   const until = day(o.availableUntil);
@@ -414,4 +465,40 @@ export function resolveOfferingProposals(args: {
     });
   }
   return { rows, dropped, priceDropped };
+}
+
+// ─────────────────────────────── seasons ───────────────────────────────
+
+/** Months once each, in calendar order (a transform on the schema would break `patchOf`). */
+export const normalizeMonths = (months: readonly number[]) => [...new Set(months)].sort((a, b) => a - b);
+
+/** The Persian month (1 = Farvardin … 12 = Esfand) of a date, read with `Intl` (no hand-made converter). */
+export function persianMonthOf(date: Date): number {
+  const part = new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', { month: 'numeric', timeZone: 'Asia/Tehran' })
+    .formatToParts(date)
+    .find((p) => p.type === 'month');
+  return Number(part?.value ?? 1);
+}
+
+/** The month after `month`, wrapping Esfand to Farvardin. */
+export const nextPersianMonth = (month: number) => (month % 12) + 1;
+
+/** Whether demand for the offering peaks in the Persian month of `now`. */
+export const isPeakNow = (o: Pick<OfferingCore, 'peakMonths'>, now = new Date()) =>
+  (o.peakMonths ?? []).includes(persianMonthOf(now));
+
+/**
+ * Offerings whose peak starts next Persian month (peak next month, not this one) — the time to plan
+ * content for them. Only offerings that can be sold are listed.
+ */
+export function peakingSoon<T extends Pick<OfferingCore, 'peakMonths' | 'status' | 'availableFrom' | 'availableUntil' | 'stock'>>(
+  offerings: readonly T[],
+  now = new Date(),
+): T[] {
+  const current = persianMonthOf(now);
+  const next = nextPersianMonth(current);
+  return offerings.filter((o) => {
+    const months = o.peakMonths ?? [];
+    return months.includes(next) && !months.includes(current) && o.status !== 'PAUSED' && o.status !== 'DISCONTINUED' && o.stock !== 'OUT';
+  });
 }

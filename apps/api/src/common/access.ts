@@ -50,6 +50,7 @@ export type BusinessVia =
   | 'businessAudit'
   | 'businessStyle'
   | 'businessOffering'
+  | 'businessCompetitor'
   | 'styleSource';
 
 export interface AccessScopeMeta {
@@ -210,6 +211,8 @@ export class AccessService {
         return business(await p.businessStyle.findUnique({ where: { id }, ...bsel }));
       case 'businessOffering':
         return business(await p.businessOffering.findUnique({ where: { id }, ...bsel }));
+      case 'businessCompetitor':
+        return business(await p.businessCompetitor.findUnique({ where: { id }, ...bsel }));
       case 'styleSource': {
         const s = await p.styleSource.findUnique({
           where: { id },

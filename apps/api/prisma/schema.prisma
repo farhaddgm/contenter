@@ -55,6 +55,7 @@ model User {
   lockedSections      BusinessSection[]         @relation("SectionLockedBy")
   businessFacts       BusinessFact[]
   businessOfferings   BusinessOffering[]        @relation("OfferingUpdatedBy")
+  businessCompetitors BusinessCompetitor[]      @relation("CompetitorUpdatedBy")
   sectionRevisions    BusinessSectionRevision[]
   businessDiscovery   BusinessDiscovery[]
   blockedSources      BlockedSource[]
@@ -201,6 +202,8 @@ model Business {
   pillars     ContentPillar[]
   styles      BusinessStyle[]
   offerings   BusinessOffering[]
+  competitors BusinessCompetitor[]
+  questionSkips BusinessQuestionSkip[]
 
   @@index([status, updatedAt])
 }
@@ -567,6 +570,12 @@ enum OfferingKind {
   BUNDLE
 }
 
+enum OfferingStock {
+  IN_STOCK
+  LOW
+  OUT
+}
+
 enum OfferingStatus {
   ACTIVE
   SEASONAL
@@ -586,8 +595,17 @@ model BusinessOffering {
   status          OfferingStatus @default(ACTIVE)
   /// 0 = do not promote · 1 = normal · 2 = priority · 3 = hero
   push            Int            @default(1)
+  /// OUT counts as not available (prompt, quality gate); LOW is told to the model
+  stock           OfferingStock  @default(IN_STOCK)
+  /// Persian months (1 = Farvardin … 12 = Esfand) when demand peaks
+  peakMonths      Int[]
+  /// Offerings of the same business that sell well together / stand in for this one (checked by the service)
+  complementIds   String[]
+  substituteIds   String[]
   summary         String         @default("")
   features        String[]
+  /// [{ feature, benefit, proof }] — what it has, what the customer gets, what backs it (docs/67 §4.9)
+  claims          Json           @default("[]")
   priceAmount     Decimal?       @db.Decimal(18, 2)
   /// IRT (toman) | IRR (rial) | USD | EUR — always given with a price, never converted
   priceCurrency   String?
@@ -616,6 +634,57 @@ model BusinessOffering {
 
   @@unique([businessId, name])
   @@index([businessId, status])
+}
+
+enum CompetitorKind {
+  DIRECT
+  INDIRECT
+  REFERENCE
+}
+
+/// A competitor card the admin fills in (docs/70, phase 1). Never part of `BusinessApi.promptProfile`,
+/// `[DOCUMENTS]`, the exports or similarity: it reaches a prompt only as text the admin pushes into the
+/// COMPETITORS section ("add to profile").
+model BusinessCompetitor {
+  id          String         @id @default(cuid())
+  businessId  String
+  name        String
+  kind        CompetitorKind @default(DIRECT)
+  website     String         @default("")
+  instagram   String         @default("")
+  /// How the competitor positions itself, in a sentence or two
+  positioning String         @default("")
+  /// Price level in the admin's words ("cheaper", "premium") — free text, never compared by code
+  pricing     String         @default("")
+  strengths   String[]
+  weaknesses  String[]
+  /// Where we differ from them
+  difference  String         @default("")
+  /// Internal note
+  note        String         @default("")
+  isActive    Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  updatedById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User?    @relation("CompetitorUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, name])
+  @@index([businessId, kind])
+}
+
+/// A profile question the admin chose to skip (docs/72); it stays hidden until the skips are reset.
+model BusinessQuestionSkip {
+  id         String   @id @default(cuid())
+  businessId String
+  code       String
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, code])
 }
 
 enum SourceBlockKind {

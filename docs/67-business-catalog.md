@@ -166,3 +166,13 @@ M. ترتیب: مدل + Zod + CRUD ← `[CATALOG]` ← بررسی قیمت ← �
 **ساخته نشد (بخش ۴.۸):** `Idea.offeringId` / `Content.offeringId`، `offeringCoverage` و پیشنهاد اولویت از `GOALS`.
 
 **تست‌ها:** `business-catalog.spec.ts` (shared: قیمت‌ها، مقایسه، دروازهٔ کیفیت، اسکیما، پیشنهاد AI)، `stale.spec.ts` (shared و API)، `offerings.spec.ts` (قالب `[CATALOG]`، سرویس، رانر)، `docoo-export.spec.ts`، `offerings.test.tsx` (رابط). راستی‌آزمایی دستی با API و PGlite و AI ساختگی: ساخت ردیف با قیمت فارسی، نام تکراری ← ۴۰۰، قیمت بدون ارز ← ۴۰۰، حضور بلوک در پیش‌نمایش، استخراج ← ردیف غیرفعال، تأیید، و `OFFERING_PRICE_MISMATCH` روی یک محتوای واقعی (قیمت درست بی‌هشدار، قیمت غلط هشدار).
+
+## ۱۰. افزوده‌ها: مزیت و مدرک، موجودی و فصل اوج (§۴.۹ و §۴.۱۰)
+
+**مزیت → فایده → مدرک (`claims`).** ستون JSON روی `BusinessOffering` (`[{ feature, benefit, proof }]`، ≤ ۸ مورد) در migration `20261023130000_offering_claims`. `features` (فهرست کوتاه) می‌ماند. در `[CATALOG]` زیر هر محصول «Selling points» می‌آید: مزیتی که `proof` دارد با «(proof: …)» و مزیت بی‌مدرک با «(no proof — do not state as certain)». بدون مزیت، بایت‌ها همان قبل است. JSON خراب با `parseClaims` دور ریخته می‌شود، نه خطا. رابط: یک خط برای هر مزیت به شکل «ویژگی | فایده | مدرک» و نشان «N بدون مدرک» روی ردیف.
+
+**چرخهٔ عمر** (migration `20261023150000_offering_lifecycle`):
+- `stock` (`IN_STOCK | LOW | OUT`): `OUT` مثل متوقف‌شده «NOT AVAILABLE» حساب می‌شود (پرامپت و `OFFERING_UNAVAILABLE`)؛ `LOW` برچسب «LOW STOCK» می‌گیرد.
+- `peakMonths` (ماه‌های شمسی ۱ تا ۱۲): ماه جاری با `Intl` (`persianMonthOf`، بدون مبدل دستی) خوانده می‌شود؛ در ماه اوج برچسب «PEAK SEASON NOW». `peakingSoon` محصول‌هایی را می‌دهد که اوجشان **ماه بعد** شروع می‌شود (و قابل فروش‌اند): نوار یادآوری بالای برگه و سؤال `PEAK_SOON` در docs/72.
+- `complementIds` / `substituteIds` (≤ ۶، فقط محصولات همین کسب‌وکار؛ سرویس هم‌کسب‌وکاری و عدم ارجاع به خود را بررسی می‌کند): مکمل‌های **قابل‌فروش** در «Pairs well with»، و برای محصول ناموجود/متوقف، جایگزین‌های قابل‌فروش در «Instead offer». شناسهٔ حذف‌شده بی‌صدا کنار می‌رود.
+- نکتهٔ فنی: `patchOf` فقط `ZodDefault` بالاترین سطح را برمی‌دارد؛ پس `peakMonths` transform ندارد و یکتا/مرتب‌سازی در سرویس (`normalizeMonths`) است، وگرنه هر PATCH ماه‌های اوج را پاک می‌کرد (تست نگهبان در `offerings.spec.ts`).

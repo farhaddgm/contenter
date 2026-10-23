@@ -1,6 +1,6 @@
 # رقبای ساختاریافته (docs/70)
 
-> **وضعیت: طرح و بنچ‌مارک؛ ساخت فازبندی‌شده.** کدی ساخته نشده. این طرح جایگزین بخش «رصد رقبا» (گام ۳۰) در [docs/29-steps/06-data-and-reports.md](29-steps/06-data-and-reports.md) می‌شود (بخش ۴.۷). نمای کلی: [65-business-next-steps.md](65-business-next-steps.md).
+> **وضعیت: فاز ۱ (کارت دستی) ساخته شد؛ خواندن منابع، مقایسه و `COMPETITOR_BRIEF` ساخته نشده.** جزئیات در بخش ۹. این طرح جایگزین بخش «رصد رقبا» (گام ۳۰) در [docs/29-steps/06-data-and-reports.md](29-steps/06-data-and-reports.md) می‌شود (بخش ۴.۷). نمای کلی: [65-business-next-steps.md](65-business-next-steps.md).
 
 ادمین فهرست کوچکی از رقبا را ثبت می‌کند (سایت، صفحهٔ اینستاگرام با داده‌ٔ دستی یا Graph API، متن چسبانده). **کد** آن‌ها را می‌خواند و با آمار خود برند مقایسه می‌کند؛ مدل فقط آمار را تفسیر می‌کند و خروجی‌اش `BusinessSuggestion` برای بخش `COMPETITORS` است، نه نوشتن مستقیم.
 
@@ -91,3 +91,14 @@
 
 ## ۸. تلاش
 L در کل؛ فاز ۱ و ۲ هر کدام M. به خاطر نیاز به کار دستی و نبود Graph API، پیشنهاد می‌شود فاز ۱ ساخته شود و فاز ۲ بعد از دیدن استفاده.
+
+## ۹. آنچه ساخته شد (فاز ۱، کارت دستی)
+
+**کد:** `packages/shared/src/business-competitors.ts` (اسکیما، `competitorsSectionBlock`، `mergeCompetitorsBlock`)، `CompetitorsService` / `CompetitorsController` در `modules/businesses`، `competitors-panel.tsx` و برگهٔ «رقبا» در صفحهٔ کسب‌وکار. migration: `20261023120000_business_competitors`.
+
+**تفاوت با طرح:**
+- جدول `BusinessCompetitor` (نه `Competitor`)، تا قانون مرز کسب‌وکار (docs/63) و `BusinessScoped('businessCompetitor')` با همان الگوی نام‌ها بخورد؛ `Competitor` به regex ESLint اضافه شد.
+- به‌جای ردیف منبع، **فیلدهای ساختاریافتهٔ دستی** دارد: نوع (`DIRECT | INDIRECT | REFERENCE`)، سایت، اینستاگرام (فقط یادآوری؛ برنامه آن را باز نمی‌کند)، جایگاه‌یابی، سطح قیمت (متن آزاد؛ کد مقایسه‌اش نمی‌کند)، نقاط قوت و ضعف (≤ ۶)، «تفاوت ما با او» و یادداشت داخلی. سقف ۸ رقیب.
+- **قاعدهٔ نشت (بخش ۴.۵) رعایت شد:** کارت‌ها در `BUSINESS_PROMPT_INCLUDE`، `EXPORT_INCLUDE`، `[DOCUMENTS]`، خروجی Docoo/Researcher و شباهت‌سنجی نیستند (تست نگهبان در `competitors.spec.ts`). تنها راه رسیدن به AI دکمهٔ «افزودن به پروفایل» است (`POST /businesses/:id/competitors/add-to-profile`): خلاصهٔ کارت‌های **فعال** بین دو نشانگر `<!-- competitors:start/end -->` در بخش `COMPETITORS` نوشته می‌شود (متن دستی ادمین دور آن می‌ماند و اجرای بعدی فقط همین بلوک را عوض می‌کند). نوشتن از `writeSection` با `actor` کاربر می‌گذرد، پس قفل بخش (docs/69) اعمال می‌شود. یادداشت داخلی هرگز در متن نمی‌آید.
+
+**ساخته نشد:** `CompetitorSource` / `CompetitorSnapshot` و خواندن سایت، اینستاگرام و متن چسبانده (فاز ۱ در طرح و فاز ۲)، `compareBrands`، `COMPETITOR_BRIEF`. دلیل: خواندن منابع به‌جز بازآرایی `StylesService` به خوانندهٔ مشترک `OtherBrandReader` نمی‌شود و سؤال بازِ مالک (چند رقیب، ورود دستی اینستاگرام) هنوز پاسخ ندارد.

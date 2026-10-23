@@ -85,6 +85,10 @@ import { AssetImportService } from './asset-import.service';
 import { PodSpaceService } from './podspace.service';
 import { ProfileKnowledgeController } from './profile-knowledge.controller';
 import { StylesController } from './styles.controller';
+import { ProfileQuestionsController } from './profile-questions.controller';
+import { ProfileQuestionsService } from './profile-questions.service';
+import { CompetitorsController } from './competitors.controller';
+import { CompetitorsService } from './competitors.service';
 import { OfferingsController } from './offerings.controller';
 import { OfferingsService } from './offerings.service';
 import { StylesService } from './styles.service';
@@ -1137,6 +1141,8 @@ export class BusinessItemsController {
     ProfileKnowledgeController,
     StylesController,
     OfferingsController,
+    CompetitorsController,
+    ProfileQuestionsController,
   ],
   providers: [
     BusinessesService,
@@ -1152,6 +1158,8 @@ export class BusinessItemsController {
     ProfileKnowledgeService,
     StylesService,
     OfferingsService,
+    CompetitorsService,
+    ProfileQuestionsService,
   ],
   exports: [BusinessesService],
 })
