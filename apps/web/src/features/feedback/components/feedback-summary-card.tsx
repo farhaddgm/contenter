@@ -110,7 +110,7 @@ export function FeedbackSummaryCard() {
                 <h3 className="mb-2 text-sm font-semibold">{t('feedback.summary.recentNotes')}</h3>
                 <ul className="space-y-2 text-sm">
                   {data.recentNotes.map((n) => (
-                    <li key={n.id} className="rounded-md border p-2" dir="auto">
+                    <li key={n.id} className="rounded-md border p-2" data-bidi="">
                       {n.reason && (
                         <span className="me-2 text-xs text-muted-foreground">
                           {t(`feedback.reasons.${n.reason}`)}

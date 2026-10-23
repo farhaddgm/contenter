@@ -13,6 +13,7 @@ AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/sr
 - Request/response contracts live in `packages/shared`; API validates with `ZodValidationPipe`, web forms with `zodResolver` on the same schema.
 - Enums exist in both `schema.prisma` and `packages/shared/src/enums.ts` — keep in sync.
 - Audit important mutations with `AuditService.log()`.
+- Mixed Persian/English text: never `dir="auto"` (it follows the first letter, so a sentence starting with English renders LTR). Use `data-bidi=""` (`lib/bidi.ts`: RTL if any Arabic-script letter, LTR only for Latin-only); rendered Markdown blocks get it automatically.
 - Web: features must not import from `app/`; translation keys are typed from `i18n/fa.ts` (en must match); use logical CSS (`ps-`, `start-`) for RTL.
 - Dialogs with local state mount only while open (no reset-in-effect; react-hooks v7 rules).
 - Docs are in Persian under `docs/`; update them with behavior changes.

@@ -108,14 +108,14 @@ function CampaignFormDialog({
     >
       <form id="campaign-form" onSubmit={submit} className="space-y-4">
         <Field label={t('campaigns.name')} error={errors.name?.message}>
-          {(id) => <Input id={id} dir="auto" autoFocus {...form.register('name')} />}
+          {(id) => <Input id={id} data-bidi="" autoFocus {...form.register('name')} />}
         </Field>
         <Field
           label={t('campaigns.description')}
           optional={t('common.optional')}
           error={errors.description?.message}
         >
-          {(id) => <Textarea id={id} dir="auto" rows={3} {...form.register('description')} />}
+          {(id) => <Textarea id={id} data-bidi="" rows={3} {...form.register('description')} />}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Controller
@@ -164,7 +164,7 @@ function CampaignRow({ campaign, editable }: { campaign: Campaign; editable: boo
           <Link
             to={`${paths.app.topic.getHref(campaign.topicId, 'contents')}?campaignId=${campaign.id}`}
             className="font-medium hover:text-primary"
-            dir="auto"
+            data-bidi=""
           >
             {campaign.name}
           </Link>
@@ -179,7 +179,7 @@ function CampaignRow({ campaign, editable }: { campaign: Campaign; editable: boo
           )}
         </div>
         {campaign.description && (
-          <p className="line-clamp-2 text-sm text-muted-foreground" dir="auto">
+          <p className="line-clamp-2 text-sm text-muted-foreground" data-bidi="">
             {campaign.description}
           </p>
         )}

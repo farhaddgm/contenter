@@ -130,7 +130,7 @@ function IssueDrawer({ issue, onClose }: { issue: WalkerIssue; onClose: () => vo
         </dl>
         <Field label={t('topics.fields.title')}>
           {(id) => (
-            <Input id={id} dir="auto" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input id={id} data-bidi="" value={title} onChange={(e) => setTitle(e.target.value)} />
           )}
         </Field>
         <Card className="p-4">
@@ -141,7 +141,7 @@ function IssueDrawer({ issue, onClose }: { issue: WalkerIssue; onClose: () => vo
             <Textarea
               id={id}
               rows={3}
-              dir="auto"
+              data-bidi=""
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
@@ -180,7 +180,7 @@ export default function SmartIssuesRoute() {
       key: 'title',
       header: t('topics.fields.title'),
       cell: (i) => (
-        <p className="line-clamp-2 min-w-64 max-w-xl font-medium" dir="auto">
+        <p className="line-clamp-2 min-w-64 max-w-xl font-medium" data-bidi="">
           {i.title}
         </p>
       ),

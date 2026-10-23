@@ -48,7 +48,7 @@ function Composer({
     <div className="space-y-2">
       <Textarea
         rows={3}
-        dir="auto"
+        data-bidi=""
         autoFocus={autoFocus}
         placeholder={placeholder}
         value={body}
@@ -121,7 +121,7 @@ function CommentBody({
           }
         />
       ) : (
-        <p className="whitespace-pre-wrap text-sm leading-7" dir="auto">
+        <p className="whitespace-pre-wrap text-sm leading-7" data-bidi="">
           {comment.body}
         </p>
       )}

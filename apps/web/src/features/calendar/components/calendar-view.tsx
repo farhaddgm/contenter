@@ -97,7 +97,7 @@ function ItemChip({
     >
       {draggable && <GripVertical className="mt-0.5 size-3 shrink-0 opacity-50" />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate" dir="auto">
+        <span className="block truncate" data-bidi="">
           {item.title}
         </span>
         {showTime && item.state && (
@@ -215,7 +215,7 @@ function ItemDialog({ item, onClose }: { item: CalendarItem; onClose: () => void
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title={<span dir="auto">{item.title}</span>}
+      title={<span data-bidi="">{item.title}</span>}
       description={`${item.topic.title} · ${t(`enums.platform.${item.platform}`)} · ${t(`enums.contentFormat.${item.format}`)}`}
       footer={
         <>
@@ -527,7 +527,7 @@ export function CalendarView() {
               data.ready.map((item) => (
                 <div key={item.id} className="space-y-0.5">
                   <ItemChip item={item} onOpen={(i) => setOpenedId(i.id)} showTime={false} />
-                  <p className="px-1 text-[11px] text-muted-foreground" dir="auto">
+                  <p className="px-1 text-[11px] text-muted-foreground" data-bidi="">
                     {item.topic.title}
                   </p>
                 </div>

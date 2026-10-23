@@ -162,7 +162,7 @@ function RemoveSourceDialog({
       <div className="space-y-4">
         <p className="break-all rounded-md bg-muted px-3 py-2 text-xs" dir="ltr">
           {source.title && source.title !== source.url && (
-            <span className="block font-medium" dir="auto">
+            <span className="block font-medium" data-bidi="">
               {source.title}
             </span>
           )}

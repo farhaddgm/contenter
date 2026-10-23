@@ -99,7 +99,7 @@ export default function DiscoveryRoute() {
             <div>
               <p className="font-medium">{t('businesses.discover.failed')}</p>
               {d.error && (
-                <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+                <p className="mt-1 text-xs text-muted-foreground" data-bidi="">
                   {d.error}
                 </p>
               )}

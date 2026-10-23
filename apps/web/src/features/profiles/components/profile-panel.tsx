@@ -305,7 +305,7 @@ function ProfileTextDialog({
             <Textarea
               id={id}
               rows={3}
-              dir="auto"
+              data-bidi=""
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
             />
@@ -316,7 +316,7 @@ function ProfileTextDialog({
             <Textarea
               id={id}
               rows={16}
-              dir="auto"
+              data-bidi=""
               value={styleGuide}
               onChange={(e) => setStyleGuide(e.target.value)}
               className="font-mono text-xs"

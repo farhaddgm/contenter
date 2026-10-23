@@ -103,7 +103,7 @@ function JobDetails({ job, onClose }: { job: AiJob | null; onClose: () => void }
       {job.error && (
         <div className="mb-6">
           <h4 className="mb-2 text-sm font-semibold text-destructive">{t('jobs.error')}</h4>
-          <p className="rounded-md bg-destructive/10 p-3 text-sm" dir="auto">
+          <p className="rounded-md bg-destructive/10 p-3 text-sm" data-bidi="">
             {job.error}
           </p>
         </div>

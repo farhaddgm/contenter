@@ -19,7 +19,7 @@ export function WalkerChat() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-        <p className="min-w-0 truncate text-xs font-medium" dir="auto">
+        <p className="min-w-0 truncate text-xs font-medium" data-bidi="">
           {current?.title || t('smart.chat.title')}
         </p>
         <div className="flex shrink-0 items-center gap-1">
@@ -36,7 +36,7 @@ export function WalkerChat() {
               {(history.data ?? []).slice(0, 15).map((c) => (
                 <Dropdown.Item key={c.id} onSelect={() => setConversationId(c.id)}>
                   <span className="flex w-60 flex-col">
-                    <span className="truncate" dir="auto">
+                    <span className="truncate" data-bidi="">
                       {c.title || '—'}
                     </span>
                     <span className="text-[11px] text-muted-foreground">

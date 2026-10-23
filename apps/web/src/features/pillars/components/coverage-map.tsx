@@ -117,7 +117,7 @@ function Matrix({ data }: { data: CoverageReport }) {
                 key={r.pillarId ?? 'none'}
                 className={cn('border-t', r.pillarId === null && 'text-muted-foreground')}
               >
-                <td className="py-1.5" dir="auto">
+                <td className="py-1.5" data-bidi="">
                   {r.name ?? t('coverage.unlabeled')}
                 </td>
                 {cols.map((c) => (

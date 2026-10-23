@@ -48,7 +48,7 @@ export function PageHeader({
 
 export function MarkdownView({ children, className }: { children: string; className?: string }) {
   return (
-    <div className={cn('prose-content', className)} dir="auto">
+    <div className={cn('prose-content', className)}>
       <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>
     </div>
   );

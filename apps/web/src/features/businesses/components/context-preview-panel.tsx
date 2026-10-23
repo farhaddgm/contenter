@@ -81,7 +81,7 @@ function BlockRow({
         <tr>
           <td colSpan={4} className="pb-3">
             <pre
-              dir="auto"
+              data-bidi=""
               className="max-h-80 overflow-auto whitespace-pre-wrap rounded-control bg-muted p-3 text-start text-xs leading-6"
             >
               {block.text}
@@ -131,7 +131,7 @@ function Report({ report }: { report: ContextReport }) {
           {report.estCostUsd !== null && (
             <li>{t('businesses.context.cost', { cost: formatUsd(report.estCostUsd) })}</li>
           )}
-          {report.model && <li dir="auto">{t('businesses.context.model', { model: report.model })}</li>}
+          {report.model && <li data-bidi="">{t('businesses.context.model', { model: report.model })}</li>}
           <li>
             {t(`businesses.context.ratio.${report.ratio.source}`, {
               value: formatNumber(report.ratio.charsPerToken, 2),

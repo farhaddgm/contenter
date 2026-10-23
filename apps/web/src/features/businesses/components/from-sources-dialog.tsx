@@ -128,7 +128,7 @@ export function FromSourcesDialog({ onOpenChange }: { onOpenChange: (v: boolean)
             <Textarea
               id={id}
               rows={4}
-              dir="auto"
+              data-bidi=""
               value={text}
               maxLength={BUSINESS_REFERENCE_MAX_CHARS}
               onChange={(e) => setText(e.target.value)}

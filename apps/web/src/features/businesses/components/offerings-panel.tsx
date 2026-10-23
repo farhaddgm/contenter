@@ -208,7 +208,7 @@ function OfferingRow({
     <li className="rounded-lg border px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="flex flex-wrap items-center gap-2 font-semibold" dir="auto">
+          <p className="flex flex-wrap items-center gap-2 font-semibold" data-bidi="">
             {o.name}
             <Badge tone="outline">{t(`enums.offeringKind.${o.kind}`)}</Badge>
             <Badge tone={sellable ? STATUS_TONE[o.status] : 'warning'}>
@@ -239,12 +239,12 @@ function OfferingRow({
             </p>
           )}
           {o.summary && (
-            <p className="text-xs leading-6 text-muted-foreground" dir="auto">
+            <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
               {o.summary}
             </p>
           )}
           {!o.verified && o.evidence && (
-            <blockquote className="border-s-2 ps-3 text-xs leading-6 text-muted-foreground" dir="auto">
+            <blockquote className="border-s-2 ps-3 text-xs leading-6 text-muted-foreground" data-bidi="">
               <span className="font-semibold">{t('businesses.offerings.evidence')}: </span>
               {o.evidence}
             </blockquote>
@@ -430,7 +430,7 @@ function OfferingDrawer({
           {(id) => (
             <Input
               id={id}
-              dir="auto"
+              data-bidi=""
               maxLength={120}
               value={f.name}
               aria-invalid={!!errors.name}
@@ -445,7 +445,7 @@ function OfferingDrawer({
           {(id) => (
             <Textarea
               id={id}
-              dir="auto"
+              data-bidi=""
               rows={2}
               value={f.aliases}
               onChange={(e) => set('aliases', e.target.value)}
@@ -497,7 +497,7 @@ function OfferingDrawer({
           {(id) => (
             <Textarea
               id={id}
-              dir="auto"
+              data-bidi=""
               rows={2}
               maxLength={400}
               value={f.summary}
@@ -512,7 +512,7 @@ function OfferingDrawer({
           {(id) => (
             <Textarea
               id={id}
-              dir="auto"
+              data-bidi=""
               rows={3}
               value={f.features}
               onChange={(e) => set('features', e.target.value)}
@@ -561,7 +561,7 @@ function OfferingDrawer({
             {(id) => (
               <Input
                 id={id}
-                dir="auto"
+                data-bidi=""
                 maxLength={40}
                 value={f.priceUnit}
                 disabled={!priced}
@@ -633,7 +633,7 @@ function OfferingDrawer({
           {(id) => (
             <Textarea
               id={id}
-              dir="auto"
+              data-bidi=""
               rows={2}
               value={f.note}
               onChange={(e) => set('note', e.target.value)}

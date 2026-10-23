@@ -134,7 +134,7 @@ function BrandDocForm({
           hint={t('brandDocs.contentHint')}
           error={errors.content?.message}
         >
-          {(id) => <Textarea id={id} rows={14} dir="auto" {...form.register('content')} />}
+          {(id) => <Textarea id={id} rows={14} data-bidi="" {...form.register('content')} />}
         </Field>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">

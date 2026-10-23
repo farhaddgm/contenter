@@ -104,7 +104,7 @@ function KeyRow({ k, onRevoke }: { k: ApiKeyInfo; onRevoke: () => Promise<unknow
   const status = apiKeyStatus(k);
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border p-3 text-sm">
-      <span className="font-medium" dir="auto">
+      <span className="font-medium" data-bidi="">
         {k.name}
       </span>
       <code className="rounded bg-muted px-1.5 py-0.5 text-xs" dir="ltr">

@@ -177,14 +177,14 @@ function EditDrawer({
       <div className="space-y-4">
         <Field label={t('topics.fields.title')}>
           {(id) => (
-            <Input id={id} dir="auto" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input id={id} data-bidi="" value={title} onChange={(e) => setTitle(e.target.value)} />
           )}
         </Field>
         <Field label={t('contents.body')}>
           {(id) => (
             <Textarea
               id={id}
-              dir="auto"
+              data-bidi=""
               rows={16}
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -195,7 +195,7 @@ function EditDrawer({
           {(id) => (
             <Input
               id={id}
-              dir="auto"
+              data-bidi=""
               value={hashtags}
               onChange={(e) => setHashtags(e.target.value)}
             />
@@ -203,14 +203,14 @@ function EditDrawer({
         </Field>
         <Field label={t('contents.cta')}>
           {(id) => (
-            <Input id={id} dir="auto" value={cta} onChange={(e) => setCta(e.target.value)} />
+            <Input id={id} data-bidi="" value={cta} onChange={(e) => setCta(e.target.value)} />
           )}
         </Field>
         <Field label={t('contents.notes')}>
           {(id) => (
             <Textarea
               id={id}
-              dir="auto"
+              data-bidi=""
               rows={4}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -448,7 +448,7 @@ export function ContentView({ contentId }: { contentId: string }) {
             {content.topic?.title}
           </Link>
         }
-        title={<span dir="auto">{content.title}</span>}
+        title={<span data-bidi="">{content.title}</span>}
         description={
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={statusTone[content.status]}>
@@ -533,7 +533,7 @@ export function ContentView({ contentId }: { contentId: string }) {
             <AlertTriangle className="size-4" /> {t('contents.failed')}
           </p>
           {lastJob.data?.error && (
-            <p className="mt-1 text-muted-foreground" dir="auto">
+            <p className="mt-1 text-muted-foreground" data-bidi="">
               {lastJob.data.error}
             </p>
           )}
@@ -583,20 +583,20 @@ export function ContentView({ contentId }: { contentId: string }) {
                 }
               />
               <CardBody>
-                <h2 className="mb-3 text-xl font-bold" dir="auto">
+                <h2 className="mb-3 text-xl font-bold" data-bidi="">
                   {version.title}
                 </h2>
                 <MarkdownView>{version.body}</MarkdownView>
                 {version.cta && (
                   <p
                     className="mt-4 rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
-                    dir="auto"
+                    data-bidi=""
                   >
                     👉 {version.cta}
                   </p>
                 )}
                 {version.hashtags.length > 0 && (
-                  <p className="mt-4 flex flex-wrap gap-2 text-sm text-primary" dir="auto">
+                  <p className="mt-4 flex flex-wrap gap-2 text-sm text-primary" data-bidi="">
                     {version.hashtags.map((h) => (
                       <span key={h}>{h.startsWith('#') ? h : `#${h}`}</span>
                     ))}

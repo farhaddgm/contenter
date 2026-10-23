@@ -44,7 +44,7 @@ export function StaleCard({ businessId }: { businessId: string }) {
               <Link
                 to={paths.app.content.getHref(c.id)}
                 className="font-medium hover:underline"
-                dir="auto"
+                data-bidi=""
               >
                 {c.title}
               </Link>
@@ -53,7 +53,7 @@ export function StaleCard({ businessId }: { businessId: string }) {
                   ? t('stale.published', { date: formatDate(new Date(c.publishedAt)) })
                   : t(`enums.contentStatus.${c.status}`)}
               </Badge>
-              <span className="text-xs text-muted-foreground" dir="auto">
+              <span className="text-xs text-muted-foreground" data-bidi="">
                 {c.topic.title}
               </span>
             </div>

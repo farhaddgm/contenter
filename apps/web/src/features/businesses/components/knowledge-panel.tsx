@@ -108,7 +108,7 @@ function FactsCard({ businessId }: { businessId: string }) {
                       )}
                     >
                       <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm" dir="auto">
+                        <p className="text-sm" data-bidi="">
                           <span className="text-muted-foreground">{f.label}: </span>
                           <span className="font-medium">{f.value}</span>
                         </p>
@@ -138,7 +138,7 @@ function FactsCard({ businessId }: { businessId: string }) {
                               <ExternalLink className="size-3" />
                             </a>
                           )}
-                          {f.note && <span dir="auto">· {f.note}</span>}
+                          {f.note && <span data-bidi="">· {f.note}</span>}
                         </div>
                       </div>
                       {editable && (
@@ -270,10 +270,10 @@ function FactDialog({
           hint={t('businesses.facts.fields.labelHint')}
           error={errors.label?.message}
         >
-          {(id) => <Input id={id} dir="auto" autoFocus {...form.register('label')} />}
+          {(id) => <Input id={id} data-bidi="" autoFocus {...form.register('label')} />}
         </Field>
         <Field label={t('businesses.facts.fields.value')} error={errors.value?.message}>
-          {(id) => <Textarea id={id} dir="auto" rows={2} {...form.register('value')} />}
+          {(id) => <Textarea id={id} data-bidi="" rows={2} {...form.register('value')} />}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('businesses.facts.fields.category')}>
@@ -313,7 +313,7 @@ function FactDialog({
           optional={t('common.optional')}
           error={errors.note?.message}
         >
-          {(id) => <Input id={id} dir="auto" {...form.register('note')} />}
+          {(id) => <Input id={id} data-bidi="" {...form.register('note')} />}
         </Field>
       </form>
     </Dialog>
@@ -382,7 +382,7 @@ function TermsCard({ businessId }: { businessId: string }) {
                 {(id) => (
                   <Input
                     id={id}
-                    dir="auto"
+                    data-bidi=""
                     value={term}
                     maxLength={120}
                     onChange={(e) => setTerm(e.target.value)}
@@ -407,7 +407,7 @@ function TermsCard({ businessId }: { businessId: string }) {
               {(id) => (
                 <Input
                   id={id}
-                  dir="auto"
+                  data-bidi=""
                   value={alternatives}
                   onChange={(e) => setAlternatives(e.target.value)}
                 />
@@ -417,7 +417,7 @@ function TermsCard({ businessId }: { businessId: string }) {
               {(id) => (
                 <Input
                   id={id}
-                  dir="auto"
+                  data-bidi=""
                   value={note}
                   maxLength={500}
                   onChange={(e) => setNote(e.target.value)}
@@ -466,7 +466,7 @@ function TermsCard({ businessId }: { businessId: string }) {
             </p>
             <Textarea
               rows={3}
-              dir="auto"
+              data-bidi=""
               value={sample}
               placeholder={t('businesses.terms.testPlaceholder')}
               aria-label={t('businesses.terms.test')}
@@ -509,12 +509,12 @@ function TermRow({
           <Badge tone={term.kind === 'USE' ? 'success' : 'danger'}>
             {t(`enums.termKind.${term.kind}`)}
           </Badge>
-          <span className="font-medium" dir="auto">
+          <span className="font-medium" data-bidi="">
             {term.term}
           </span>
         </p>
         {(list || term.note) && (
-          <p className="text-xs text-muted-foreground" dir="auto">
+          <p className="text-xs text-muted-foreground" data-bidi="">
             {list &&
               t(
                 term.kind === 'USE' ? 'businesses.terms.wrongForms' : 'businesses.terms.insteadUse',

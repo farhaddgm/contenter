@@ -51,12 +51,12 @@ function MessageBubble({ message }: { message: SmartMessage }) {
         )}
       >
         {message.status === 'FAILED' ? (
-          <p className="flex items-start gap-1.5 text-xs text-destructive" dir="auto">
+          <p className="flex items-start gap-1.5 text-xs text-destructive" data-bidi="">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             {t('smart.chat.failed')}: {message.content}
           </p>
         ) : mine ? (
-          <p className="whitespace-pre-wrap leading-7" dir="auto">
+          <p className="whitespace-pre-wrap leading-7" data-bidi="">
             {message.content}
           </p>
         ) : (
@@ -213,7 +213,7 @@ export function ChatView({
         <Textarea
           rows={2}
           value={text}
-          dir="auto"
+          data-bidi=""
           placeholder={t('smart.chat.placeholder')}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

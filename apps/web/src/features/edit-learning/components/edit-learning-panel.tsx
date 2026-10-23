@@ -95,7 +95,7 @@ export function EditLearningPanel({ topicId }: { topicId: string }) {
           <AiWorkingBanner title={t('editLearning.working')} hint={t('editLearning.workingHint')} />
         )}
         {tracker.job?.status === 'FAILED' && !running && (
-          <p className="text-sm text-destructive" dir="auto">
+          <p className="text-sm text-destructive" data-bidi="">
             {tracker.job.error ?? t('jobs.jobFailed')}
           </p>
         )}
@@ -206,10 +206,10 @@ function SuggestionCard({
           />
         </div>
       ) : (
-        <p dir="auto">{suggestion.text}</p>
+        <p data-bidi="">{suggestion.text}</p>
       )}
       {suggestion.rationale && (
-        <p className="text-sm text-muted-foreground" dir="auto">
+        <p className="text-sm text-muted-foreground" data-bidi="">
           {suggestion.rationale}
         </p>
       )}
@@ -229,7 +229,7 @@ function SuggestionCard({
               <span className="ms-2 text-xs text-muted-foreground">
                 {t('editLearning.changed', { percent: percent(e.changeRatio) })}
               </span>
-              <p className="mt-1 whitespace-pre-wrap text-xs leading-6" dir="auto">
+              <p className="mt-1 whitespace-pre-wrap text-xs leading-6" data-bidi="">
                 {e.excerpt}
               </p>
             </li>
@@ -274,7 +274,7 @@ function Decided({ items }: { items: LearningSuggestion[] }) {
             <Badge tone={s.status === 'ACCEPTED' ? 'success' : 'neutral'}>
               {t(`editLearning.status.${s.status}`)}
             </Badge>
-            <span dir="auto">{s.text}</span>
+            <span data-bidi="">{s.text}</span>
           </li>
         ))}
       </ul>

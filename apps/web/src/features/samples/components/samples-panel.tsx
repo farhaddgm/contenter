@@ -75,13 +75,13 @@ function SampleCard({ sample, topicId }: { sample: SampleContent; topicId: strin
               target="_blank"
               rel="noreferrer noopener"
               className="line-clamp-2 font-medium hover:text-primary"
-              dir="auto"
+              data-bidi=""
             >
               {title} <ExternalLink className="inline size-3.5 text-muted-foreground" />
             </a>
           </div>
           {f?.description && (
-            <p className="line-clamp-2 text-sm text-muted-foreground" dir="auto">
+            <p className="line-clamp-2 text-sm text-muted-foreground" data-bidi="">
               {f.description}
             </p>
           )}
@@ -100,7 +100,7 @@ function SampleCard({ sample, topicId }: { sample: SampleContent; topicId: strin
             </span>
           </div>
           {sample.fetchStatus === 'FAILED' && sample.fetchError && (
-            <p className="text-xs text-destructive" dir="auto">
+            <p className="text-xs text-destructive" data-bidi="">
               {sample.fetchError}
             </p>
           )}
@@ -167,7 +167,7 @@ function SampleCard({ sample, topicId }: { sample: SampleContent; topicId: strin
               )}
               <p
                 className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap leading-7 text-muted-foreground"
-                dir="auto"
+                data-bidi=""
               >
                 {sample.manualText || f?.text}
               </p>

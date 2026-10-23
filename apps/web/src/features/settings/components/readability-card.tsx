@@ -62,14 +62,14 @@ function ReadabilityForm({ saved }: { saved: ReadabilitySettings }) {
           <Textarea
             id={id}
             rows={5}
-            dir="auto"
+            data-bidi=""
             value={phrases}
             onChange={(e) => setPhrases(e.target.value)}
             placeholder={t('contents.readability.settings.phrasesPlaceholder')}
           />
         )}
       </Field>
-      <p className="text-xs leading-6 text-muted-foreground" dir="auto">
+      <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
         {t('contents.readability.settings.builtIn')} {DEFAULT_STIFF_PHRASES.join('، ')}
       </p>
       <Field

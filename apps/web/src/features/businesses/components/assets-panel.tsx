@@ -232,7 +232,7 @@ function AddAssetDialog({
             <Textarea
               id={id}
               rows={2}
-              dir="auto"
+              data-bidi=""
               value={description}
               maxLength={4000}
               onChange={(e) => setDescription(e.target.value)}
@@ -248,7 +248,7 @@ function AddAssetDialog({
             <Textarea
               id={id}
               rows={article ? 9 : 3}
-              dir="auto"
+              data-bidi=""
               value={text}
               maxLength={BUSINESS_ASSET_TEXT_MAX_CHARS}
               onChange={(e) => setText(e.target.value)}
@@ -385,7 +385,7 @@ function AssetDialog({
             </Badge>
           </h3>
           {asset.analysisStatus === 'FAILED' && asset.analysisError && (
-            <p className="text-xs leading-5 text-destructive" dir="auto">
+            <p className="text-xs leading-5 text-destructive" data-bidi="">
               {asset.analysisError}
             </p>
           )}
@@ -406,7 +406,7 @@ function AssetDialog({
                 v && v !== 'n/a' ? (
                   <div key={k}>
                     <dt className="font-medium">{t(`businesses.assets.fields.${k}`)}</dt>
-                    <dd dir="auto" className="text-muted-foreground">
+                    <dd data-bidi="" className="text-muted-foreground">
                       {v}
                     </dd>
                   </div>
@@ -428,7 +428,7 @@ function AssetDialog({
             <Textarea
               id={id}
               rows={2}
-              dir="auto"
+              data-bidi=""
               value={description}
               maxLength={4000}
               readOnly={!editable}
@@ -444,7 +444,7 @@ function AssetDialog({
               <Textarea
                 id={id}
                 rows={asset.kind === 'ARTICLE' ? 10 : 4}
-                dir="auto"
+                data-bidi=""
                 value={currentText}
                 maxLength={BUSINESS_ASSET_TEXT_MAX_CHARS}
                 readOnly={!editable}
@@ -520,12 +520,12 @@ export function AssetsPanel({ businessId }: { businessId: string }) {
                   </span>
                 </button>
                 <div className="flex flex-1 flex-col gap-2 p-3 text-sm">
-                  <p className="truncate font-medium" dir="auto">
+                  <p className="truncate font-medium" data-bidi="">
                     {asset.title || t(`enums.businessAssetKind.${asset.kind}`)}
                   </p>
                   <p
                     className="line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground"
-                    dir="auto"
+                    data-bidi=""
                   >
                     {asset.analysis?.summary ?? asset.description}
                   </p>
