@@ -4,7 +4,6 @@ import {
   AddReferenceSchema,
   BUSINESS_REFERENCE_LIMIT,
   BUSINESS_REFERENCE_MAX_CHARS,
-  InstagramManualSchema,
   instagramProfileUrl,
   isGoogleDriveUrl,
   isInstagramUrl,
@@ -15,8 +14,6 @@ import {
   parsePodSpaceUrl,
   type AddReferenceInput,
   type GoogleFileType,
-  type InstagramPost,
-  type InstagramProfile,
   type ReferenceAnalysis,
   type UpdateReferenceInput,
 } from '@contenter/shared';
@@ -25,13 +22,11 @@ import { SemanticRetriever } from '../ai/semantic/semantic.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DriveReadError, GoogleDriveService } from '../google-drive/google-drive.service';
-import { FetchError, MediaFetcherService } from '../samples/media-fetcher.service';
+import { FetchError } from '../samples/media-fetcher.service';
 import { documentKind, extractText, isTextKind } from './document-text';
 import { AssetImportService, PREVIEW_MAX_BYTES } from './asset-import.service';
 import { PodSpaceService, type PodSpaceEntry } from './podspace.service';
-import { analyzeInstagram, formatInstagramSnapshot } from './social/instagram-analysis';
-import { InstagramService } from './social/instagram.service';
-import { WebsiteCrawlerService } from './social/website-crawler.service';
+import { SourceReader } from './social/source-reader.service';
 
 const ACCOUNT_REF = { select: { id: true, email: true } } as const;
 const PUBLIC_EXPORT: Record<GoogleFileType, ((id: string) => string) | null> = {
@@ -40,8 +35,6 @@ const PUBLIC_EXPORT: Record<GoogleFileType, ((id: string) => string) | null> = {
   presentation: (id) => `https://docs.google.com/presentation/d/${id}/export?format=txt`,
   file: null,
 };
-/** A web page with less readable text than this is a shell (login wall, JS app), not a source. */
-export const MIN_PAGE_TEXT = 200;
 const READ_CONCURRENCY = 4;
 /** Largest shared file downloaded to be read as text (PDF, Word …). */
 const DOCUMENT_MAX_BYTES = 25_000_000;
@@ -88,31 +81,7 @@ const toPublic = ({ content, ...r }: ReferenceWithAccount, withContent = false) 
   ...(withContent ? { content } : {}),
 });
 
-/**
- * True when a fetch ended on a sign-in page instead of the requested one (the requested page is
- * private). Such a page must never be stored as the content of a reference.
- */
-export function isLoginWall(requestedUrl: string, finalUrl: string): boolean {
-  let requested: URL;
-  let final: URL;
-  try {
-    requested = new URL(requestedUrl);
-    final = new URL(finalUrl);
-  } catch {
-    return false;
-  }
-  const host = final.hostname.toLowerCase();
-  if (/^(accounts\.google\.com|login\.microsoftonline\.com|login\.live\.com)$/.test(host)) {
-    return true;
-  }
-  const moved = host !== requested.hostname.toLowerCase() || final.pathname !== requested.pathname;
-  return (
-    moved &&
-    /(^|[/._-])(login|signin|sign-in|sign_in|authwall|sso|auth)([/._?-]|$)/i.test(
-      `${host}${final.pathname}`,
-    )
-  );
-}
+export { isLoginWall, MIN_PAGE_TEXT } from './social/source-reader.service';
 
 /**
  * References of a business (docs/14-business-references.md): links, Google Docs/Drive files and
@@ -127,12 +96,10 @@ export class ReferencesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly fetcher: MediaFetcherService,
     private readonly drive: GoogleDriveService,
     private readonly podspace: PodSpaceService,
     private readonly assets: AssetImportService,
-    private readonly instagram: InstagramService,
-    private readonly crawler: WebsiteCrawlerService,
+    private readonly reader: SourceReader,
     private readonly semantic: SemanticRetriever,
   ) {}
 
@@ -578,22 +545,7 @@ export class ReferencesService {
 
   /** The public data of a Business/Creator account through the Instagram API. */
   private async readInstagram(row: ReferenceRow): Promise<ReadOutcome> {
-    const handle = parseInstagramHandle(row.url);
-    if (!handle) throw new FetchError('This reference does not point to an Instagram account');
-    const { profile, posts } = await this.instagram.fetchAccount(handle);
-    const analysis = analyzeInstagram('GRAPH', profile, posts);
-    return {
-      title: `Instagram @${profile.username}`,
-      text: formatInstagramSnapshot({
-        provider: 'GRAPH',
-        profile,
-        posts,
-        analysis,
-        readAt: new Date(),
-      }),
-      accountId: null,
-      analysis,
-    };
+    return { ...(await this.reader.readInstagram(row.url)), accountId: null };
   }
 
   /** Bio, counts and captions the admin typed or took from the account's data export. */
@@ -602,52 +554,24 @@ export class ReferencesService {
     input: NonNullable<AddReferenceInput['instagram']>,
     user: AuthUser,
   ): Promise<string> {
-    const manual = InstagramManualSchema.parse(input);
-    const handle = parseInstagramHandle(manual.handle) ?? '';
-    const url = handle ? instagramProfileUrl(handle) : '';
+    const manual = this.reader.manualInstagram(input);
     await this.assertRoom(businessId);
-    if (url && (await this.prisma.businessReference.findFirst({ where: { businessId, url } }))) {
+    if (
+      manual.url &&
+      (await this.prisma.businessReference.findFirst({ where: { businessId, url: manual.url } }))
+    ) {
       throw new BadRequestException(
         'This Instagram account is already a reference. Delete it first to replace it with new data.',
       );
     }
-    const profile: InstagramProfile = {
-      username: handle,
-      name: manual.name,
-      biography: manual.biography,
-      website: manual.website,
-      followers: manual.followers ?? null,
-      following: manual.following ?? null,
-      mediaCount: manual.mediaCount ?? null,
-    };
-    const posts: InstagramPost[] = manual.posts
-      .filter((p) => p.caption)
-      .map((p) => ({
-        caption: p.caption,
-        takenAt:
-          p.takenAt && !Number.isNaN(Date.parse(p.takenAt))
-            ? new Date(p.takenAt).toISOString()
-            : null,
-        mediaType: p.mediaType ?? 'UNKNOWN',
-        likes: p.likes ?? null,
-        comments: p.comments ?? null,
-        permalink: p.permalink ?? '',
-      }));
-    const analysis = analyzeInstagram('MANUAL', profile, posts);
     const row = await this.prisma.businessReference.create({
       data: {
         businessId,
         kind: 'INSTAGRAM',
-        url,
-        title: handle ? `Instagram @${handle}` : 'Instagram (given by hand)',
-        content: formatInstagramSnapshot({
-          provider: 'MANUAL',
-          profile,
-          posts,
-          analysis,
-          readAt: new Date(),
-        }).slice(0, BUSINESS_REFERENCE_MAX_CHARS),
-        analysis: analysis as unknown as Prisma.InputJsonValue,
+        url: manual.url,
+        title: manual.title,
+        content: manual.content,
+        analysis: manual.analysis as unknown as Prisma.InputJsonValue,
         status: 'READY',
         fetchedAt: new Date(),
         createdById: user.id,
@@ -658,24 +582,11 @@ export class ReferencesService {
 
   /** Several pages of a website (home, about, services …), see WebsiteCrawlerService. */
   private async readWebsite(row: ReferenceRow): Promise<ReadOutcome> {
-    const out = await this.crawler.read(row.url);
-    return { title: out.title, text: out.text, accountId: null, analysis: out.analysis };
+    return { ...(await this.reader.readWebsite(row.url)), accountId: null };
   }
 
   private async readPage(url: string): Promise<ReadOutcome> {
-    const { media } = await this.fetcher.fetch(url);
-    if (isLoginWall(url, media.finalUrl ?? url)) {
-      throw new FetchError(
-        'This page requires signing in, so its content cannot be read. Paste the text instead.',
-      );
-    }
-    const text = (media.text ?? media.description ?? '').trim();
-    if (text.length < MIN_PAGE_TEXT) {
-      throw new FetchError(
-        `Only ${text.length} characters of readable text were found — the page probably needs a login or JavaScript. Paste the text instead.`,
-      );
-    }
-    return { title: media.title ?? '', text, accountId: null as string | null };
+    return { ...(await this.reader.readPage(url)), accountId: null };
   }
 
   /** One shared PodSpace file: downloaded through the API and turned into text. */

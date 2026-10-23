@@ -2,6 +2,9 @@
 
 Monorepo (npm workspaces): `apps/api` (NestJS + Prisma + BullMQ), `apps/web` (React/Vite, bulletproof-react layout), `packages/shared` (Zod schemas/types, built with tsup — run `npm run build -w @contenter/shared` after changing it).
 
+## Status
+- What is built / in progress / open, and which items overlap, lives in `docs/00-status.md` — read it before starting a feature and update it in the same PR. Uncommitted code from another session is not "built".
+
 ## Core rule
 AI decides, code executes. LLM calls only happen inside AI runners (`apps/api/src/modules/ai/runners`) executed by the queue worker; they return schema-validated JSON and the runner persists it. Never call the AI provider from a controller/request path — use `AiJobsService.enqueue()`.
 

@@ -20,6 +20,8 @@
 | `activeFacts(id)` | facts فعال | `StaleService` |
 | `instagramStats(id)` | آمار اینستاگرام (محاسبه‌شده با کد) | `StyleFitService` |
 | `materialForTopic(topicId)` | شمار بخش‌های پرشده و رفرنس‌های خواندنی | `ProfilesService.build` |
+| `styleForPrompt(id, styleId)` | سبک تأییدشدهٔ پروژه برای `[STYLE]` (docs/64) | `ContextLoader` |
+| `offeringsForQuality(id)` | ردیف‌های فعال و تأییدشدهٔ کاتالوگ برای بررسی قیمت (docs/67) | جزئیات محتوا |
 | `countAll` / `listSummaries` / `findForExport` | خروجی یکپارچه‌سازی‌ها | `DocooExportService` |
 
 `BUSINESS_PROMPT_INCLUDE`، `EXPORT_INCLUDE` و `ExportRow` از همین فایل می‌آیند. قراردادهای داده (Zod و انواع) همان‌جا در `packages/shared` می‌مانند.
