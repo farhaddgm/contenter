@@ -5,6 +5,7 @@ import {
   BUSINESS_TERM_LIMIT,
   CreateBusinessFactSchema,
   CreateBusinessTermSchema,
+  SetSectionLockSchema,
   UpdateBusinessFactSchema,
   UpdateBusinessTermSchema,
   type AuditIssue,
@@ -12,6 +13,7 @@ import {
   type CreateBusinessFactInput,
   type CreateBusinessTermInput,
   type FixAuditIssueInput,
+  type SetSectionLockInput,
   type UpdateBusinessFactInput,
   type UpdateBusinessTermInput,
 } from '@contenter/shared';
@@ -82,6 +84,48 @@ export class ProfileKnowledgeService {
     });
     this.log(user, 'business.section_review', id, { key });
     return updated;
+  }
+
+  /**
+   * Locks or unlocks a section (docs/69-business-section-lock.md). Only the route's role check
+   * (admin) decides who may; the lock itself is enforced where text is written (`writeSection`).
+   * A section that has no row yet gets an empty one, so a lock can be set before anything is written.
+   * The lock note is shown to people but never written to the audit log.
+   */
+  async setSectionLock(
+    id: string,
+    key: BusinessSectionKey,
+    input: SetSectionLockInput,
+    user: AuthUser,
+  ) {
+    const data = SetSectionLockSchema.parse(input);
+    await this.business(id);
+    const unlock = data.lock === 'NONE';
+    const lockFields = {
+      lock: data.lock,
+      lockedAt: unlock ? null : new Date(),
+      lockedById: unlock ? null : user.id,
+      lockNote: unlock ? '' : data.note,
+    };
+    const where = { businessId_key: { businessId: id, key } };
+    const include = { updatedBy: USER_REF, reviewedBy: USER_REF, lockedBy: USER_REF };
+    const existing = await this.prisma.businessSection.findUnique({ where });
+    const section = existing
+      ? await this.prisma.businessSection.update({
+          where,
+          // locking is not an edit of the text: keep the date the text last changed
+          data: { ...lockFields, updatedAt: existing.updatedAt },
+          include,
+        })
+      : await this.prisma.businessSection.create({
+          data: { businessId: id, key, content: '', source: 'ADMIN', ...lockFields },
+          include,
+        });
+    this.log(user, unlock ? 'business.section_unlock' : 'business.section_lock', id, {
+      key,
+      lock: data.lock,
+    });
+    return section;
   }
 
   // ---------- key facts ----------

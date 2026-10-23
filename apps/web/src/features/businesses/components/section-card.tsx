@@ -4,6 +4,8 @@ import {
   CheckCheck,
   ChevronDown,
   History,
+  Lock,
+  LockOpen,
   Pencil,
   ShieldAlert,
   Sparkles,
@@ -12,6 +14,8 @@ import {
 import {
   BUSINESS_SECTION_MAX_CHARS,
   BUSINESS_SECTION_META,
+  SECTION_LOCK_NOTE_MAX,
+  SectionLock,
   type BusinessSection,
   type BusinessSectionKey,
   type BusinessSuggestion,
@@ -20,10 +24,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/form-controls';
+import { Field, Textarea } from '@/components/ui/form-controls';
 import { MarkdownView } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
+import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/format';
@@ -34,7 +39,7 @@ import {
   useSectionRevisions,
   useUpdateSection,
 } from '../api/businesses';
-import { useReviewSection } from '../api/profile-knowledge';
+import { useReviewSection, useSetSectionLock } from '../api/profile-knowledge';
 
 type Editing = { suggestionId: string | null; text: string } | null;
 
@@ -66,8 +71,13 @@ export function SectionCard({
   const accept = useAcceptSuggestion();
   const dismiss = useDismissSuggestion();
   const review = useReviewSection(businessId);
+  const { can } = useAuthorization();
   const [editing, setEditing] = useState<Editing>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [lockOpen, setLockOpen] = useState(false);
+  const lock = section?.lock ?? 'NONE';
+  // an admin-only section can be changed by admins alone (the server enforces it, docs/69)
+  const canWrite = editable && (lock !== 'ADMIN_ONLY' || can('business:lock'));
   const content = section?.content.trim() ?? '';
   const title = t(`enums.businessSection.${sectionKey}`);
   const unreviewed = !!content && section?.source === 'AI' && !section.reviewedAt;
@@ -134,6 +144,12 @@ export function SectionCard({
               </Badge>
             )}
             {thin && <Badge tone="outline">{t('businesses.review.thin')}</Badge>}
+            {lock !== 'NONE' && (
+              <Badge tone="primary" title={section?.lockNote || undefined}>
+                <Lock />
+                {t(`businesses.lock.badge.${lock}`)}
+              </Badge>
+            )}
             {suggestions.length > 0 && (
               <Badge tone="warning">
                 <Sparkles />
@@ -157,7 +173,18 @@ export function SectionCard({
                 <History />
               </Button>
             )}
-            {editable && !editing && (
+            {can('business:lock') && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={t('businesses.lock.action')}
+                title={t('businesses.lock.action')}
+                onClick={() => setLockOpen(true)}
+              >
+                {lock === 'NONE' ? <LockOpen /> : <Lock />}
+              </Button>
+            )}
+            {canWrite && !editing && (
               <>
                 <Button
                   size="sm"
@@ -185,6 +212,24 @@ export function SectionCard({
         }
       />
       <CardBody id={`section-body-${sectionKey}`} hidden={!open} className="space-y-4">
+        {lock !== 'NONE' && (
+          <div className="flex gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs leading-6">
+            <Lock className="mt-1 size-3.5 shrink-0 text-primary" />
+            <div>
+              <p>{t(`businesses.lock.hint.${lock}`)}</p>
+              {(section?.lockedBy || section?.lockNote) && (
+                <p className="text-muted-foreground" dir="auto">
+                  {section?.lockedBy &&
+                    t('businesses.lock.by', {
+                      name: section.lockedBy.name,
+                      date: formatDate(section.lockedAt),
+                    })}
+                  {section?.lockNote ? ` — ${section.lockNote}` : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
         {editing ? (
           <div className="space-y-2">
             {editing.suggestionId && (
@@ -215,7 +260,7 @@ export function SectionCard({
             {unreviewed && (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2">
                 <p className="text-xs leading-6">{t('businesses.review.hint')}</p>
-                {editable && (
+                {canWrite && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -281,7 +326,7 @@ export function SectionCard({
               {s.rationale && (
                 <p className="text-xs leading-6 text-muted-foreground">{s.rationale}</p>
               )}
-              {editable && (
+              {canWrite && (
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
@@ -322,16 +367,126 @@ export function SectionCard({
             </div>
           ))}
       </CardBody>
+      {lockOpen && (
+        <LockDialog
+          businessId={businessId}
+          sectionKey={sectionKey}
+          title={title}
+          current={lock}
+          note={section?.lockNote ?? ''}
+          onOpenChange={setLockOpen}
+        />
+      )}
       {historyOpen && (
         <RevisionsDialog
           businessId={businessId}
           sectionKey={sectionKey}
           title={title}
-          editable={editable}
+          editable={canWrite}
           onOpenChange={setHistoryOpen}
         />
       )}
     </Card>
+  );
+}
+
+/** The admin picks who may change the section (docs/69). */
+function LockDialog({
+  businessId,
+  sectionKey,
+  title,
+  current,
+  note: currentNote,
+  onOpenChange,
+}: {
+  businessId: string;
+  sectionKey: BusinessSectionKey;
+  title: string;
+  current: SectionLock;
+  note: string;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const t = useT();
+  const setLock = useSetSectionLock(businessId);
+  const [level, setLevel] = useState<SectionLock>(current);
+  const [note, setNote] = useState(currentNote);
+
+  return (
+    <Dialog
+      open
+      onOpenChange={onOpenChange}
+      title={t('businesses.lock.title', { section: title })}
+      description={t('businesses.lock.intro')}
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            isLoading={setLock.isPending}
+            onClick={() =>
+              setLock.mutate(
+                { key: sectionKey, lock: level, note },
+                {
+                  onSuccess: () => {
+                    notify.success(
+                      t(level === 'NONE' ? 'businesses.lock.unlocked' : 'businesses.lock.locked'),
+                    );
+                    onOpenChange(false);
+                  },
+                  onError: (e) => notify.error(t('common.error'), e.message),
+                },
+              )
+            }
+          >
+            {t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <fieldset className="space-y-2">
+          <legend className="sr-only">{t('businesses.lock.action')}</legend>
+          {SectionLock.map((value) => (
+            <label
+              key={value}
+              className={cn(
+                'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm',
+                level === value && 'border-primary bg-primary/5',
+              )}
+            >
+              <input
+                type="radio"
+                name={`lock-${sectionKey}`}
+                className="mt-1.5 accent-[var(--primary)]"
+                checked={level === value}
+                onChange={() => setLevel(value)}
+              />
+              <span>
+                <span className="block font-semibold">{t(`businesses.lock.level.${value}`)}</span>
+                <span className="block text-xs leading-6 text-muted-foreground">
+                  {t(`businesses.lock.levelHint.${value}`)}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        {level !== 'NONE' && (
+          <Field label={t('businesses.lock.noteLabel')} hint={t('businesses.lock.noteHint')}>
+            {(id) => (
+              <Textarea
+                id={id}
+                dir="auto"
+                rows={2}
+                maxLength={SECTION_LOCK_NOTE_MAX}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            )}
+          </Field>
+        )}
+      </div>
+    </Dialog>
   );
 }
 

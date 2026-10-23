@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AiJob, Prisma } from '@prisma/client';
 import {
+  aiMustSuggest,
   ASSET_MAX_PREVIEWS,
   AuditTarget,
   BusinessAssetAnalysisSchema,
@@ -24,6 +25,11 @@ import { consult, SEARCHES } from './business.runners';
 import type { AiRunner, RunnerResult } from './runner';
 
 const MAX_ASSET_PROMPT_TEXT = 14_000;
+/** Prefix of the rationale of a rewrite of a locked section (docs/69), in the business language. */
+const REVISE_LOCKED_NOTE: Record<string, string> = {
+  fa: 'این بخش قفل است و مستقیم تغییر نکرد.',
+  en: 'This section is locked, so it was not changed directly.',
+};
 const asJson = (v: unknown) => v as Prisma.InputJsonValue;
 
 /**
@@ -90,13 +96,16 @@ export class BusinessReviseRunner implements AiRunner {
 
     const byKey = new Map(b.sections.map((s) => [s.key, s]));
     const changed: BusinessSectionKey[] = [];
+    /** Locked sections (docs/69) that got a suggestion instead of the direct rewrite. */
+    const held: BusinessSectionKey[] = [];
     await this.prisma.$transaction(async (tx) => {
       for (const s of data.sections) {
         const content = s.content.trim();
-        if (!content || changed.includes(s.key)) continue;
+        if (!content || changed.includes(s.key) || held.includes(s.key)) continue;
         if (byKey.get(s.key)?.content.trim() === content) continue;
-        changed.push(s.key);
-        if (apply === 'SUGGEST') {
+        const locked = apply === 'DIRECT' && aiMustSuggest(byKey.get(s.key)?.lock);
+        (locked ? held : changed).push(s.key);
+        if (apply === 'SUGGEST' || locked) {
           await tx.businessSuggestion.updateMany({
             where: { businessId: b.id, key: s.key, status: 'PENDING' },
             data: { status: 'DISMISSED', decidedAt: new Date() },
@@ -106,7 +115,9 @@ export class BusinessReviseRunner implements AiRunner {
               businessId: b.id,
               key: s.key,
               content,
-              rationale: s.change.trim(),
+              rationale: locked
+                ? `${REVISE_LOCKED_NOTE[b.language] ?? REVISE_LOCKED_NOTE.en!} ${s.change.trim()}`.trim()
+                : s.change.trim(),
               jobId: job.id,
             },
           });
@@ -119,6 +130,7 @@ export class BusinessReviseRunner implements AiRunner {
             content,
             source: 'AI',
             userId: null,
+            actor: { kind: 'AI' },
           });
         }
       }
@@ -165,6 +177,7 @@ export class BusinessReviseRunner implements AiRunner {
         noteId: note.id,
         apply,
         sectionsChanged: changed.length,
+        sectionsHeld: held.length,
         references,
         webSearch: !!research,
       },

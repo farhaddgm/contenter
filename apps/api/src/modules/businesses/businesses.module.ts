@@ -171,7 +171,7 @@ export class BusinessesService {
     const b = await this.prisma.business.findUnique({
       where: { id },
       include: {
-        sections: { include: { updatedBy: USER_REF, reviewedBy: USER_REF } },
+        sections: { include: { updatedBy: USER_REF, reviewedBy: USER_REF, lockedBy: USER_REF } },
         // only the projects this user may open (docs/17)
         topics: {
           where: this.access.visibleTopics(user),
@@ -256,6 +256,7 @@ export class BusinessesService {
         content: input.content,
         source: 'ADMIN',
         userId: user.id,
+        actor: { kind: 'USER', role: user.role },
       }),
     );
     await this.touch(id);
@@ -291,7 +292,14 @@ export class BusinessesService {
     if (!rev) throw new NotFoundException('Revision not found');
     const { businessId, key } = rev.section;
     const section = await this.prisma.$transaction((tx) =>
-      writeSection(tx, { businessId, key, content: rev.content, source: 'ADMIN', userId: user.id }),
+      writeSection(tx, {
+        businessId,
+        key,
+        content: rev.content,
+        source: 'ADMIN',
+        userId: user.id,
+        actor: { kind: 'USER', role: user.role },
+      }),
     );
     await this.touch(businessId);
     this.audit.log({
@@ -352,6 +360,7 @@ export class BusinessesService {
         content,
         source,
         userId: user.id,
+        actor: { kind: 'USER', role: user.role },
         // The admin read and accepted it.
         reviewed: true,
       });
@@ -509,6 +518,8 @@ export class BusinessesService {
           content: candidate.description.trim(),
           source: 'AI',
           userId: null,
+          // a business that was just created has no locked section
+          actor: { kind: 'AI' },
         });
       }
       await tx.businessDiscovery.update({

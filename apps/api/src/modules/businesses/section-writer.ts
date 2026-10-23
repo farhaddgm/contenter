@@ -1,5 +1,30 @@
+import { ForbiddenException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { BusinessSectionKey, SectionSource } from '@contenter/shared';
+import {
+  isWriteBlocked,
+  type BusinessSectionKey,
+  type SectionActor,
+  type SectionLock,
+  type SectionSource,
+} from '@contenter/shared';
+
+/**
+ * The section's lock does not let this writer change it (docs/69-business-section-lock.md). A
+ * person gets a 403; an AI runner is expected to turn its text into a suggestion first
+ * (`aiMustSuggest`), so seeing this error there means a path forgot to.
+ */
+export class SectionLockedError extends ForbiddenException {
+  constructor(
+    readonly key: BusinessSectionKey,
+    readonly lock: SectionLock,
+  ) {
+    super(
+      lock === 'ADMIN_ONLY'
+        ? 'This section is locked: only an admin can change it'
+        : 'This section is locked against direct AI writes',
+    );
+  }
+}
 
 /**
  * Sets a section's content. The previous non-empty content is kept as a revision (restorable),
@@ -7,6 +32,10 @@ import type { BusinessSectionKey, SectionSource } from '@contenter/shared';
  *
  * Review state: text a person wrote or accepted counts as reviewed by them (`reviewed`, default
  * = written by the admin); AI text written directly starts unreviewed until the admin confirms it.
+ *
+ * Lock (docs/69): the single place every write goes through, so it enforces who may change a
+ * locked section (`actor`). The update only applies if the lock is still the one that was
+ * checked, so a lock set while this runs is respected, not overwritten.
  */
 export async function writeSection(
   tx: Prisma.TransactionClient,
@@ -16,6 +45,8 @@ export async function writeSection(
     content: string;
     source: SectionSource;
     userId: string | null;
+    /** Who is writing: the AI, or a person with their role. */
+    actor: SectionActor;
     /** A person approved this text (default: source ADMIN). */
     reviewed?: boolean;
   },
@@ -34,6 +65,9 @@ export async function writeSection(
     }
     return existing;
   }
+  if (existing && isWriteBlocked(existing.lock, args.actor)) {
+    throw new SectionLockedError(args.key, existing.lock);
+  }
   if (existing?.content.trim()) {
     await tx.businessSectionRevision.create({
       data: {
@@ -44,22 +78,25 @@ export async function writeSection(
       },
     });
   }
+  const data = {
+    content: args.content,
+    source: args.source,
+    updatedById: args.userId,
+    ...review,
+  };
+  if (existing) {
+    // compare-and-set on the lock that was checked above
+    const done = await tx.businessSection.updateMany({
+      where: { id: existing.id, lock: existing.lock },
+      data,
+    });
+    if (done.count === 0) throw new SectionLockedError(args.key, existing.lock);
+    return tx.businessSection.findUniqueOrThrow({ where: { id: existing.id } });
+  }
   return tx.businessSection.upsert({
     where,
-    create: {
-      businessId: args.businessId,
-      key: args.key,
-      content: args.content,
-      source: args.source,
-      updatedById: args.userId,
-      ...review,
-    },
-    update: {
-      content: args.content,
-      source: args.source,
-      updatedById: args.userId,
-      ...review,
-    },
+    create: { businessId: args.businessId, key: args.key, ...data },
+    update: data,
   });
 }
 
