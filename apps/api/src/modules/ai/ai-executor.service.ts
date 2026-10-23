@@ -118,6 +118,12 @@ export class AiExecutor {
     const system = renderTemplate(prompt.system, args.vars);
     const user = appendMissingBlocks(prompt.user, renderTemplate(prompt.user, args.vars), args.vars);
     const ctx = batchContext.getStore();
+    if (ctx) {
+      // sizes of the prompts of this run, to learn characters per token (docs/66); images add
+      // tokens the text does not explain
+      ctx.promptChars = (ctx.promptChars ?? 0) + system.length + user.length;
+      if (args.imageUrls?.length) ctx.unmeasured = true;
+    }
     if (ctx?.economy) {
       const answered = await this.economy(ctx, args, { ref, effort, system, user });
       if (answered) return { ...answered, prompt: { key: prompt.key, version: prompt.version } };
@@ -205,6 +211,9 @@ export class AiExecutor {
       throw new NonRetryableAiError('No site is left to search: every reference site is blocked');
     }
     const note = blocklistNote(blocked);
+    // search results add tokens the prompt text does not explain (docs/66)
+    const store = batchContext.getStore();
+    if (store) store.unmeasured = true;
     const prompt = await this.prompts.resolve(args.promptKey);
     const { model: ref, effort } = await this.settings.modelFor(args.task);
     const system = renderTemplate(prompt.system, args.vars);

@@ -59,9 +59,10 @@ export class ContextLoader {
    * documents, so content rests on documents instead of samples (docs/19-optional-samples.md).
    * When those documents are too big to send whole, the passages closest in meaning to the topic
    * (and to `extraQuery`, e.g. the brief) are chosen instead of an equal slice of each
-   * (docs/60-reliability-and-cost.md).
+   * (docs/60-reliability-and-cost.md). `opts.semantic: false` skips that choice (no indexing, no
+   * embeddings call) and gives the equal slices, for read-only previews.
    */
-  async business(topicId: string, target?: ExampleTarget) {
+  async business(topicId: string, target?: ExampleTarget, opts: { semantic?: boolean } = {}) {
     const topic = await this.prisma.topic.findUniqueOrThrow({
       where: { id: topicId },
       select: {
@@ -84,7 +85,10 @@ export class ContextLoader {
     if (analyzed === 0) {
       const all = await this.documents(topic.businessId);
       const query = [topic.title, topic.description, topic.audience].filter(Boolean).join('\n');
-      documents = (await this.semantic?.select(all, query, MAX_DOCUMENTS_TEXT)) ?? all;
+      // `semantic: false` (the preview, docs/66) must not index or call the embeddings vendor
+      documents =
+        (opts.semantic === false ? null : await this.semantic?.select(all, query, MAX_DOCUMENTS_TEXT)) ??
+        all;
     }
     return {
       ...business,

@@ -22,6 +22,8 @@ import {
   isFactExpired,
   isRegister,
   registerInstruction,
+  type ContextBlock,
+  type ContextBlockId,
   type FetchedMedia,
   type SampleAnalysisResult,
 } from '@contenter/shared';
@@ -373,9 +375,41 @@ export function formatBusinessAssets(assets: AssetForPrompt[], budget = MAX_ASSE
  */
 export function formatBusiness(
   b: BusinessForPrompt | null,
-  { includeEmpty = false, budget = MAX_BUSINESS_TEXT } = {},
+  opts: { includeEmpty?: boolean; budget?: number } = {},
 ): string {
   if (!b) return NO_BUSINESS;
+  return buildBusinessParts(b, opts)
+    .map((p) => p.text)
+    .join('\n\n');
+}
+
+/** One block of the `business` variable, with what the preview shows about it (docs/66). */
+export type BusinessPart = Omit<ContextBlock, 'estTokens'>;
+
+const OMITTED_RE = /\((\d+) more (?:asset\(s\) )?omitted/;
+
+/**
+ * Whether a block's text was cut, read from the markers the formatters already write
+ * (`[truncated]`, "[omitted — …]", "(N more omitted …)") so the preview cannot drift from them.
+ */
+function cutMarks(text: string): { cut: boolean; omitted: number } {
+  const m = OMITTED_RE.exec(text);
+  const cut = !!m || text.includes('[truncated]') || text.includes('[omitted — ');
+  return { cut, omitted: m ? Number(m[1]) : 0 };
+}
+
+function part(id: ContextBlockId, text: string, unreviewed = false): BusinessPart {
+  return { id, text, chars: text.length, unreviewed, ...cutMarks(text) };
+}
+
+/**
+ * The `business` variable as its blocks, in prompt order. `formatBusiness` is exactly these texts
+ * joined by a blank line, so a preview built from the parts shows what the model reads.
+ */
+export function buildBusinessParts(
+  b: BusinessForPrompt,
+  { includeEmpty = false, budget = MAX_BUSINESS_TEXT } = {},
+): BusinessPart[] {
   const head = [
     `Name: ${b.name}`,
     b.tagline ? `Tagline: ${b.tagline}` : null,
@@ -386,35 +420,43 @@ export function formatBusiness(
   ]
     .filter(Boolean)
     .join('\n');
+  const parts: BusinessPart[] = [part('HEAD', head)];
   const byKey = new Map(b.sections.map((s) => [s.key, s]));
   let left = budget - head.length;
-  const blocks: string[] = [];
   for (const key of BusinessSectionKey) {
     const section = byKey.get(key);
     const text = section?.content.trim() ?? '';
     const draft = section?.source === 'AI' && section.reviewedAt === null;
     const title = `### ${SECTION_TITLE[key]} [${key}]${text && draft ? ` ${UNREVIEWED_MARK}` : ''}`;
+    const id = `SECTION:${key}` as const;
     if (!text) {
-      if (includeEmpty) blocks.push(`${title}\n(empty)`);
+      if (includeEmpty) parts.push(part(id, `${title}\n(empty)`));
       continue;
     }
     if (left <= 0) {
-      blocks.push(`${title}\n[omitted — business profile budget exhausted]`);
+      parts.push(part(id, `${title}\n[omitted — business profile budget exhausted]`, draft));
       continue;
     }
     const cap = Math.min(MAX_BUSINESS_SECTION, left);
-    blocks.push(`${title}\n${text.length > cap ? `${text.slice(0, cap)}\n[truncated]` : text}`);
+    parts.push(
+      part(
+        id,
+        `${title}\n${text.length > cap ? `${text.slice(0, cap)}\n[truncated]` : text}`,
+        draft,
+      ),
+    );
     left -= Math.min(text.length, cap);
   }
-  const facts = b.facts?.length ? formatBusinessFacts(b.facts) : '';
-  const terms = b.terms?.length ? formatBusinessTerms(b.terms) : '';
-  const assets = b.assets?.length ? formatBusinessAssets(b.assets) : '';
-  const documents = b.documents?.length ? formatBusinessDocuments(b.documents) : '';
-  const examples = b.examples?.length ? formatGoldenExamples(b.examples) : '';
-  const style = formatStyle(b.style);
-  return [head, ...blocks, facts, terms, assets, documents, examples, style]
-    .filter(Boolean)
-    .join('\n\n');
+  const rest: [ContextBlockId, string][] = [
+    ['FACTS', b.facts?.length ? formatBusinessFacts(b.facts) : ''],
+    ['TERMS', b.terms?.length ? formatBusinessTerms(b.terms) : ''],
+    ['ASSETS', b.assets?.length ? formatBusinessAssets(b.assets) : ''],
+    ['DOCUMENTS', b.documents?.length ? formatBusinessDocuments(b.documents) : ''],
+    ['EXAMPLES', b.examples?.length ? formatGoldenExamples(b.examples) : ''],
+    ['STYLE', formatStyle(b.style)],
+  ];
+  for (const [id, text] of rest) if (text) parts.push(part(id, text));
+  return parts;
 }
 
 const NATURE_HINT = {

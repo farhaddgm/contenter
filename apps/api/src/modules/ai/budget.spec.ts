@@ -82,7 +82,7 @@ describe('BudgetService.usage', () => {
       job({ costUsd: 50, finishedAt: new Date('2026-09-22T20:29:00Z') }), // last month
       job({ costUsd: 50, finishedAt: new Date('2026-10-22T20:31:00Z') }), // next month
     ]);
-    const u = await svc.usage();
+    const u = await svc.usage(undefined, NOW);
     expect(u.label).toBe('1405/7');
     expect(u.spentUsd).toBe(7.5);
     expect(u.capUsd).toBe(20);
@@ -110,7 +110,7 @@ describe('BudgetService.usage', () => {
 
   it('works without a cap', async () => {
     const { svc } = setup([job({ costUsd: 3 })], { monthlyUsd: null });
-    const u = await svc.usage();
+    const u = await svc.usage(undefined, NOW);
     expect(u).toMatchObject({ capUsd: null, percent: null, level: 'none', spentUsd: 3 });
   });
 });
