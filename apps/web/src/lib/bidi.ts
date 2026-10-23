@@ -6,7 +6,7 @@
  * RTL as soon as it contains any Arabic-script letter, and LTR only when it is Latin-only.
  * Elements opt in with `data-bidi`; `installBidi()` keeps their `dir` up to date.
  */
-const ARABIC_SCRIPT = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
+const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 const LATIN = /[A-Za-z]/;
 
 export type TextDir = 'rtl' | 'ltr';
