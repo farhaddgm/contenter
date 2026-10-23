@@ -7,6 +7,7 @@ import { referenceSites } from '../ai/runners/business.runners';
 import { ReferencesService } from './references.service';
 import { InstagramError, type InstagramService } from './social/instagram.service';
 import type { WebsiteCrawlerService } from './social/website-crawler.service';
+import { SourceReader } from './social/source-reader.service';
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -109,9 +110,7 @@ function setup(
     {} as never,
     {} as never,
     {} as never,
-    {} as never,
-    instagram,
-    crawler,
+    new SourceReader({} as never, instagram, crawler),
     {} as never,
   );
   return { service, rows, instagram, crawler };

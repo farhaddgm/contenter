@@ -21,6 +21,7 @@ import type { MediaFetcherService } from '../samples/media-fetcher.service';
 import { BusinessApi } from './business-api';
 import type { InstagramService } from './social/instagram.service';
 import type { WebsiteCrawlerService } from './social/website-crawler.service';
+import { SourceReader } from './social/source-reader.service';
 import { StylesService } from './styles.service';
 
 const admin = { id: 'u1', role: 'ADMIN' } as AuthUser;
@@ -50,9 +51,11 @@ function service(db: Record<string, unknown>) {
     db as unknown as PrismaService,
     { log } as unknown as AuditService,
     { enqueue } as unknown as AiJobsService,
-    { fetch } as unknown as MediaFetcherService,
-    {} as InstagramService,
-    {} as WebsiteCrawlerService,
+    new SourceReader(
+      { fetch } as unknown as MediaFetcherService,
+      {} as InstagramService,
+      {} as WebsiteCrawlerService,
+    ),
   );
   return { svc, log, enqueue, fetch };
 }

@@ -5,7 +5,6 @@ import {
   BUSINESS_REFERENCE_MAX_CHARS,
   BUSINESS_STYLE_LIMIT,
   CreateBusinessStyleSchema,
-  InstagramManualSchema,
   STYLE_SOURCE_LIMIT,
   UpdateBusinessStyleSchema,
   instagramProfileUrl,
@@ -15,8 +14,6 @@ import {
   type BusinessStyleDetail,
   type BusinessStyleSummary,
   type CreateBusinessStyleInput,
-  type InstagramPost,
-  type InstagramProfile,
   type ReferenceAnalysis,
   type StyleSourceSummary,
   type StyleTrait,
@@ -26,20 +23,10 @@ import { type AuthUser } from '../../common/auth.decorators';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
 import { AuditService } from '../audit/audit.service';
-import { FetchError, MediaFetcherService } from '../samples/media-fetcher.service';
-import { isLoginWall, MIN_PAGE_TEXT } from './references.service';
-import { analyzeInstagram, formatInstagramSnapshot } from './social/instagram-analysis';
-import { InstagramService } from './social/instagram.service';
-import { WebsiteCrawlerService } from './social/website-crawler.service';
+import { FetchError } from '../samples/media-fetcher.service';
+import { SourceReader } from './social/source-reader.service';
 
 const asJson = (v: unknown) => v as Prisma.InputJsonValue;
-
-/** What reading one source produced. */
-interface Read {
-  title: string;
-  text: string;
-  analysis?: ReferenceAnalysis;
-}
 
 type StyleWithCounts = StyleRow & { _count: { sources: number; topics: number } };
 
@@ -84,9 +71,7 @@ export class StylesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly jobs: AiJobsService,
-    private readonly fetcher: MediaFetcherService,
-    private readonly instagram: InstagramService,
-    private readonly crawler: WebsiteCrawlerService,
+    private readonly reader: SourceReader,
   ) {}
 
   private log(user: AuthUser, businessId: string, action: string, meta?: Record<string, unknown>) {
@@ -319,10 +304,10 @@ export class StylesService {
     try {
       const out =
         row.kind === 'INSTAGRAM'
-          ? await this.readInstagram(row)
+          ? await this.reader.readInstagram(row.url)
           : row.kind === 'WEBSITE'
-            ? await this.readWebsite(row)
-            : await this.readPage(row.url);
+            ? await this.reader.readWebsite(row.url)
+            : await this.reader.readPage(row.url);
       const text = out.text.trim().slice(0, BUSINESS_REFERENCE_MAX_CHARS);
       if (!text) throw new FetchError('No readable text was found. Paste the text instead.');
       data = {
@@ -344,91 +329,29 @@ export class StylesService {
     await this.prisma.styleSource.update({ where: { id: row.id }, data });
   }
 
-  /** Public data of a Business/Creator account through the official API (never instagram.com). */
-  private async readInstagram(row: SourceRow): Promise<Read> {
-    const handle = parseInstagramHandle(row.url);
-    if (!handle) throw new FetchError('This source does not point to an Instagram account');
-    const { profile, posts } = await this.instagram.fetchAccount(handle);
-    const analysis = analyzeInstagram('GRAPH', profile, posts);
-    return {
-      title: `Instagram @${profile.username}`,
-      text: formatInstagramSnapshot({ provider: 'GRAPH', profile, posts, analysis, readAt: new Date() }),
-      analysis,
-    };
-  }
-
-  private async readWebsite(row: SourceRow): Promise<Read> {
-    const out = await this.crawler.read(row.url);
-    return { title: out.title, text: out.text, analysis: out.analysis };
-  }
-
-  private async readPage(url: string): Promise<Read> {
-    const { media } = await this.fetcher.fetch(url);
-    if (isLoginWall(url, media.finalUrl ?? url)) {
-      throw new FetchError(
-        'This page requires signing in, so its content cannot be read. Paste the text instead.',
-      );
-    }
-    const text = (media.text ?? media.description ?? '').trim();
-    if (text.length < MIN_PAGE_TEXT) {
-      throw new FetchError(
-        `Only ${text.length} characters of readable text were found — the page probably needs a login or JavaScript. Paste the text instead.`,
-      );
-    }
-    return { title: media.title ?? '', text };
-  }
-
   /** Bio, counts and captions the admin typed or took from the account's data export. */
   private async addManualInstagram(
     styleId: string,
     input: NonNullable<AddStyleSourceInput['instagram']>,
     user: AuthUser,
   ): Promise<SourceRow> {
-    const manual = InstagramManualSchema.parse(input);
-    const handle = parseInstagramHandle(manual.handle) ?? '';
-    const url = handle ? instagramProfileUrl(handle) : '';
-    if (url && (await this.prisma.styleSource.findFirst({ where: { styleId, url } }))) {
+    const manual = this.reader.manualInstagram(input);
+    if (
+      manual.url &&
+      (await this.prisma.styleSource.findFirst({ where: { styleId, url: manual.url } }))
+    ) {
       throw new BadRequestException(
         'This Instagram account is already a source. Delete it first to replace it with new data.',
       );
     }
-    const profile: InstagramProfile = {
-      username: handle,
-      name: manual.name,
-      biography: manual.biography,
-      website: manual.website,
-      followers: manual.followers ?? null,
-      following: manual.following ?? null,
-      mediaCount: manual.mediaCount ?? null,
-    };
-    const posts: InstagramPost[] = manual.posts
-      .filter((p) => p.caption)
-      .map((p) => ({
-        caption: p.caption,
-        takenAt:
-          p.takenAt && !Number.isNaN(Date.parse(p.takenAt))
-            ? new Date(p.takenAt).toISOString()
-            : null,
-        mediaType: p.mediaType ?? 'UNKNOWN',
-        likes: p.likes ?? null,
-        comments: p.comments ?? null,
-        permalink: p.permalink ?? '',
-      }));
-    const analysis = analyzeInstagram('MANUAL', profile, posts);
     return this.prisma.styleSource.create({
       data: {
         styleId,
         kind: 'INSTAGRAM',
-        url,
-        title: handle ? `Instagram @${handle}` : 'Instagram (given by hand)',
-        content: formatInstagramSnapshot({
-          provider: 'MANUAL',
-          profile,
-          posts,
-          analysis,
-          readAt: new Date(),
-        }).slice(0, BUSINESS_REFERENCE_MAX_CHARS),
-        analysis: asJson(analysis),
+        url: manual.url,
+        title: manual.title,
+        content: manual.content,
+        analysis: asJson(manual.analysis),
         status: 'READY',
         fetchedAt: new Date(),
         createdById: user.id,
