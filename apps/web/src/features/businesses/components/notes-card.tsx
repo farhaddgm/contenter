@@ -106,7 +106,7 @@ export function NotesCard({
           <div className="space-y-3">
             <Textarea
               rows={4}
-              dir="auto"
+              data-bidi=""
               value={text}
               maxLength={BUSINESS_NOTE_MAX_CHARS}
               placeholder={t('businesses.notes.placeholder')}
@@ -167,7 +167,7 @@ export function NotesCard({
               {history.map((n) => (
                 <li key={n.id} className="space-y-2 px-4 py-3 text-sm">
                   <div className="flex flex-wrap items-start gap-2">
-                    <p className="min-w-0 flex-1 whitespace-pre-wrap break-words" dir="auto">
+                    <p className="min-w-0 flex-1 whitespace-pre-wrap break-words" data-bidi="">
                       {n.text}
                     </p>
                     <Badge
@@ -184,7 +184,7 @@ export function NotesCard({
                   </div>
                   {n.status === 'APPLIED' && (
                     <div className="space-y-1.5 rounded-md bg-muted px-3 py-2 text-xs leading-6">
-                      {n.summary && <p dir="auto">{n.summary}</p>}
+                      {n.summary && <p data-bidi="">{n.summary}</p>}
                       <p className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
                         {n.changedKeys.length
                           ? t(`businesses.notes.changed.${n.apply}`)
@@ -200,7 +200,7 @@ export function NotesCard({
                   {n.status === 'FAILED' && n.error && (
                     <p className="flex items-start gap-1.5 text-xs leading-5 text-destructive">
                       <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                      <span dir="auto">{n.error}</span>
+                      <span data-bidi="">{n.error}</span>
                     </p>
                   )}
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">

@@ -131,7 +131,7 @@ export function RepurposeDialog({ content, onClose }: { content: Content; onClos
             <Textarea
               id={id}
               rows={3}
-              dir="auto"
+              data-bidi=""
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
@@ -167,7 +167,7 @@ export function RepurposedCard({ content }: { content: Content }) {
             <CornerUpLeft className="mt-1 size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0">
               <span className="block text-xs text-muted-foreground">{t('repurpose.madeFrom')}</span>
-              <span className="block truncate font-medium" dir="auto">
+              <span className="block truncate font-medium" data-bidi="">
                 {source.title}
               </span>
             </span>

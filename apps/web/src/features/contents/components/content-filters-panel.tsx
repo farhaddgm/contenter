@@ -78,7 +78,7 @@ function SearchInput({ initial, onSearch }: { initial: string; onSearch: (q: str
       <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         className="ps-9"
-        dir="auto"
+        data-bidi=""
         placeholder={t('common.search')}
         value={text}
         onChange={(e) => setText(e.target.value)}

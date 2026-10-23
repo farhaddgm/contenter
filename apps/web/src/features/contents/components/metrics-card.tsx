@@ -94,7 +94,7 @@ function AddMetricDialog({ contentId, onClose }: { contentId: string; onClose: (
         </div>
         <Field label={t('contents.metrics.note')} optional={t('common.optional')}>
           {(id) => (
-            <Input id={id} dir="auto" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
+            <Input id={id} data-bidi="" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
           )}
         </Field>
       </div>

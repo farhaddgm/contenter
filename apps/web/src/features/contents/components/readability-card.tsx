@@ -121,7 +121,7 @@ export function ReadabilityCard({
           </ul>
         )}
         {m.stiffPhrases.length > 0 && (
-          <p className="text-xs leading-5 text-muted-foreground" dir="auto">
+          <p className="text-xs leading-5 text-muted-foreground" data-bidi="">
             {t('contents.readability.stiffFound')}{' '}
             {m.stiffPhrases.map((s) => `«${s.phrase}» ×${formatNumber(s.count)}`).join('، ')}
           </p>

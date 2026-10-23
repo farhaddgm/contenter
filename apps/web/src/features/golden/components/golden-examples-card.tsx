@@ -50,7 +50,7 @@ export function GoldenExamplesCard({ businessId }: { businessId: string }) {
                   <Link
                     to={paths.app.content.getHref(g.id)}
                     className="font-medium text-primary hover:underline"
-                    dir="auto"
+                    data-bidi=""
                   >
                     {g.title}
                   </Link>
@@ -61,7 +61,7 @@ export function GoldenExamplesCard({ businessId }: { businessId: string }) {
                   </span>
                 </div>
                 {g.excerpt && (
-                  <p className="mt-1.5 line-clamp-3 leading-6 text-muted-foreground" dir="auto">
+                  <p className="mt-1.5 line-clamp-3 leading-6 text-muted-foreground" data-bidi="">
                     {g.excerpt}
                   </p>
                 )}

@@ -6,6 +6,7 @@ import { Notifications } from '@/components/ui/notifications';
 import { isRtl } from '@/i18n';
 import { AuthLoader } from '@/lib/auth';
 import { createQueryClient } from '@/lib/react-query';
+import { installBidi } from '@/lib/bidi';
 import { useUi } from '@/stores/ui';
 
 /** Keeps <html> dir/lang, data-theme and the dark class in sync with UI preferences. */
@@ -16,6 +17,7 @@ function DocumentSync() {
     root.lang = lang;
     root.dir = isRtl(lang) ? 'rtl' : 'ltr';
   }, [lang]);
+  useEffect(() => installBidi(), []);
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {

@@ -70,7 +70,7 @@ export function TagPicker({
             >
               <Input
                 autoFocus
-                dir="auto"
+                data-bidi=""
                 value={query}
                 placeholder={t('tags.searchOrCreate')}
                 onChange={(e) => setQuery(e.target.value)}
@@ -90,7 +90,7 @@ export function TagPicker({
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start hover:bg-muted"
                     >
                       <span className={cn('size-2.5 rounded-full', tagSwatchClass[tag.color])} />
-                      <span className="flex-1 truncate" dir="auto">
+                      <span className="flex-1 truncate" data-bidi="">
                         {tag.name}
                       </span>
                       {ids.includes(tag.id) && <Check className="size-4 text-primary" />}
@@ -109,7 +109,7 @@ export function TagPicker({
                   className="mt-1 flex w-full items-center gap-2 rounded-md border-t px-2 py-2 text-start text-primary hover:bg-muted disabled:opacity-50"
                 >
                   <Plus className="size-4" />
-                  <span dir="auto">{t('tags.create', { name: trimmed })}</span>
+                  <span data-bidi="">{t('tags.create', { name: trimmed })}</span>
                 </button>
               )}
             </Popover.Content>

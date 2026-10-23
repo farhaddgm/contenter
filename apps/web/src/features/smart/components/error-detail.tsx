@@ -70,7 +70,7 @@ export function ErrorDetail({
         </div>
         <p
           className={compact ? 'text-sm font-medium leading-6' : 'font-semibold leading-7'}
-          dir="auto"
+          data-bidi=""
         >
           {error.message}
         </p>

@@ -66,11 +66,11 @@ export function NotificationItem({
     >
       <Icon className={cn('mt-1 size-4 shrink-0', tone)} />
       <span className="min-w-0 flex-1 space-y-0.5">
-        <span className={cn('block text-sm leading-6', unread && 'font-semibold')} dir="auto">
+        <span className={cn('block text-sm leading-6', unread && 'font-semibold')} data-bidi="">
           {title}
         </span>
         {body && (
-          <span className="line-clamp-2 block text-xs leading-5 text-muted-foreground" dir="auto">
+          <span className="line-clamp-2 block text-xs leading-5 text-muted-foreground" data-bidi="">
             {body}
           </span>
         )}

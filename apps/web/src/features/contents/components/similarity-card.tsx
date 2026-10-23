@@ -61,7 +61,7 @@ export function SimilarityCard({
                 key={`${m.kind}-${m.id}`}
                 className="flex items-baseline justify-between gap-3 rounded-md bg-muted px-3 py-1.5"
               >
-                <span className="min-w-0" dir="auto">
+                <span className="min-w-0" data-bidi="">
                   <span className="me-2 text-xs text-muted-foreground">
                     {t(`contents.similarity.kinds.${m.kind}`)}
                   </span>

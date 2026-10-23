@@ -89,16 +89,16 @@ export function AuditCard({
           </button>
         )}
       </div>
-      <p className="text-sm font-medium leading-6" dir="auto">
+      <p className="text-sm font-medium leading-6" data-bidi="">
         {issue.title}
       </p>
       {issue.detail && (
-        <p className="text-xs leading-6 text-muted-foreground" dir="auto">
+        <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
           {issue.detail}
         </p>
       )}
       {issue.fix && (
-        <p className="text-xs leading-6" dir="auto">
+        <p className="text-xs leading-6" data-bidi="">
           <span className="font-semibold">{t('businesses.audit.fixLabel')}</span> {issue.fix}
         </p>
       )}
@@ -181,7 +181,7 @@ export function AuditCard({
           {audit.status === 'FAILED' && (
             <p
               className="rounded-md bg-destructive/5 px-3 py-2 text-xs text-destructive"
-              dir="auto"
+              data-bidi=""
             >
               {t('businesses.audit.failed')}
               {audit.error ? ` — ${audit.error}` : ''}
@@ -197,7 +197,7 @@ export function AuditCard({
                   <p className="text-xs text-muted-foreground">{t('businesses.audit.score')}</p>
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-sm leading-6" dir="auto">
+                  <p className="text-sm leading-6" data-bidi="">
                     {audit.summary}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -221,7 +221,7 @@ export function AuditCard({
                   {showStrengths && (
                     <ul className="mt-2 list-disc space-y-1 ps-5 text-xs leading-6">
                       {audit.strengths.map((s, i) => (
-                        <li key={i} dir="auto">
+                        <li key={i} data-bidi="">
                           {s}
                         </li>
                       ))}

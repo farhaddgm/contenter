@@ -95,7 +95,7 @@ function NoteDialog({
           <Textarea
             id={id}
             rows={5}
-            dir="auto"
+            data-bidi=""
             autoFocus
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -217,7 +217,7 @@ export function ReviewTimelineCard({ content }: { content: Content }) {
                   {r.note && (
                     <p
                       className="whitespace-pre-wrap rounded-md bg-muted px-2.5 py-1.5 text-xs leading-6"
-                      dir="auto"
+                      data-bidi=""
                     >
                       {r.note}
                     </p>

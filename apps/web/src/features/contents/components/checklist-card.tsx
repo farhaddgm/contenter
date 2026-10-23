@@ -56,7 +56,7 @@ export function ChecklistCard({
                 onChange={() => onToggle(item)}
               />
               <label htmlFor={`check-${item.id}`} className="min-w-0 flex-1 text-sm leading-6">
-                <span dir="auto">{item.text}</span>
+                <span data-bidi="">{item.text}</span>
                 {item.required && (
                   <Badge tone="warning" className="ms-2 align-middle">
                     {t('contents.checklist.required')}

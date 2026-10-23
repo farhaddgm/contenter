@@ -32,17 +32,17 @@ function HitCard({ kind, hit, terms }: { kind: Kind; hit: SearchHit; terms: stri
         to={hrefOf(kind, hit)}
         className="block space-y-1.5 px-4 py-3 transition hover:bg-muted/50"
       >
-        <p className="font-medium leading-6" dir="auto">
+        <p className="font-medium leading-6" data-bidi="">
           <Highlight text={hit.title} terms={terms} />
         </p>
         {hit.snippet && (
-          <p className="line-clamp-2 text-sm leading-6 text-muted-foreground" dir="auto">
+          <p className="line-clamp-2 text-sm leading-6 text-muted-foreground" data-bidi="">
             <Highlight text={hit.snippet} terms={terms} />
           </p>
         )}
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           {hit.topic && kind !== 'topics' && (
-            <span className="text-muted-foreground" dir="auto">
+            <span className="text-muted-foreground" data-bidi="">
               {hit.topic.title}
             </span>
           )}
@@ -129,7 +129,7 @@ export function SearchPage() {
         <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           autoFocus
-          dir="auto"
+          data-bidi=""
           className="ps-9"
           placeholder={t('search.placeholder')}
           value={text}

@@ -218,7 +218,7 @@ export function SectionCard({
             <div>
               <p>{t(`businesses.lock.hint.${lock}`)}</p>
               {(section?.lockedBy || section?.lockNote) && (
-                <p className="text-muted-foreground" dir="auto">
+                <p className="text-muted-foreground" data-bidi="">
                   {section?.lockedBy &&
                     t('businesses.lock.by', {
                       name: section.lockedBy.name,
@@ -239,7 +239,7 @@ export function SectionCard({
             )}
             <Textarea
               rows={12}
-              dir="auto"
+              data-bidi=""
               autoFocus
               value={editing.text}
               maxLength={BUSINESS_SECTION_MAX_CHARS}
@@ -476,7 +476,7 @@ function LockDialog({
             {(id) => (
               <Textarea
                 id={id}
-                dir="auto"
+                data-bidi=""
                 rows={2}
                 maxLength={SECTION_LOCK_NOTE_MAX}
                 value={note}

@@ -77,7 +77,7 @@ export function InstagramManualFields({
           <Textarea
             id={id}
             rows={2}
-            dir="auto"
+            data-bidi=""
             maxLength={2000}
             value={value.biography}
             onChange={(e) => onChange({ ...value, biography: e.target.value })}
@@ -101,7 +101,7 @@ export function InstagramManualFields({
           <Textarea
             id={id}
             rows={6}
-            dir="auto"
+            data-bidi=""
             value={value.captions}
             disabled={value.exported.length > 0}
             onChange={(e) => onChange({ ...value, captions: e.target.value })}
@@ -169,7 +169,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   return (
     <div className="rounded-md bg-muted/60 px-3 py-2" title={hint}>
       <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium" dir="auto">
+      <p className="text-sm font-medium" data-bidi="">
         {value}
       </p>
     </div>
@@ -248,7 +248,7 @@ function InstagramReport({ a }: { a: InstagramAnalysis }) {
         </p>
       )}
       {s.topHashtags.length > 0 && (
-        <p className="text-xs leading-6" dir="auto">
+        <p className="text-xs leading-6" data-bidi="">
           <span className="font-medium">{t('businesses.analysis.hashtags')}: </span>
           {s.topHashtags.map((h) => `${h.tag} (${formatNumber(h.count)})`).join('  ')}
         </p>
@@ -258,7 +258,7 @@ function InstagramReport({ a }: { a: InstagramAnalysis }) {
           <p className="mb-1 font-medium">{t('businesses.analysis.topPosts')}</p>
           <ul className="space-y-1">
             {s.topPosts.map((p, i) => (
-              <li key={`${p.permalink}-${i}`} className="flex gap-2" dir="auto">
+              <li key={`${p.permalink}-${i}`} className="flex gap-2" data-bidi="">
                 <span className="shrink-0 text-muted-foreground">
                   ♥ {known(p.likes)} · 💬 {known(p.comments)}
                 </span>
@@ -276,7 +276,7 @@ function WebsiteReport({ a }: { a: WebsiteAnalysis }) {
   const t = useT();
   return (
     <div className="space-y-3 text-xs">
-      <p className="text-muted-foreground" dir="auto">
+      <p className="text-muted-foreground" data-bidi="">
         {a.name} · {a.origin}
         {a.language && ` · ${a.language}`}
         {a.sitemap && ` · ${t('businesses.analysis.sitemap')}`}
@@ -303,7 +303,7 @@ function WebsiteReport({ a }: { a: WebsiteAnalysis }) {
         <p className="text-muted-foreground">{t('businesses.analysis.robots')}</p>
       )}
       {(a.emails.length > 0 || a.phones.length > 0) && (
-        <p dir="auto">
+        <p data-bidi="">
           <span className="font-medium">{t('businesses.analysis.contacts')}: </span>
           {[...a.emails, ...a.phones].join(' · ')}
         </p>

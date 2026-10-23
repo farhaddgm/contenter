@@ -104,20 +104,20 @@ function Draft({
           <p className="text-sm text-muted-foreground">{t('variants.noText')}</p>
         ) : (
           <div className="space-y-2">
-            <h3 className="font-semibold" dir="auto">
+            <h3 className="font-semibold" data-bidi="">
               {item.title}
             </h3>
             <MarkdownView>{item.body}</MarkdownView>
             {item.cta && (
               <p
                 className="rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
-                dir="auto"
+                data-bidi=""
               >
                 👉 {item.cta}
               </p>
             )}
             {item.hashtags.length > 0 && (
-              <p className="flex flex-wrap gap-2 text-sm text-primary" dir="auto">
+              <p className="flex flex-wrap gap-2 text-sm text-primary" data-bidi="">
                 {item.hashtags.map((h) => (
                   <span key={h}>{h.startsWith('#') ? h : `#${h}`}</span>
                 ))}

@@ -48,7 +48,7 @@ export default function SmartErrorsRoute() {
       header: t('smart.errors.title'),
       cell: (e) => (
         <div className="min-w-64 max-w-xl">
-          <p className="line-clamp-2 text-sm" dir="auto">
+          <p className="line-clamp-2 text-sm" data-bidi="">
             {e.message}
           </p>
           {(e.path || e.route) && (

@@ -272,7 +272,7 @@ export default function BusinessRoute() {
               <div>
                 <p className="font-medium">{t('businesses.buildFailed')}</p>
                 {business.buildError && (
-                  <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+                  <p className="mt-1 text-xs text-muted-foreground" data-bidi="">
                     {business.buildError}
                   </p>
                 )}

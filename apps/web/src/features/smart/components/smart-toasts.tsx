@@ -30,7 +30,7 @@ export function SmartToasts() {
                 {t(`smart.errors.sourceLabels.${toast.source}`)}
               </span>
             </p>
-            <p className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground" dir="auto">
+            <p className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground" data-bidi="">
               {toast.message}
             </p>
             <button

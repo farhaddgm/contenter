@@ -127,7 +127,7 @@ export function ErrorsTab() {
                     ×{formatNumber(e.count)} · {formatRelative(e.lastSeenAt)}
                   </span>
                 </div>
-                <p className="line-clamp-2 text-xs leading-5" dir="auto">
+                <p className="line-clamp-2 text-xs leading-5" data-bidi="">
                   {e.message}
                 </p>
               </button>

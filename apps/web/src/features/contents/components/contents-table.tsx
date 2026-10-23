@@ -42,7 +42,7 @@ export function ContentsTable({
       header: t('topics.fields.title'),
       cell: (c) => (
         <div className="min-w-48 space-y-1">
-          <p className="line-clamp-1 font-medium" dir="auto">
+          <p className="line-clamp-1 font-medium" data-bidi="">
             {c.title}
           </p>
           {c.idea && (
@@ -82,7 +82,7 @@ export function ContentsTable({
             header: t('campaigns.one'),
             cell: (c: Content) =>
               c.campaign ? (
-                <span className="text-xs" dir="auto">
+                <span className="text-xs" data-bidi="">
                   {c.campaign.name}
                 </span>
               ) : (

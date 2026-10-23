@@ -346,7 +346,7 @@ function AddReferenceDialog({
                 <Textarea
                   id={id}
                   rows={10}
-                  dir="auto"
+                  data-bidi=""
                   value={text}
                   maxLength={BUSINESS_REFERENCE_MAX_CHARS}
                   onChange={(e) => setText(e.target.value)}
@@ -399,7 +399,7 @@ function ReferenceViewDialog({
           </p>
           {data.analysis && <AnalysisReport analysis={data.analysis} />}
           <pre
-            dir="auto"
+            data-bidi=""
             className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-4 text-xs leading-6"
           >
             {data.content}
@@ -470,7 +470,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                 <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="flex flex-wrap items-center gap-2">
-                    <span className="truncate font-medium" dir="auto">
+                    <span className="truncate font-medium" data-bidi="">
                       {r.title || r.url || t('businesses.references.pastedText')}
                     </span>
                     <Badge tone={statusTone[r.status]}>
@@ -489,7 +489,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                     </a>
                   )}
                   {r.analysis && r.status === 'READY' && (
-                    <p className="text-xs" dir="auto">
+                    <p className="text-xs" data-bidi="">
                       {analysisSummary(r.analysis, t)}
                     </p>
                   )}
@@ -503,7 +503,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                   {r.status === 'FAILED' && r.error && (
                     <p className="flex items-start gap-1.5 text-xs leading-5 text-destructive">
                       <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                      <span dir="auto">{r.error}</span>
+                      <span data-bidi="">{r.error}</span>
                     </p>
                   )}
                 </div>

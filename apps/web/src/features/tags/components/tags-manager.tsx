@@ -64,7 +64,7 @@ function TagFormDialog({
     >
       <form id="tag-form" onSubmit={submit} className="space-y-4">
         <Field label={t('tags.name')} error={form.formState.errors.name?.message}>
-          {(id) => <Input id={id} dir="auto" autoFocus {...form.register('name')} />}
+          {(id) => <Input id={id} data-bidi="" autoFocus {...form.register('name')} />}
         </Field>
         <Controller
           control={form.control}
