@@ -3,6 +3,7 @@ import type {
   BusinessOffering,
   CreateBusinessOfferingInput,
   JobAccepted,
+  SetOfferingSegmentsInput,
   UpdateBusinessOfferingInput,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
@@ -45,6 +46,21 @@ export function useUpdateOffering(businessId: string, id: string) {
     mutationFn: (data: UpdateBusinessOfferingInput) =>
       api.patch<BusinessOffering>(`/business-offerings/${id}`, data),
     onSuccess: invalidate,
+  });
+}
+
+/** Replaces the audiences an offering is for (docs/73). */
+export function useSetOfferingSegments(businessId: string) {
+  const invalidate = useInvalidateOfferings(businessId);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & SetOfferingSegmentsInput) =>
+      api.put<BusinessOffering>(`/business-offerings/${id}/segments`, body),
+    onSuccess: () => {
+      invalidate();
+      // the audience list shows which offerings it is linked to
+      void qc.invalidateQueries({ queryKey: [...businessKeys.one(businessId), 'segments'] });
+    },
   });
 }
 

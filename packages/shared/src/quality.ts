@@ -372,6 +372,7 @@ export const QualityIssueCode = [
   'EMPTY_BODY',
   'OFFERING_PRICE_MISMATCH',
   'OFFERING_UNAVAILABLE',
+  'GUARDRAIL_HIT',
 ] as const;
 export type QualityIssueCode = (typeof QualityIssueCode)[number];
 
@@ -405,6 +406,8 @@ export interface QualityOfferingRule {
   priceValidUntil?: string | Date | null;
   /** False when the offering is paused, discontinued or out of its season. */
   available: boolean;
+  /** Phrases never to write about this offering (its own and its line's); found in the text → warn. */
+  guardrails?: readonly string[];
 }
 
 export interface QualityInput {
@@ -600,6 +603,25 @@ export function checkContentQuality(input: QualityInput): QualityReport {
     const expired = priced && isFactExpired(o.priceValidUntil ?? null, now);
     let unavailableReported = false;
     let expiredReported = false;
+    // never-say phrases (docs/73): a text that talks about the offering anywhere is checked whole,
+    // so a promise in the next sentence is not missed
+    const talksAbout = sentences.some((sentence) => names.some((n) => mentionsLabel(sentence, n)));
+    if (talksAbout) {
+      for (const phrase of o.guardrails ?? []) {
+        const hit = sentences.find((sentence) => countPhrase(normalizeTermText(sentence), phrase) > 0);
+        if (hit) {
+          issues.push({
+            code: 'GUARDRAIL_HIT',
+            severity: 'warn',
+            params: {
+              name: o.name,
+              phrase,
+              sentence: hit.length > 140 ? `${hit.slice(0, 137)}…` : hit,
+            },
+          });
+        }
+      }
+    }
     for (const sentence of sentences) {
       if (!names.some((n) => mentionsLabel(sentence, n))) continue;
       if (!o.available && !unavailableReported) {

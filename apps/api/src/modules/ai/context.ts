@@ -19,7 +19,9 @@ import {
   BUSINESS_SECTION_META,
   BUSINESS_SECTION_SPEC,
   BusinessSectionKey,
+  effectiveGuardrails,
   formatOfferingPrice,
+  hasOfferingTree,
   hasValidPrice,
   isFactExpired,
   isClaimProven,
@@ -28,6 +30,7 @@ import {
   parseClaims,
   isRegister,
   MAX_CATALOG_TEXT,
+  orderOfferingTree,
   priceText,
   registerInstruction,
   type ContextBlock,
@@ -232,7 +235,10 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
       .map((id) => byId.get(id))
       .filter((r): r is OfferingForPrompt => !!r && (!onlyAvailable || isOfferingAvailable(r, now)))
       .map((r) => r.name);
-  const lines = offerings.map((o) => {
+  // a product tree (docs/73): variants follow their line and are indented; no tree = the flat list as before
+  const tree = hasOfferingTree(offerings);
+  const placed = tree ? orderOfferingTree(offerings) : offerings.map((row) => ({ row, depth: 0 }));
+  function catalogLine(o: OfferingForPrompt): string {
     const available = isOfferingAvailable(o, now);
     const tags = [
       o.kind,
@@ -252,7 +258,8 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
     const until = o.priceValidUntil && hasValidPrice(o, now)
       ? ` (valid until ${new Date(o.priceValidUntil).toISOString().slice(0, 10)})`
       : '';
-    const head = `- [${tags}] ${o.name}${price ? ` — ${price}${until}` : ''}`;
+    const parent = tree && o.parentId ? byId.get(o.parentId) : undefined;
+    const head = `- [${tags}] ${o.name}${price ? ` — ${price}${until}` : ''}${parent ? `\n  Part of: ${parent.name}` : ''}`;
     if (!available) {
       const instead = names(o.substituteIds, true);
       return instead.length ? `${head}\n  Instead offer: ${instead.join(' | ')}` : head;
@@ -264,11 +271,24 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
     const features = o.features.length ? `\n  Features: ${o.features.join('; ')}` : '';
     const list = parseClaims(o.claims);
     const claims = list.length ? `\n  Selling points:${list.map(claimLine).join('')}` : '';
-    return `${head}${alias}${summary}${features}${claims}${pairs}`;
+    const never = o.id ? effectiveGuardrails(o.id, byId) : (o.guardrails ?? []);
+    const guard = never.length ? `\n  Never say: ${never.join(' | ')}` : '';
+    return `${head}${alias}${summary}${features}${claims}${guard}${pairs}`;
+  }
+  const lines = placed.map(({ row: o, depth }) => {
+    const text = catalogLine(o);
+    return depth ? text.replace(/^/gm, '  '.repeat(depth)) : text;
   });
+  const hasGuardrails = offerings.some((o) => o.guardrails?.length);
   return [
     '### Offerings [CATALOG]',
-    'What the business sells. Use these names and prices exactly as written. A price is valid only if it is shown here; if one is missing, write around it. Never promote an item marked NOT AVAILABLE or "do not promote". Prices listed here are valid in addition to [FACTS]. A selling point may be stated as certain only when a proof is listed; otherwise soften it or leave it out.',
+    'What the business sells. Use these names and prices exactly as written. A price is valid only if it is shown here; if one is missing, write around it. Never promote an item marked NOT AVAILABLE or "do not promote". Prices listed here are valid in addition to [FACTS]. A selling point may be stated as certain only when a proof is listed; otherwise soften it or leave it out.' +
+      (tree
+        ? ' Indented items are variants of the item above them ("Part of"): what is written for a line also holds for its variants unless a variant says otherwise, and never describe a variant with another variant\'s price, terms or features.'
+        : '') +
+      (hasGuardrails
+        ? ' Never write the phrases listed after "Never say" about that item (a variant is bound by its line\'s phrases too).'
+        : ''),
     ...budgeted(lines, MAX_CATALOG_TEXT),
   ].join('\n');
 }

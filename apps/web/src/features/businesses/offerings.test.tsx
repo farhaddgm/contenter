@@ -8,6 +8,8 @@ import { useUi } from '@/stores/ui';
 const state = vi.hoisted(() => ({
   rows: [] as unknown[],
   canEdit: true,
+  segments: [] as unknown[],
+  setSegments: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
   confirm: vi.fn(),
@@ -17,11 +19,15 @@ const state = vi.hoisted(() => ({
 vi.mock('./api/offerings', () => ({
   offeringKeys: { list: (id: string) => ['offerings', id] },
   useOfferings: () => ({ data: state.rows, isLoading: false }),
-  useCreateOffering: () => ({ mutate: state.create, isPending: false }),
-  useUpdateOffering: () => ({ mutate: state.update, isPending: false }),
+  useCreateOffering: () => ({ mutateAsync: state.create, isPending: false }),
+  useUpdateOffering: () => ({ mutate: state.update, mutateAsync: state.update, isPending: false }),
+  useSetOfferingSegments: () => ({ mutateAsync: state.setSegments, isPending: false }),
   useConfirmOffering: () => ({ mutate: state.confirm, isPending: false }),
   useDeleteOffering: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useExtractOfferings: () => ({ mutate: state.extract, isPending: false }),
+}));
+vi.mock('./api/segments', () => ({
+  useSegments: () => ({ data: state.segments, isLoading: false }),
 }));
 vi.mock('./api/businesses', () => ({ useCanEditBusiness: () => state.canEdit }));
 vi.mock('@/features/jobs/api/jobs', () => ({
@@ -40,6 +46,9 @@ const row = (over: Partial<BusinessOffering> = {}): BusinessOffering => ({
   aliases: [],
   claims: [],
   stock: 'IN_STOCK',
+  parentId: null,
+  guardrails: [],
+  segments: [],
   peakMonths: [],
   complementIds: [],
   substituteIds: [],
@@ -71,8 +80,10 @@ beforeEach(() => {
   useUi.setState({ lang: 'fa' });
   state.rows = [row()];
   state.canEdit = true;
-  state.create = vi.fn();
-  state.update = vi.fn();
+  state.segments = [];
+  state.setSegments = vi.fn(async () => undefined);
+  state.create = vi.fn(async () => ({ id: 'new' }));
+  state.update = vi.fn(async () => ({ id: 'o1' }));
   state.confirm = vi.fn();
   state.extract = vi.fn();
 });
@@ -145,10 +156,93 @@ describe('OfferingsPanel', () => {
       priceAmount: '',
       priceCurrency: null,
       priceFrom: false,
+      parentId: null,
+      guardrails: [],
     });
 
-    await userEvent.type(within(drawer).getByLabelText(t('businesses.offerings.fields.priceAmount')), '۱۲۰٬۰۰۰');
-    await userEvent.click(within(drawer).getByRole('button', { name: t('common.save') }));
+    // the drawer closes after a save; a second one carries the price
+    await userEvent.click(screen.getByRole('button', { name: t('businesses.offerings.new') }));
+    const again = await screen.findByRole('dialog');
+    await userEvent.type(within(again).getByLabelText(t('businesses.offerings.fields.name')), 'مشاوره ۲');
+    await userEvent.type(within(again).getByLabelText(t('businesses.offerings.fields.priceAmount')), '۱۲۰٬۰۰۰');
+    await userEvent.click(within(again).getByRole('button', { name: t('common.save') }));
     expect(state.create.mock.calls[1]![0]).toMatchObject({ priceAmount: '۱۲۰٬۰۰۰', priceCurrency: 'IRT' });
+}, 20_000);
+});
+
+describe('OfferingsPanel: product tree and audiences (docs/73)', () => {
+  const tree = () => [
+    row({ id: 'l', name: 'تسهیلات ویپاد', kind: 'SERVICE', priceAmount: null, priceCurrency: null }),
+    row({ id: 'v', name: 'تسهیلات تجهیزات', parentId: 'l', kind: 'SERVICE', guardrails: ['سود تضمینی'] }),
+    row({ id: 'x', name: 'بیمه', kind: 'SERVICE' }),
+  ];
+
+  it('shows a variant right under its line, saying what it belongs to, with its banned phrases counted', () => {
+    state.rows = [tree()[2]!, tree()[1]!, tree()[0]!];
+    render(<OfferingsPanel businessId="b1" />);
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
+    const line = items.findIndex((x) => x.includes('تسهیلات ویپاد') && !x.includes('تسهیلات تجهیزات'));
+    const variant = items.findIndex((x) => x.includes('تسهیلات تجهیزات'));
+    expect(line).toBeGreaterThanOrEqual(0);
+    expect(variant).toBe(line + 1);
+    expect(screen.getByText(t('businesses.offerings.variantOf', { name: 'تسهیلات ویپاد' }))).toBeVisible();
+    expect(screen.getByText(t('businesses.offerings.guardrailsCount', { count: '۱' }))).toBeVisible();
+  });
+
+  it('adds a variant with its line already chosen', async () => {
+    state.rows = tree();
+    render(<OfferingsPanel businessId="b1" />);
+    const line = screen.getByText('تسهیلات ویپاد').closest('li')!;
+    await userEvent.click(within(line).getByRole('button', { name: t('businesses.offerings.addVariant') }));
+    const drawer = await screen.findByRole('dialog');
+    await userEvent.type(within(drawer).getByLabelText(t('businesses.offerings.fields.name')), 'تسهیلات خرید');
+    await userEvent.type(
+      within(drawer).getByLabelText(t('businesses.offerings.fields.guardrails')),
+      'بدون ریسک{enter}سود تضمینی',
+    );
+    await userEvent.click(within(drawer).getByRole('button', { name: t('common.save') }));
+    expect(state.create.mock.calls[0]![0]).toMatchObject({
+      name: 'تسهیلات خرید',
+      parentId: 'l',
+      guardrails: ['بدون ریسک', 'سود تضمینی'],
+    });
+}, 20_000);
+
+  it('offers no variant button below the last level', () => {
+    state.rows = [
+      row({ id: 'l', name: 'خط' }),
+      row({ id: 'p', name: 'محصول', parentId: 'l' }),
+      row({ id: 'v', name: 'گونه', parentId: 'p' }),
+    ];
+    render(<OfferingsPanel businessId="b1" />);
+    const variant = screen.getByText('گونه').closest('li')!;
+    expect(within(variant).queryByRole('button', { name: t('businesses.offerings.addVariant') })).toBeNull();
+    const line = screen.getByText('خط').closest('li')!;
+    expect(within(line).getByRole('button', { name: t('businesses.offerings.addVariant') })).toBeVisible();
+  });
+
+  it('links audiences after saving, main or secondary, and only when they changed', async () => {
+    state.segments = [
+      { id: 's1', name: 'کارمند' },
+      { id: 's2', name: 'صاحب کسب‌وکار' },
+    ];
+    state.rows = [row({ id: 'o1', name: 'مشاوره' })];
+    render(<OfferingsPanel businessId="b1" />);
+    await userEvent.click(screen.getByRole('button', { name: t('common.edit') }));
+    const drawer = await screen.findByRole('dialog');
+    await userEvent.click(within(drawer).getByRole('button', { name: 'کارمند' }));
+    await userEvent.click(within(drawer).getByRole('button', { name: t('businesses.offerings.fields.fitMain') }));
+    await userEvent.click(within(drawer).getByRole('button', { name: t('common.save') }));
+    expect(state.setSegments).toHaveBeenCalledWith({ id: 'o1', links: [{ segmentId: 's1', fit: 1 }] });
+  });
+
+  it('does not call the link endpoint when the audiences did not change', async () => {
+    state.segments = [{ id: 's1', name: 'کارمند' }];
+    state.rows = [row({ id: 'o1', name: 'مشاوره', segments: [{ segmentId: 's1', fit: 1 }] })];
+    render(<OfferingsPanel businessId="b1" />);
+    await userEvent.click(screen.getByRole('button', { name: t('common.edit') }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: t('common.save') }));
+    expect(state.update).toHaveBeenCalled();
+    expect(state.setSegments).not.toHaveBeenCalled();
   });
 });

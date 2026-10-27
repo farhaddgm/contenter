@@ -50,6 +50,7 @@ export type BusinessVia =
   | 'businessAudit'
   | 'businessStyle'
   | 'businessOffering'
+  | 'businessSegment'
   | 'businessCompetitor'
   | 'businessCompetitorSource'
   | 'styleSource';
@@ -212,6 +213,8 @@ export class AccessService {
         return business(await p.businessStyle.findUnique({ where: { id }, ...bsel }));
       case 'businessOffering':
         return business(await p.businessOffering.findUnique({ where: { id }, ...bsel }));
+      case 'businessSegment':
+        return business(await p.businessSegment.findUnique({ where: { id }, ...bsel }));
       case 'businessCompetitorSource': {
         const s = await p.businessCompetitorSource.findUnique({
           where: { id },

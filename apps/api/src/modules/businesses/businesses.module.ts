@@ -90,6 +90,8 @@ import { ProfileQuestionsService } from './profile-questions.service';
 import { CompetitorSourcesService } from './competitor-sources.service';
 import { CompetitorsController } from './competitors.controller';
 import { CompetitorsService } from './competitors.service';
+import { SegmentsController } from './segments.controller';
+import { SegmentsService } from './segments.service';
 import { OfferingsController } from './offerings.controller';
 import { OfferingsService } from './offerings.service';
 import { StylesService } from './styles.service';
@@ -1143,6 +1145,7 @@ export class BusinessItemsController {
     StylesController,
     OfferingsController,
     CompetitorsController,
+    SegmentsController,
     ProfileQuestionsController,
   ],
   providers: [
@@ -1161,6 +1164,7 @@ export class BusinessItemsController {
     OfferingsService,
     CompetitorsService,
     CompetitorSourcesService,
+    SegmentsService,
     ProfileQuestionsService,
   ],
   exports: [BusinessesService],

@@ -39,6 +39,8 @@ export * from './stale';
 export * from './context-report';
 export * from './business-catalog';
 export * from './business-competitors';
+export * from './business-segments';
+export * from './offering-tree';
 export * from './brand-compare';
 export * from './profile-questions';
 export * from './section-lock';

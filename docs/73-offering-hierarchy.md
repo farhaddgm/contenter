@@ -1,6 +1,6 @@
 # سلسله‌مراتب محصول، بازار و پرسونا (docs/73)
 
-> **وضعیت: طرح و ایده‌پردازی؛ هنوز ساخته نشده، منتظر تأیید مالک.** پایه: [67-business-catalog.md](67-business-catalog.md) (کاتالوگ تخت). ربطی به زیربرند ([71](71-business-sub-brands.md)) ندارد: اینجا **یک برند** است با چند محصول؛ زیربرند یعنی چند برند.
+> **وضعیت: فاز ۱ ساخته شد (ایده‌های A، B، C، H)؛ فاز ۲ تا ۴ ساخته نشده.** تفاوت‌های ساخت با طرح در بخش ۱۰. پایه: [67-business-catalog.md](67-business-catalog.md) (کاتالوگ تخت). ربطی به زیربرند ([71](71-business-sub-brands.md)) ندارد: اینجا **یک برند** است با چند محصول؛ زیربرند یعنی چند برند.
 
 ## ۱. مسئله
 
@@ -125,3 +125,22 @@ model OfferingSegment {          // N:M با «نقش»
 
 ## ۹. تلاش
 فاز ۱: M+. فاز ۲: M. فاز ۳: S+. فاز ۴: M.
+
+## ۱۰. فاز ۱: آنچه ساخته شد و تفاوت با طرح
+
+**پیش‌فرض‌های سؤال‌های بخش ۸ (تا پاسخ مالک):** سه سطح (`OFFERING_TREE_DEPTH_MAX`)، مخاطب مشترک بین محصول‌ها (N:M)، حذف والد دارای فرزند ← ۴۰۰ «ابتدا زیرمجموعه‌ها را جابه‌جا یا حذف کنید».
+
+**کد:**
+- shared: `offering-tree.ts` (`offeringParentProblem`، `orderOfferingTree`، `hasOfferingTree`، `effectiveGuardrails`، `offeringQualityRules`)، `business-segments.ts` (اسکیماها، `OfferingSegmentLink`)، فیلدهای `parentId` / `guardrails` در `business-catalog.ts`، کد تازهٔ `GUARDRAIL_HIT` در انتهای `QualityIssueCode`.
+- API: migration `20261027100000_offering_hierarchy` (`BusinessOffering.parentId` با `ON DELETE NO ACTION`، `guardrails`، جدول‌های `BusinessSegment` و `OfferingSegment`)، `SegmentsService`/`SegmentsController` (`/businesses/:id/segments`، `/business-segments/:id`)، `PUT /business-offerings/:id/segments`، بررسی درخت در `OfferingsService.assertParent`.
+- رابط: برگهٔ «مخاطب‌ها»، نمایش درختی در «محصولات و خدمات» با دکمهٔ «افزودن زیرمجموعه»، فیلدهای والد، عبارت‌های ممنوع و مخاطب‌ها در فرم.
+
+**تفاوت‌ها با طرح:**
+- `parentId` با **`NoAction`** است نه `Restrict`: `Restrict` فوری سنجیده می‌شود و حذف کل کسب‌وکار (cascade) را از میان خط و گونه‌هایش می‌شکست. حفاظت اصلی در سرویس است (۴۰۰) و پایگاه داده پشتیبان.
+- `BusinessSegment` در فاز ۱ فقط `isActive` دارد؛ `source` / `verified` / `evidence` همراه فاز ۴ (AI) می‌آیند. ویژگی‌های مخاطب ستون‌های `String[]` هستند (`goals`، `pains`، `objections`، `channels`) نه JSON.
+- **مخاطب‌ها هنوز به هیچ پرامپت، خروجی Docoo/Researcher یا بررسی نمی‌رسند** (فاز ۲ برای `[FOCUS]`، فاز ۳ برای خروجی).
+- `[CATALOG]`: وقتی درخت هست، گونه‌ها زیر خط خود و تورفته می‌آیند با «Part of: …» و یک جملهٔ راهنما در سرآغاز؛ «Never say: …» عبارت‌های خود مورد و والدهایش (یک‌بار هر کدام) را می‌آورد. بدون درخت و بدون عبارت ممنوع، بایت‌ها عیناً همان قبل است (تست). والد غیرفعال/تأییدنشده در پرامپت وجود ندارد، پس گونه‌اش ریشه دیده می‌شود و عبارت‌های والد را به ارث نمی‌برد. وضعیت «متوقف» خط، گونه‌ها را پنهان نمی‌کند.
+- `GUARDRAIL_HIT` (`warn`): اگر متن **در جایی** نام مورد (یا نام‌های دیگرش) را بیاورد، کل متن برای عبارت‌های ممنوع آن مورد و والدهایش بررسی می‌شود (نه فقط همان جمله، تا وعدهٔ جملهٔ بعد جا نیفتد). خط با عبارت‌های ممنوع گونه‌اش بسته نمی‌شود. به `STALE_CODES` اضافه نشد.
+- `OFFERING_CROSSED` (ایدهٔ J) در فاز ۲ می‌ماند.
+
+**تست‌ها:** `offering-tree.spec.ts` (shared)، `offering-hierarchy.spec.ts` (API)، `offerings.test.tsx` (رابط). راستی‌آزمایی: migration روی PGlite تازه اعمال شد و `prisma migrate diff` بدون اختلاف است.
