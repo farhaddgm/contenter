@@ -78,6 +78,16 @@ describe('[CATALOG] with a product tree (docs/73)', () => {
     expect(out.match(/Never say:/g)).toHaveLength(2);
   });
 
+  it('still tells the model the phrases of a line that is switched off (it is read through `parent`)', () => {
+    const out = formatBusinessCatalog(
+      [offering({ id: 'v', name: 'گونه', parentId: 'gone', parent: { guardrails: ['سود تضمینی'] } })],
+      NOW,
+    );
+    expect(out).toContain('  Never say: سود تضمینی');
+    expect(out).toMatch(/Never write the phrases listed after "Never say"/);
+    expect(out).not.toContain('Part of');
+  });
+
   it('does not print phrases of an item that cannot be sold', () => {
     const out = formatBusinessCatalog([offering({ status: 'PAUSED', guardrails: ['x y'] })], NOW);
     expect(out).not.toContain('Never say:');

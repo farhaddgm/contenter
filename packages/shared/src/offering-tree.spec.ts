@@ -113,6 +113,20 @@ describe('effectiveGuardrails', () => {
   it('gives a root only its own', () => {
     expect(effectiveGuardrails('L', byId)).toEqual(['سود تضمینی', 'بدون ریسک']);
   });
+
+  it('still applies the phrases of a line that is switched off (absent from the list)', () => {
+    // only the variant is usable; its line and the line above it are read through `parent`
+    const only = new Map([
+      [
+        'V',
+        {
+          ...row('V', 'P', { guardrails: ['فوری'] }),
+          parent: { guardrails: ['سود تضمینی'], parent: { guardrails: ['بدون ریسک'] } },
+        },
+      ],
+    ]);
+    expect(effectiveGuardrails('V', only)).toEqual(['فوری', 'سود تضمینی', 'بدون ریسک']);
+  });
 });
 
 describe('never-say phrases in the quality gate (GUARDRAIL_HIT)', () => {

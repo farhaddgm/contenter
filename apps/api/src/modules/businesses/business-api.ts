@@ -15,6 +15,8 @@ export const OFFERING_CORE_SELECT = {
   id: true,
   parentId: true,
   guardrails: true,
+  // the line and its parent, switched on or not: their never-say phrases still bind this variant
+  parent: { select: { guardrails: true, parent: { select: { guardrails: true } } } },
   stock: true,
   peakMonths: true,
   complementIds: true,

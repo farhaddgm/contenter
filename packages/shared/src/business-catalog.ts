@@ -223,6 +223,12 @@ export interface BusinessOffering {
 /** A decimal as text or as the database driver's decimal object (its `toString` is exact). */
 export type DecimalLike = string | { toString(): string };
 
+/** An ancestor of an offering, with only what the never-say inheritance needs (docs/73). */
+export interface GuardrailAncestor {
+  guardrails?: readonly string[];
+  parent?: GuardrailAncestor | null;
+}
+
 /** The fields the prompt, the quality check and the export read (a database row fits). */
 export interface OfferingCore {
   /** Needed to resolve `complementIds` / `substituteIds` (absent in hand-made rows). */
@@ -230,6 +236,8 @@ export interface OfferingCore {
   /** Tree position and never-say phrases (docs/73); absent in hand-made rows. */
   parentId?: string | null;
   guardrails?: string[];
+  /** The line it belongs to and that line's own parent, read whether or not they are switched on (`effectiveGuardrails`). */
+  parent?: GuardrailAncestor | null;
   stock?: string;
   peakMonths?: number[];
   complementIds?: string[];

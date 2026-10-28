@@ -279,7 +279,9 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
     const text = catalogLine(o);
     return depth ? text.replace(/^/gm, '  '.repeat(depth)) : text;
   });
-  const hasGuardrails = offerings.some((o) => o.guardrails?.length);
+  const hasGuardrails = offerings.some((o) =>
+    o.id ? effectiveGuardrails(o.id, byId).length > 0 : !!o.guardrails?.length,
+  );
   return [
     '### Offerings [CATALOG]',
     'What the business sells. Use these names and prices exactly as written. A price is valid only if it is shown here; if one is missing, write around it. Never promote an item marked NOT AVAILABLE or "do not promote". Prices listed here are valid in addition to [FACTS]. A selling point may be stated as certain only when a proof is listed; otherwise soften it or leave it out.' +

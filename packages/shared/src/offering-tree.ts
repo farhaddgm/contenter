@@ -8,6 +8,7 @@ import {
   OFFERING_GUARDRAILS_MAX,
   OFFERING_TREE_DEPTH_MAX,
   offeringQualityRule,
+  type GuardrailAncestor,
   type OfferingCore,
 } from './business-catalog';
 import type { QualityOfferingRule } from './quality';
@@ -114,13 +115,20 @@ const foldPhrase = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
  */
 export function effectiveGuardrails(
   id: string,
-  byId: ReadonlyMap<string, TreeNode & { guardrails?: readonly string[] }>,
+  byId: ReadonlyMap<string, TreeNode & { guardrails?: readonly string[]; parent?: GuardrailAncestor | null }>,
 ): string[] {
-  const chain = [id, ...offeringAncestors(id, byId)];
+  // a line that is switched off (so missing from `byId`) still binds its variants: a database row
+  // carries its ancestors' phrases in `parent`, while `byId` covers hand-made rows
+  const lists: (readonly string[])[] = [byId.get(id)?.guardrails ?? []];
+  let up = byId.get(id)?.parent ?? null;
+  for (let depth = 0; up && depth < OFFERING_TREE_DEPTH_MAX; depth++, up = up.parent ?? null) {
+    lists.push(up.guardrails ?? []);
+  }
+  for (const ancestor of offeringAncestors(id, byId)) lists.push(byId.get(ancestor)?.guardrails ?? []);
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const node of chain) {
-    for (const phrase of byId.get(node)?.guardrails ?? []) {
+  for (const list of lists) {
+    for (const phrase of list) {
       const key = foldPhrase(phrase);
       if (!key || seen.has(key)) continue;
       seen.add(key);
