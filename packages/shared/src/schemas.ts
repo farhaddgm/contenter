@@ -174,6 +174,9 @@ export const CreateTopicSchema = z.object({
   businessId: z.string().trim().min(1).nullish(),
   /** Imitation style of that business (docs/64); null = none. */
   styleId: z.string().trim().min(1).nullish(),
+  /** The offering and the audience this project is about (docs/73); both of that business, null = none. */
+  offeringId: z.string().trim().min(1).max(64).nullish(),
+  segmentId: z.string().trim().min(1).max(64).nullish(),
 });
 export type CreateTopicInput = z.input<typeof CreateTopicSchema>;
 
@@ -466,6 +469,9 @@ export const UpdateContentSchema = z.object({
   campaignId: z.string().min(1).nullable().optional(),
   /** null removes the content pillar label (docs/50-coverage-map.md). */
   pillarId: z.string().min(1).nullable().optional(),
+  /** This piece's own offering and audience (docs/73); null = follow the project. */
+  offeringId: z.string().trim().min(1).max(64).nullable().optional(),
+  segmentId: z.string().trim().min(1).max(64).nullable().optional(),
 });
 export type UpdateContentInput = z.infer<typeof UpdateContentSchema>;
 

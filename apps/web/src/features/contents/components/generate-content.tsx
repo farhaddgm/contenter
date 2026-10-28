@@ -10,6 +10,7 @@ import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { formatNumber } from '@/utils/format';
 import { useIdeas } from '@/features/ideas/api/ideas';
+import { FocusNote } from '@/features/topics/components/focus-note';
 import { useGenerateContent } from '../api/contents';
 import { useVariantLimit } from '../api/variants';
 import { EconomyToggle } from './economy-toggle';
@@ -84,6 +85,7 @@ export function GenerateContentDialog({
       }
     >
       <div className="space-y-4">
+        <FocusNote topicId={topicId} />
         <Segmented
           value={mode}
           onChange={setMode}

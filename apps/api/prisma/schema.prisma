@@ -643,6 +643,8 @@ model BusinessOffering {
   parent       BusinessOffering?  @relation("OfferingTree", fields: [parentId], references: [id], onDelete: NoAction)
   children     BusinessOffering[] @relation("OfferingTree")
   segmentLinks OfferingSegment[]
+  topics       Topic[]            @relation("TopicOffering")
+  contents     Content[]          @relation("ContentOffering")
 
   @@unique([businessId, name])
   @@index([businessId, status])
@@ -678,6 +680,8 @@ model BusinessSegment {
   business  Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   updatedBy User?             @relation("SegmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   offerings OfferingSegment[]
+  topics    Topic[]           @relation("TopicSegment")
+  contents  Content[]         @relation("ContentSegment")
 
   @@unique([businessId, name])
   @@index([businessId, kind])
@@ -836,6 +840,9 @@ model Topic {
   businessId       String?
   /// Imitation style the drafts are written in (docs/64); one of the business's reviewed styles
   styleId          String?
+  /// The offering and audience this project is about (docs/73): both of its own business, null = none
+  offeringId       String?
+  segmentId        String?
   /// Set when the admin chose to produce content without sample contents (docs/19-optional-samples.md)
   samplesSkippedAt DateTime?
   createdById      String?
@@ -845,6 +852,8 @@ model Topic {
   createdBy     User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   business      Business?            @relation(fields: [businessId], references: [id], onDelete: SetNull)
   style         BusinessStyle?       @relation(fields: [styleId], references: [id], onDelete: SetNull)
+  offering      BusinessOffering?    @relation("TopicOffering", fields: [offeringId], references: [id], onDelete: SetNull)
+  segment       BusinessSegment?     @relation("TopicSegment", fields: [segmentId], references: [id], onDelete: SetNull)
   activeProfile ContentProfile?      @relation("ActiveProfile", fields: [activeProfileId], references: [id], onDelete: SetNull)
   principles    Principle[]
   samples       SampleContent[]
@@ -863,6 +872,8 @@ model Topic {
   @@index([status, createdAt])
   @@index([businessId])
   @@index([styleId])
+  @@index([offeringId])
+  @@index([segmentId])
 }
 
 /// Label an editor puts on ideas and contents of one topic (docs/20-tags-campaigns.md).
@@ -1225,6 +1236,9 @@ model Content {
   goldenAt         DateTime?
   /// The content pillar of the business this piece covers (docs/50-coverage-map.md); null = unlabeled
   pillarId         String?
+  /// The offering and audience this piece is about; null = the project's (docs/73)
+  offeringId       String?
+  segmentId        String?
   /// Drafts written together for one idea share this id; null = a single draft (docs/51-draft-variants.md)
   variantGroupId   String?
   /// The fixed writing angle this draft was asked for (`VariantAngle` in packages/shared)
@@ -1242,6 +1256,8 @@ model Content {
   profile        ContentProfile?        @relation(fields: [profileId], references: [id], onDelete: SetNull)
   campaign       Campaign?              @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   pillar         ContentPillar?         @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+  offering       BusinessOffering?      @relation("ContentOffering", fields: [offeringId], references: [id], onDelete: SetNull)
+  segment        BusinessSegment?       @relation("ContentSegment", fields: [segmentId], references: [id], onDelete: SetNull)
   currentVersion ContentVersion?        @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   versions       ContentVersion[]       @relation("ContentVersions")
   tags           Tag[]
@@ -1258,6 +1274,8 @@ model Content {
   @@index([status, updatedAt])
   @@index([campaignId])
   @@index([pillarId])
+  @@index([offeringId])
+  @@index([segmentId])
   @@index([variantGroupId])
   @@index([scheduledAt])
   @@index([publishedAt])

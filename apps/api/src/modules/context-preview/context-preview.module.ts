@@ -70,7 +70,7 @@ export class ContextPreviewService {
       const loaded = await this.loader.business(
         topic.id,
         target === 'DRAFT' ? { platform: topic.platform, format: 'POST' } : undefined,
-        { semantic: false },
+        { semantic: false, focus: true },
       );
       if (loaded) source = loaded;
     }

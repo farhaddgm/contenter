@@ -13,6 +13,7 @@ import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState, Pagination } from '@/components/ui/table';
 import { useT } from '@/i18n';
 import { useCanEditTopic } from '@/features/topics/api/topics';
+import { useFocusNames } from '@/features/topics/components/focus-note';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -255,6 +256,8 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
   // the occasions calendar links here with the direction already written
   const [params, setParams] = useSearchParams();
   const presetDirection = params.get('direction') ?? '';
+  // a project about one offering or audience starts the direction with it (docs/73); the prompt has it anyway
+  const focusNames = useFocusNames(topicId).names;
   const ideateDialog = useDisclosure(!!presetDirection);
   const writeDialog = useDisclosure();
   const tags = useTags(topicId);
@@ -375,7 +378,7 @@ export function IdeasPanel({ topicId, hasProfile }: { topicId: string; hasProfil
       <IdeateDialog
         topicId={topicId}
         open={ideateDialog.isOpen}
-        initialDirection={presetDirection}
+        initialDirection={presetDirection || (focusNames ? t('ideas.focusDirection', { names: focusNames }) : '')}
         onOpenChange={(v) => {
           ideateDialog.setIsOpen(v);
           if (!v && presetDirection) setParams({}, { replace: true });

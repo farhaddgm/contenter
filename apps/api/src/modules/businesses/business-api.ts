@@ -1,8 +1,13 @@
 import { Global, Injectable, Module } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
+  FOCUS_SEGMENTS_MAX,
+  FOCUS_SIBLINGS_MAX,
+  offeringAncestors,
   offeringQualityRules,
   type DocooBusinessListQuery,
+  type FocusForPrompt,
+  type FocusSegmentForPrompt,
   type InstagramStats,
   type QualityOfferingRule,
   type StyleTrait,
@@ -175,6 +180,82 @@ export class BusinessApi {
       select: OFFERING_CORE_SELECT,
     });
     return offeringQualityRules(rows, now);
+  }
+
+  /** Whether `id` is an offering of the business (a project or content may only focus on its own). */
+  async hasOffering(businessId: string, id: string): Promise<boolean> {
+    return !!(await this.prisma.businessOffering.findFirst({ where: { id, businessId }, select: { id: true } }));
+  }
+
+  /** Whether `id` is an audience of the business. */
+  async hasSegment(businessId: string, id: string): Promise<boolean> {
+    return !!(await this.prisma.businessSegment.findFirst({ where: { id, businessId }, select: { id: true } }));
+  }
+
+  /**
+   * What a job is focused on (docs/73): the offering with the usable lines above it, the offerings
+   * next to it, and the audience — the chosen one if it is switched on, else the offering's main
+   * audiences. Only usable offerings and active audiences count; null when nothing is left.
+   */
+  async focusForPrompt(
+    businessId: string,
+    focus: { offeringId?: string | null; segmentId?: string | null },
+  ): Promise<FocusForPrompt | null> {
+    if (!focus.offeringId && !focus.segmentId) return null;
+    let chain: FocusForPrompt['chain'] = [];
+    let siblings: string[] = [];
+    if (focus.offeringId) {
+      const rows = await this.prisma.businessOffering.findMany({
+        where: { businessId, ...USABLE_OFFERING },
+        orderBy: OFFERING_ORDER,
+        select: OFFERING_CORE_SELECT,
+      });
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const self = byId.get(focus.offeringId);
+      if (self) {
+        const above = offeringAncestors(self.id, byId)
+          .reverse()
+          .flatMap((id) => byId.get(id) ?? []);
+        chain = [...above, self];
+        siblings = rows
+          .filter((r) => r.id !== self.id && (r.parentId ?? null) === (self.parentId ?? null))
+          .map((r) => r.name)
+          .slice(0, FOCUS_SIBLINGS_MAX);
+      }
+    }
+    const pick = {
+      kind: true,
+      name: true,
+      summary: true,
+      goals: true,
+      pains: true,
+      objections: true,
+      channels: true,
+      messageAngle: true,
+    } satisfies Prisma.BusinessSegmentSelect;
+    let segments: FocusSegmentForPrompt[] = [];
+    let segmentChosen = false;
+    if (focus.segmentId) {
+      const row = await this.prisma.businessSegment.findFirst({
+        where: { id: focus.segmentId, businessId, isActive: true },
+        select: pick,
+      });
+      if (row) {
+        segments = [row];
+        segmentChosen = true;
+      }
+    }
+    if (!segments.length && chain.length) {
+      const links = await this.prisma.offeringSegment.findMany({
+        where: { offeringId: focus.offeringId!, segment: { businessId, isActive: true } },
+        select: { fit: true, segment: { select: { id: true, ...pick } } },
+      });
+      segments = links
+        .sort((a, b) => b.fit - a.fit || a.segment.name.localeCompare(b.segment.name) || a.segment.id.localeCompare(b.segment.id))
+        .slice(0, FOCUS_SEGMENTS_MAX)
+        .map(({ segment: { id: _id, ...rest } }) => rest);
+    }
+    return chain.length || segments.length ? { chain, siblings, segments, segmentChosen } : null;
   }
 
   /** The business's latest Instagram statistics (computed in code, docs/28), or null. */

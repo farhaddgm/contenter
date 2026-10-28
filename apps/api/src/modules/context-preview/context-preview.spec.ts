@@ -65,14 +65,14 @@ describe('ContextPreviewService', () => {
     expect(loader.business).toHaveBeenCalledWith(
       't1',
       { platform: 'INSTAGRAM', format: 'POST' },
-      { semantic: false },
+      { semantic: false, focus: true },
     );
   });
 
   it('gives ideas the project documents but no draft-only blocks', async () => {
     const { svc, loader } = setup({ topic: { id: 't1', platform: 'INSTAGRAM' } });
     await svc.preview('b1', { target: 'IDEATE', topicId: 't1' }, admin);
-    expect(loader.business).toHaveBeenCalledWith('t1', undefined, { semantic: false });
+    expect(loader.business).toHaveBeenCalledWith('t1', undefined, { semantic: false, focus: true });
   });
 
   it('lists empty sections for profile jobs and never needs a project', async () => {
