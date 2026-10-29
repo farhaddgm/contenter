@@ -26,7 +26,10 @@ import {
   defaultFormatFor,
   variantAnglesFor,
   effectivePlatform,
+  effectiveFocus,
+  focusAllowedIds,
   offeringQualityRules,
+  type OfferingCore,
   RepurposeContentSchema,
   EditContentVersionSchema,
   GenerateContentSchema,
@@ -46,7 +49,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
-import { OFFERING_CORE_SELECT } from '../businesses/business-api';
+import { BusinessApi, OFFERING_CORE_SELECT } from '../businesses/business-api';
 import { SettingsService } from '../settings/settings.module';
 import { StyleFitService } from '../style-fit/style-fit.module';
 import { CoverageService } from '../pillars/coverage.module';
@@ -81,6 +84,7 @@ export class ContentsService {
     private readonly similarity: SimilarityService,
     private readonly coverage: CoverageService,
     private readonly styleFit: StyleFitService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async list(query: z.infer<typeof ContentListQuerySchema>, user: AuthUser) {
@@ -159,6 +163,8 @@ export class ContentsService {
           },
         },
         businessId: true,
+        offeringId: true,
+        segmentId: true,
       },
     });
     const terms = topic?.business?.terms ?? [];
@@ -174,6 +180,8 @@ export class ContentsService {
       terms,
       facts: topic?.business?.facts ?? [],
       offerings: offeringQualityRules(topic?.business?.offerings ?? []),
+      // a text about one offering must not take another's price or feature (docs/73)
+      focus: this.qualityFocus(topic?.business?.offerings ?? [], effectiveFocus(c, topic ?? {}).offeringId),
       register: asRegister(topic?.business?.register),
     });
     return {
@@ -373,6 +381,9 @@ export class ContentsService {
           status: 'GENERATING',
           // same campaign and tags as the original
           campaignId: source.campaignId,
+          // the same offering and audience as the original (docs/73); null still follows the project
+          offeringId: source.offeringId,
+          segmentId: source.segmentId,
           tags: source.tags.length ? { connect: source.tags } : undefined,
           createdById: user.id,
         },
@@ -399,6 +410,15 @@ export class ContentsService {
     return { items };
   }
 
+  /** The focused offering and the ones a text about it may mention, when it is a usable offering. */
+  private qualityFocus(
+    offerings: (OfferingCore & { id: string })[],
+    offeringId: string | null,
+  ): { offeringId: string; allowedIds: string[] } | null {
+    if (!offeringId || !offerings.some((o) => o.id === offeringId)) return null;
+    return { offeringId, allowedIds: focusAllowedIds(offeringId, offerings) };
+  }
+
   async update(id: string, input: UpdateContentInput, user: AuthUser) {
     if (input.status) {
       // every status change is a review step with its own rules and history
@@ -414,6 +434,21 @@ export class ContentsService {
         select: { id: true },
       });
       if (!campaign) throw new BadRequestException('Campaign does not belong to this topic');
+    }
+    if (input.offeringId || input.segmentId) {
+      // a piece may only be about an offering and an audience of its own business (docs/73)
+      const content = await this.prisma.content.findUnique({
+        where: { id },
+        select: { topic: { select: { businessId: true } } },
+      });
+      const businessId = content?.topic.businessId;
+      if (!businessId) throw new BadRequestException('The project has no business');
+      if (input.offeringId && !(await this.businesses.hasOffering(businessId, input.offeringId))) {
+        throw new BadRequestException('Offering not found in this business');
+      }
+      if (input.segmentId && !(await this.businesses.hasSegment(businessId, input.segmentId))) {
+        throw new BadRequestException('Audience not found in this business');
+      }
     }
     if (input.pillarId) {
       const content = await this.prisma.content.findUnique({

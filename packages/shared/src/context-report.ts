@@ -22,6 +22,7 @@ export type ContextBlockId =
   | `SECTION:${BusinessSectionKey}`
   | 'FACTS'
   | 'CATALOG'
+  | 'FOCUS'
   | 'TERMS'
   | 'ASSETS'
   | 'DOCUMENTS'

@@ -633,6 +633,10 @@ export const en: DeepStrings<Dictionary> = {
       business: 'Business',
       businessHint: "This business's profile is sent to every AI job of the topic.",
       style: 'Writing style',
+      offering: 'Product or service',
+      offeringHint: 'Optional. If this project is about one product or service, choose it so AI takes its details only (not another offering’s). Only active, confirmed catalog rows are listed.',
+      segment: 'Audience',
+      segmentHint: 'Optional. If you leave it empty and an offering is chosen, that offering’s main audiences are given to AI.',
       styleHint: "Optional. Only built and confirmed styles of this business can be chosen; the style is given to AI when drafts are written.",
     },
     created: 'Topic created',
@@ -662,6 +666,8 @@ export const en: DeepStrings<Dictionary> = {
     activeProfile: 'Active profile',
     noActiveProfile: 'No approved profile',
     noStyle: 'No style',
+    noOffering: 'Whole catalog (no focus)',
+    noSegment: 'No audience chosen',
     noBusiness: 'No business',
   },
   editLearning: {
@@ -857,6 +863,7 @@ export const en: DeepStrings<Dictionary> = {
     count: 'Number of ideas',
     direction: 'Direction',
     directionHint: 'e.g. focus on common mistakes, or tailor for a specific occasion',
+    focusDirection: 'Focus: {{names}}',
     format: 'Format',
     anyFormat: 'Let AI choose',
     queued: 'Ideation queued',
@@ -1057,6 +1064,8 @@ export const en: DeepStrings<Dictionary> = {
           'The price of "{{name}}" in the text does not match the catalog. Catalog: {{expected}} · in the text: {{found}} · sentence: "{{sentence}}"',
         OFFERING_UNAVAILABLE:
           '"{{name}}" is paused, discontinued or out of its season in the catalog, but the text mentions it.',
+        OFFERING_CROSSED:
+          'This text is about "{{focus}}", but the price or a feature of "{{other}}" is in it: "{{sentence}}"',
         GUARDRAIL_HIT:
           'The banned phrase "{{phrase}}" for "{{name}}" is in the text: "{{sentence}}"',
         PLACEHOLDER: 'A placeholder is left in the text: "{{found}}".',
@@ -1080,6 +1089,11 @@ export const en: DeepStrings<Dictionary> = {
     sourceAi: 'AI',
     sourceAdmin: 'Manual edit',
     organize: 'Organization',
+    focusOffering: 'Product or service of this piece',
+    focusSegment: 'Audience of this piece',
+    focusSame: 'Same as the project',
+    focusFor: 'For: {{names}}',
+    focusAngle: 'What convinces them: {{angle}}',
   },
   inbox: {
     title: 'Notifications',
@@ -1941,6 +1955,7 @@ export const en: DeepStrings<Dictionary> = {
         HEAD: 'Details',
         FACTS: 'Key facts',
         CATALOG: 'Product catalog',
+        FOCUS: 'Focus (offering and audience of this piece)',
         TERMS: 'Terminology',
         ASSETS: 'Past content',
         DOCUMENTS: 'Reference documents',

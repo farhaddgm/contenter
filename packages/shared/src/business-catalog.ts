@@ -322,6 +322,8 @@ export function offeringQualityRule(
 ): QualityOfferingRule {
   return {
     ...(guardrails.length ? { guardrails } : {}),
+    ...(o.id ? { id: o.id } : {}),
+    ...(o.features.length ? { features: o.features } : {}),
     name: o.name,
     aliases: o.aliases,
     priceAmount: priceText(o.priceAmount),

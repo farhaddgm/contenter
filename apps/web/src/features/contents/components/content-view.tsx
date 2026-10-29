@@ -44,6 +44,8 @@ import { CommentsCard } from './comments-card';
 import { MetricsCard } from './metrics-card';
 import { ChecklistCard } from './checklist-card';
 import { useTopicPillars } from '@/features/pillars/api/coverage';
+import { useFocusOptions } from '@/features/businesses/api/focus';
+import { useTopic } from '@/features/topics/api/topics';
 import { GoldenCard } from '@/features/golden/components/golden-card';
 import { ExportMenu } from '@/features/export/components/export-menu';
 import { QualityCard } from './quality-card';
@@ -357,6 +359,8 @@ function OrganizeCard({ content, editable }: { content: Content; editable: boole
   const update = useUpdateContent(content.id);
   const { data: campaigns = [] } = useCampaigns(content.topicId);
   const { data: pillars = [] } = useTopicPillars(content.topicId);
+  const { data: topic } = useTopic(content.topicId);
+  const focus = useFocusOptions(topic?.businessId, content);
   // archived campaigns stay selectable only for a content that is already in one
   const options = campaigns
     .filter((c) => c.status === 'ACTIVE' || c.id === content.campaignId)
@@ -376,6 +380,34 @@ function OrganizeCard({ content, editable }: { content: Content; editable: boole
             />
           )}
         </Field>
+        {focus.offeringOptions.length > 0 && (
+          <Field label={t('contents.focusOffering')}>
+            {(id) => (
+              <Select
+                id={id}
+                disabled={!editable}
+                placeholder={t('contents.focusSame')}
+                value={content.offeringId ?? ''}
+                options={focus.offeringOptions}
+                onChange={(e) => update.mutate({ offeringId: e.target.value || null }, { onError })}
+              />
+            )}
+          </Field>
+        )}
+        {focus.segmentOptions.length > 0 && (
+          <Field label={t('contents.focusSegment')}>
+            {(id) => (
+              <Select
+                id={id}
+                disabled={!editable}
+                placeholder={t('contents.focusSame')}
+                value={content.segmentId ?? ''}
+                options={focus.segmentOptions}
+                onChange={(e) => update.mutate({ segmentId: e.target.value || null }, { onError })}
+              />
+            )}
+          </Field>
+        )}
         {pillars.length > 0 && (
           <Field label={t('coverage.pillar')}>
             {(id) => (

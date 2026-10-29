@@ -42,6 +42,8 @@ const COUNTS = {
   _count: { select: { samples: true, ideas: true, contents: true, profiles: true } },
   business: { select: { id: true, name: true } },
   style: { select: { id: true, name: true } },
+  offering: { select: { id: true, name: true } },
+  segment: { select: { id: true, name: true } },
 };
 
 @Injectable()
@@ -109,10 +111,27 @@ export class TopicsService {
     }
   }
 
+  /** A project may only focus on an offering and an audience of its own business (docs/73). */
+  private async assertFocus(
+    businessId: string | null | undefined,
+    offeringId: string | null | undefined,
+    segmentId: string | null | undefined,
+  ) {
+    if (!offeringId && !segmentId) return;
+    if (!businessId) throw new BadRequestException('Choose a business before choosing an offering or audience');
+    if (offeringId && !(await this.businesses.hasOffering(businessId, offeringId))) {
+      throw new BadRequestException('Offering not found in this business');
+    }
+    if (segmentId && !(await this.businesses.hasSegment(businessId, segmentId))) {
+      throw new BadRequestException('Audience not found in this business');
+    }
+  }
+
   async create(input: CreateTopicInput, user: AuthUser) {
     const data = CreateTopicSchema.parse(input);
     await this.assertBusiness(data.businessId, user);
     await this.assertStyle(data.businessId, data.styleId);
+    await this.assertFocus(data.businessId, data.offeringId, data.segmentId);
     const topic = await this.prisma.topic.create({ data: { ...data, createdById: user.id } });
     this.audit.log({
       userId: user.id,
@@ -127,7 +146,7 @@ export class TopicsService {
     const data = UpdateTopicSchema.parse(input);
     const current = await this.prisma.topic.findUnique({
       where: { id },
-      select: { businessId: true, styleId: true },
+      select: { businessId: true, styleId: true, offeringId: true, segmentId: true },
     });
     // only a new link is checked, so editing a topic linked to a hidden business still works
     if (data.businessId !== undefined && data.businessId !== current?.businessId) {
@@ -139,11 +158,24 @@ export class TopicsService {
     if (data.styleId && (data.styleId !== current?.styleId || businessChanged)) {
       await this.assertStyle(businessId, data.styleId);
     }
-    // another business (or none) cannot keep the old business's style
+    // another business (or none) cannot keep the old business's style, offering or audience
     const dropStyle = businessChanged && data.styleId === undefined;
+    const dropOffering = businessChanged && data.offeringId === undefined;
+    const dropSegment = businessChanged && data.segmentId === undefined;
+    if (
+      (data.offeringId && (data.offeringId !== current?.offeringId || businessChanged)) ||
+      (data.segmentId && (data.segmentId !== current?.segmentId || businessChanged))
+    ) {
+      await this.assertFocus(businessId, data.offeringId, data.segmentId);
+    }
     const topic = await this.prisma.topic.update({
       where: { id },
-      data: { ...data, ...(dropStyle ? { styleId: null } : {}) },
+      data: {
+        ...data,
+        ...(dropStyle ? { styleId: null } : {}),
+        ...(dropOffering ? { offeringId: null } : {}),
+        ...(dropSegment ? { segmentId: null } : {}),
+      },
     });
     this.audit.log({
       userId: user.id,

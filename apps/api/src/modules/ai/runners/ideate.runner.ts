@@ -32,7 +32,7 @@ export class IdeateRunner implements AiRunner {
       include: { topic: true },
     });
     const [business, principles, profile, brandDocs, existing] = await Promise.all([
-      this.ctx.business(request.topicId),
+      this.ctx.business(request.topicId, undefined, { focus: true }),
       this.ctx.principles(request.topicId),
       this.ctx.activeProfile(request.topicId),
       this.ctx.brandDocs(request.topicId),

@@ -55,7 +55,7 @@ export class GenerateContentRunner implements AiRunner {
         platform: content.platform ?? content.topic.platform,
         format: content.format,
         excludeIds: [content.id],
-      }),
+      }, { focus: { contentId: content.id } }),
       this.ctx.principles(content.topicId),
       this.ctx.activeProfile(content.topicId),
       this.ctx.brandDocs(content.topicId),
@@ -159,7 +159,7 @@ export class ReviseContentRunner implements AiRunner {
     if (!feedback) throw new NonRetryableAiError('Feedback is required');
 
     const [business, principles, profile, brandDocs] = await Promise.all([
-      this.ctx.business(content.topicId),
+      this.ctx.business(content.topicId, undefined, { focus: { contentId: content.id } }),
       this.ctx.principles(content.topicId),
       this.ctx.activeProfile(content.topicId),
       this.ctx.brandDocs(content.topicId),
@@ -275,7 +275,7 @@ export class RepurposeContentRunner implements AiRunner {
         format: content.format,
         // the source is what is being adapted: it is never also an example
         excludeIds: [content.id, source.id],
-      }),
+      }, { focus: { contentId: content.id } }),
       this.ctx.principles(content.topicId),
       this.ctx.activeProfile(content.topicId),
       this.ctx.brandDocs(content.topicId),

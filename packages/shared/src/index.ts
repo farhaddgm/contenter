@@ -40,6 +40,7 @@ export * from './context-report';
 export * from './business-catalog';
 export * from './business-competitors';
 export * from './business-segments';
+export * from './business-focus';
 export * from './offering-tree';
 export * from './brand-compare';
 export * from './profile-questions';

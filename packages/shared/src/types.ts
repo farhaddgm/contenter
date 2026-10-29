@@ -91,6 +91,11 @@ export interface Topic {
   business?: { id: string; name: string } | null;
   styleId?: string | null;
   style?: { id: string; name: string } | null;
+  /** The offering and audience the project is about (docs/73). */
+  offeringId?: string | null;
+  segmentId?: string | null;
+  offering?: { id: string; name: string } | null;
+  segment?: { id: string; name: string } | null;
   /** Set when the admin skipped the sample-contents step (content then rests on documents). */
   samplesSkippedAt: ISODate | null;
   createdAt: ISODate;
@@ -322,6 +327,9 @@ export interface Content {
   goldenAt: ISODate | null;
   /** The content pillar of the business this covers (docs/50); null = unlabeled. */
   pillarId: string | null;
+  /** This piece's own offering and audience (docs/73); null = the project's. */
+  offeringId?: string | null;
+  segmentId?: string | null;
   /** Drafts written together for one idea share this id (docs/51); null for a single draft. */
   variantGroupId: string | null;
   variantAngle: string | null;

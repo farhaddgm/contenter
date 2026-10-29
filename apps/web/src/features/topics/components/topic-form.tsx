@@ -14,6 +14,7 @@ import { Field, Input, Select, Textarea } from '@/components/ui/form-controls';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { useBusinessOptions } from '@/features/businesses/api/businesses';
+import { useFocusOptions } from '@/features/businesses/api/focus';
 import { useStyles } from '@/features/businesses/api/styles';
 import { useCreateTopic, useUpdateTopic } from '../api/topics';
 
@@ -53,6 +54,8 @@ export function TopicFormDrawer({
       language: 'fa',
       businessId: null,
       styleId: null,
+      offeringId: null,
+      segmentId: null,
     },
   });
 
@@ -68,6 +71,8 @@ export function TopicFormDrawer({
               language: topic.language,
               businessId: topic.businessId,
               styleId: topic.styleId ?? null,
+              offeringId: topic.offeringId ?? null,
+              segmentId: topic.segmentId ?? null,
             }
           : {
               title: '',
@@ -77,6 +82,8 @@ export function TopicFormDrawer({
               language: 'fa',
               businessId: defaultBusinessId ?? null,
               styleId: null,
+              offeringId: null,
+              segmentId: null,
             },
       );
     }
@@ -94,11 +101,23 @@ export function TopicFormDrawer({
     .filter((s) => isStyleUsable(s) || s.id === topic?.styleId)
     .map((s) => ({ value: s.id, label: s.name }));
 
+  // an offering and an audience of the chosen business (docs/73)
+  const focus = useFocusOptions(chosenBusiness, topic);
+
+  // An offering or audience is dropped only when the business changed (the server checks the rest);
+  // while the option lists are still loading or failed, a saved choice must not be wiped by a save.
+  const keepFocus = (value: string | null | undefined, options: { value: string }[]) =>
+    value && ((topic && form.getValues('businessId') === topic.businessId) || options.some((o) => o.value === value))
+      ? value
+      : null;
+
   const onSubmit = form.handleSubmit((raw) => {
-    // a style left over from another business is dropped
+    // a style, offering or audience left over from another business is dropped
     const values = {
       ...raw,
       styleId: styleOptions.some((o) => o.value === raw.styleId) ? raw.styleId : null,
+      offeringId: keepFocus(raw.offeringId, focus.offeringOptions),
+      segmentId: keepFocus(raw.segmentId, focus.segmentOptions),
     };
     if (topic) {
       update.mutate(values, {
@@ -170,6 +189,38 @@ export function TopicFormDrawer({
                 placeholder={t('topics.noStyle')}
                 options={styleOptions}
                 {...form.register('styleId', { setValueAs: (v: string | null) => v || null })}
+              />
+            )}
+          </Field>
+        )}
+        {chosenBusiness && focus.offeringOptions.length > 0 && (
+          <Field
+            label={t('topics.fields.offering')}
+            hint={t('topics.fields.offeringHint')}
+            error={errors.offeringId?.message}
+          >
+            {(id) => (
+              <Select
+                id={id}
+                placeholder={t('topics.noOffering')}
+                options={focus.offeringOptions}
+                {...form.register('offeringId', { setValueAs: (v: string | null) => v || null })}
+              />
+            )}
+          </Field>
+        )}
+        {chosenBusiness && focus.segmentOptions.length > 0 && (
+          <Field
+            label={t('topics.fields.segment')}
+            hint={t('topics.fields.segmentHint')}
+            error={errors.segmentId?.message}
+          >
+            {(id) => (
+              <Select
+                id={id}
+                placeholder={t('topics.noSegment')}
+                options={focus.segmentOptions}
+                {...form.register('segmentId', { setValueAs: (v: string | null) => v || null })}
               />
             )}
           </Field>

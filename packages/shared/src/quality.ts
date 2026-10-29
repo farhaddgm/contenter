@@ -373,6 +373,7 @@ export const QualityIssueCode = [
   'OFFERING_PRICE_MISMATCH',
   'OFFERING_UNAVAILABLE',
   'GUARDRAIL_HIT',
+  'OFFERING_CROSSED',
 ] as const;
 export type QualityIssueCode = (typeof QualityIssueCode)[number];
 
@@ -395,7 +396,11 @@ export interface QualityFactRule {
 
 /** What the check needs to know about an offering of the business catalog (docs/67). */
 export interface QualityOfferingRule {
+  /** Needed to tell the focused offering from the others (`QualityInput.focus`). */
+  id?: string;
   name: string;
+  /** Features of the offering, to notice another offering's features in a text about this one. */
+  features?: readonly string[];
   /** Other spellings of the name that count as the same offering. */
   aliases?: readonly string[];
   /** Decimal as text ("199000"); with `priceCurrency`. Empty = no price to compare. */
@@ -420,6 +425,12 @@ export interface QualityInput {
   facts?: readonly QualityFactRule[];
   /** Catalog offerings: stated prices are compared with theirs, unavailable ones are named. */
   offerings?: readonly QualityOfferingRule[];
+  /**
+   * The offering the content is about (docs/73): `allowedIds` are the ones it may mention (itself,
+   * its line, its variants, its complements and substitutes). Another offering whose price or
+   * feature the text states is `OFFERING_CROSSED`.
+   */
+  focus?: { offeringId: string; allowedIds: readonly string[] } | null;
   terms?: readonly TermRule[];
   /** The brand's language register; unset = not checked (docs/61). */
   register?: LanguageRegister | null;
@@ -665,6 +676,58 @@ export function checkContentQuality(input: QualityInput): QualityReport {
             sentence: sentence.length > 140 ? `${sentence.slice(0, 137)}…` : sentence,
           },
         });
+      }
+    }
+  }
+
+  // a text about one offering that takes another offering's price or feature (docs/73)
+  const focused = input.focus
+    ? (input.offerings ?? []).find((o) => o.id === input.focus!.offeringId)
+    : undefined;
+  if (input.focus && focused) {
+    const allowed = new Set(input.focus.allowedIds);
+    const focusFeatures = new Set((focused.features ?? []).map((f) => normalizeTermText(f)));
+    const focusPrice = focused.priceAmount ? Number(focused.priceAmount) : Number.NaN;
+    for (const other of input.offerings ?? []) {
+      if (!other.id || allowed.has(other.id) || !other.available) continue;
+      const names = [other.name, ...(other.aliases ?? [])].filter((n) => n.trim());
+      const otherPrice = other.priceAmount ? Number(other.priceAmount) : Number.NaN;
+      const features = (other.features ?? []).filter(
+        (f) => normalizeTermText(f).length >= 4 && !focusFeatures.has(normalizeTermText(f)),
+      );
+      for (const sentence of sentences) {
+        if (!names.some((n) => mentionsLabel(sentence, n))) continue;
+        const stated = extractPrices(sentence);
+        // the other offering's price, when the focused one does not cost the same
+        const takesPrice =
+          Number.isFinite(otherPrice) &&
+          !!other.priceCurrency &&
+          stated.some(
+            (p) =>
+              comparePrice({ amount: otherPrice, currency: other.priceCurrency!, from: other.priceFrom }, p) ===
+                'match' &&
+              !(
+                Number.isFinite(focusPrice) &&
+                !!focused.priceCurrency &&
+                comparePrice({ amount: focusPrice, currency: focused.priceCurrency, from: focused.priceFrom }, p) ===
+                  'match'
+              ),
+          );
+        const normalized = normalizeTermText(sentence);
+        const takesFeature = features.find((f) => countPhrase(normalized, f) > 0);
+        if (takesPrice || takesFeature) {
+          issues.push({
+            code: 'OFFERING_CROSSED',
+            severity: 'warn',
+            params: {
+              focus: focused.name,
+              other: other.name,
+              what: takesPrice ? 'price' : 'feature',
+              sentence: sentence.length > 140 ? `${sentence.slice(0, 137)}…` : sentence,
+            },
+          });
+          break;
+        }
       }
     }
   }

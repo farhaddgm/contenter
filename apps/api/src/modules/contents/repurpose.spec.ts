@@ -88,6 +88,12 @@ describe('ContentsService.repurpose', () => {
     expect(update).toHaveBeenCalledWith({ where: { id: 'new1' }, data: { lastJobId: 'job1' } });
   });
 
+  it('keeps the offering and audience of the source content (docs/73)', async () => {
+    const { svc, create } = makeService(source({ offeringId: 'o9', segmentId: 's9' }));
+    await svc.repurpose('src', { targets: [{ platform: 'X' }], notes: '' }, user);
+    expect(create.mock.calls[0]![0].data).toMatchObject({ offeringId: 'o9', segmentId: 's9' });
+  });
+
   it('does not copy tags when the source has none', async () => {
     const { svc, create } = makeService(source({ tags: [] }));
     await svc.repurpose('src', { targets: [{ platform: 'X' }] }, user);

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   DEFAULT_GOLDEN_SETTINGS,
+  effectiveFocus,
   pickGoldenExamples,
   type ContentFormat,
   type Platform,
@@ -62,13 +63,27 @@ export class ContextLoader {
    * (docs/60-reliability-and-cost.md). `opts.semantic: false` skips that choice (no indexing, no
    * embeddings call) and gives the equal slices, for read-only previews.
    */
-  async business(topicId: string, target?: ExampleTarget, opts: { semantic?: boolean } = {}) {
+  async business(
+    topicId: string,
+    target?: ExampleTarget,
+    opts: {
+      semantic?: boolean;
+      /**
+       * Add `[FOCUS]` (docs/73): `true` = the project's offering and audience; `{ contentId }` = that
+       * content's own, falling back to the project's. Jobs that do not write for one offering or
+       * audience (profile building, learning from edits) leave it off, so their prompt is unchanged.
+       */
+      focus?: true | { contentId: string };
+    } = {},
+  ) {
     const topic = await this.prisma.topic.findUniqueOrThrow({
       where: { id: topicId },
       select: {
         businessId: true,
         samplesSkippedAt: true,
         styleId: true,
+        offeringId: true,
+        segmentId: true,
         title: true,
         description: true,
         audience: true,
@@ -90,9 +105,11 @@ export class ContextLoader {
         (opts.semantic === false ? null : await this.semantic?.select(all, query, MAX_DOCUMENTS_TEXT)) ??
         all;
     }
+    const focus = opts.focus ? await this.focus(topic.businessId, topic, opts.focus) : null;
     return {
       ...business,
       documents,
+      ...(focus ? { focus } : {}),
       // only a draft being written gets examples; ideas, profiles and the like do not
       ...(target
         ? {
@@ -103,6 +120,22 @@ export class ContextLoader {
           }
         : {}),
     };
+  }
+
+  /** The offering and audience a job is about: the content's own, else the project's (docs/73). */
+  private async focus(
+    businessId: string,
+    topic: { offeringId: string | null; segmentId: string | null },
+    ref: true | { contentId: string },
+  ) {
+    const content =
+      ref === true
+        ? null
+        : await this.prisma.content.findUnique({
+            where: { id: ref.contentId },
+            select: { offeringId: true, segmentId: true },
+          });
+    return this.businesses.focusForPrompt(businessId, effectiveFocus(content, topic));
   }
 
   /**

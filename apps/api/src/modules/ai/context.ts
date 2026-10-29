@@ -27,6 +27,7 @@ import {
   isClaimProven,
   isOfferingAvailable,
   isPeakNow,
+  MAX_FOCUS_TEXT,
   parseClaims,
   isRegister,
   MAX_CATALOG_TEXT,
@@ -36,6 +37,8 @@ import {
   type ContextBlock,
   type ContextBlockId,
   type FetchedMedia,
+  type FocusForPrompt,
+  type FocusSegmentForPrompt,
   type OfferingClaim,
   type OfferingCore,
   type SampleAnalysisResult,
@@ -157,6 +160,8 @@ export type BusinessForPrompt = Pick<
   facts?: FactForPrompt[];
   /** Active, confirmed catalog rows, in prompt order (docs/67). */
   offerings?: OfferingForPrompt[];
+  /** The offering and audience the job is about (docs/73); absent = no focus. */
+  focus?: FocusForPrompt | null;
   terms?: TermForPrompt[];
 };
 
@@ -227,8 +232,8 @@ const claimLine = (c: OfferingClaim): string =>
  * available substitutes the admin named, so it can point the reader somewhere else. Stock, peak
  * season and complements (docs/67 §4.10) only add a tag or a line when they are set.
  */
-export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new Date()): string {
-  if (!offerings.length) return '';
+/** The lines of the catalog (a tree puts variants under their line); shared by `[CATALOG]` and `[FOCUS]`. */
+function catalogLines(offerings: OfferingForPrompt[], now: Date) {
   const byId = new Map(offerings.filter((o) => o.id).map((o) => [o.id as string, o]));
   const names = (ids: string[] | undefined, onlyAvailable: boolean) =>
     (ids ?? [])
@@ -282,6 +287,12 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
   const hasGuardrails = offerings.some((o) =>
     o.id ? effectiveGuardrails(o.id, byId).length > 0 : !!o.guardrails?.length,
   );
+  return { lines, tree, hasGuardrails };
+}
+
+export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new Date()): string {
+  if (!offerings.length) return '';
+  const { lines, tree, hasGuardrails } = catalogLines(offerings, now);
   return [
     '### Offerings [CATALOG]',
     'What the business sells. Use these names and prices exactly as written. A price is valid only if it is shown here; if one is missing, write around it. Never promote an item marked NOT AVAILABLE or "do not promote". Prices listed here are valid in addition to [FACTS]. A selling point may be stated as certain only when a proof is listed; otherwise soften it or leave it out.' +
@@ -292,6 +303,57 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
         ? ' Never write the phrases listed after "Never say" about that item (a variant is bound by its line\'s phrases too).'
         : ''),
     ...budgeted(lines, MAX_CATALOG_TEXT),
+  ].join('\n');
+}
+
+const segmentBlock = (s: FocusSegmentForPrompt): string => {
+  const line = (label: string, text: string) => (text ? `\n  ${label}: ${text}` : '');
+  const list = (label: string, items: string[]) => line(label, items.join(' | '));
+  return [
+    `- [${s.kind}] ${s.name}`,
+    line('Who', s.summary.trim()),
+    list('Goals', s.goals),
+    list('Pains', s.pains),
+    list('Objections', s.objections),
+    list('Channels', s.channels),
+    line('What convinces them', s.messageAngle.trim()),
+  ].join('');
+};
+
+/**
+ * What one piece is about (docs/73 §4): the offering with the line it belongs to (printed like the
+ * catalog, tree and "never say" included), the offerings next to it, and the audience in full. The
+ * rest of the catalog stays in [CATALOG]; this block says which of it this piece is for. Empty when
+ * there is no focus, so the prompt is unchanged without one.
+ */
+export function formatBusinessFocus(focus: FocusForPrompt | null | undefined, now = new Date()): string {
+  if (!focus || (!focus.chain.length && !focus.segments.length)) return '';
+  const about = [focus.chain.length ? 'one offering' : null, focus.segments.length ? 'one audience' : null]
+    .filter(Boolean)
+    .join(' and ');
+  const rules = [
+    focus.chain.length
+      ? 'Take its features, prices, conditions and proof only from the offering below and the line it belongs to; never give it the price, terms or features of another offering.'
+      : null,
+    focus.segments.length
+      ? 'Write for the audience below: answer its pains and objections, and use what convinces it. This is a choice of emphasis only; the brand voice and the rules above still hold.'
+      : null,
+  ].filter(Boolean);
+  const body: string[] = [];
+  if (focus.chain.length) {
+    body.push(`Offering: ${focus.chain.map((o) => o.name).join(' > ')}`, ...catalogLines(focus.chain, now).lines);
+    if (focus.siblings.length) {
+      body.push(`Other offerings next to it (do not mix their terms in): ${focus.siblings.join(' | ')}`);
+    }
+  }
+  if (focus.segments.length) {
+    body.push(focus.segmentChosen ? 'Audience:' : 'Audiences of this offering, main first:');
+    body.push(...focus.segments.map(segmentBlock));
+  }
+  return [
+    '### Focus [FOCUS]',
+    `This piece is about ${about}. ${rules.join(' ')}`,
+    ...budgeted(body, MAX_FOCUS_TEXT),
   ].join('\n');
 }
 
@@ -547,6 +609,7 @@ export function buildBusinessParts(
   const rest: [ContextBlockId, string][] = [
     ['FACTS', b.facts?.length ? formatBusinessFacts(b.facts) : ''],
     ['CATALOG', b.offerings?.length ? formatBusinessCatalog(b.offerings) : ''],
+    ['FOCUS', formatBusinessFocus(b.focus)],
     ['TERMS', b.terms?.length ? formatBusinessTerms(b.terms) : ''],
     ['ASSETS', b.assets?.length ? formatBusinessAssets(b.assets) : ''],
     ['DOCUMENTS', b.documents?.length ? formatBusinessDocuments(b.documents) : ''],
