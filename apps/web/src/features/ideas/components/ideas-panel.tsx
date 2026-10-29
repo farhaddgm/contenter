@@ -14,6 +14,8 @@ import { EmptyState, Pagination } from '@/components/ui/table';
 import { useT } from '@/i18n';
 import { useCanEditTopic } from '@/features/topics/api/topics';
 import { useFocusNames } from '@/features/topics/components/focus-note';
+import { useFocusOptions } from '@/features/businesses/api/focus';
+import { useTopic } from '@/features/topics/api/topics';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { notify } from '@/stores/notifications';
 import { cn } from '@/utils/cn';
@@ -135,6 +137,14 @@ function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void })
   const remove = useDeleteIdea();
   const setTags = useSetIdeaTags(idea.id);
   const setStatus = (status: IdeaStatus) => update.mutate({ id: idea.id, data: { status } });
+  // what the idea is about (docs/73); empty follows the project
+  const { data: topic } = useTopic(idea.topicId);
+  const focus = useFocusOptions(topic?.businessId, idea);
+  const setFocus = (data: { offeringId?: string | null; segmentId?: string | null }) =>
+    update.mutate(
+      { id: idea.id, data },
+      { onError: (e) => notify.error(t('common.error'), e.message) },
+    );
   return (
     <Card className={cn('flex flex-col', idea.status === 'REJECTED' && 'opacity-60')}>
       <div className="flex-1 space-y-3 p-4">
@@ -160,6 +170,30 @@ function IdeaCard({ idea, onWrite }: { idea: Idea; onWrite: (i: Idea) => void })
             )
           }
         />
+        {(focus.offeringOptions.length > 0 || focus.segmentOptions.length > 0) && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {focus.offeringOptions.length > 0 && (
+              <Select
+                aria-label={t('ideas.focusOffering')}
+                disabled={!editable}
+                placeholder={t('contents.focusSame')}
+                value={idea.offeringId ?? ''}
+                options={focus.offeringOptions}
+                onChange={(e) => setFocus({ offeringId: e.target.value || null })}
+              />
+            )}
+            {focus.segmentOptions.length > 0 && (
+              <Select
+                aria-label={t('ideas.focusSegment')}
+                disabled={!editable}
+                placeholder={t('contents.focusSame')}
+                value={idea.segmentId ?? ''}
+                options={focus.segmentOptions}
+                onChange={(e) => setFocus({ segmentId: e.target.value || null })}
+              />
+            )}
+          </div>
+        )}
         {idea.hook && (
           <p className="rounded-md border-s-4 border-primary/50 bg-primary/5 px-3 py-2 text-sm italic leading-7">
             «{idea.hook}»

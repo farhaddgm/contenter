@@ -124,7 +124,8 @@ describe('renderTemplate', () => {
       ],
       business_audit: ['language', 'sections_spec', 'business', 'gaps', 'standing_notes'],
       business_style_build: ['language', 'business', 'style_name', 'direction', 'sources'],
-      business_offerings_extract: ['language', 'business', 'existing', 'sources'],
+      business_offerings_extract: ['language', 'business', 'existing', 'scope', 'sources'],
+      business_segments_propose: ['language', 'business', 'catalog', 'existing', 'sources'],
       learn_from_edits: [
         'language',
         'pair_count',

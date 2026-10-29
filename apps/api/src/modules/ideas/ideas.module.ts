@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,6 +7,7 @@ import {
   HttpCode,
   Injectable,
   Module,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -27,6 +29,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { paginate, toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AiJobsService } from '../ai/ai-jobs.service';
+import { BusinessApi } from '../businesses/business-api';
 import { TAG_SELECT } from '../tags/tag-select';
 import { has, matchAllWords } from '../../common/search-where';
 
@@ -36,6 +39,7 @@ export class IdeasService {
     private readonly prisma: PrismaService,
     private readonly jobs: AiJobsService,
     private readonly audit: AuditService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async list(topicId: string, query: z.infer<typeof IdeaListQuerySchema>) {
@@ -96,6 +100,16 @@ export class IdeasService {
   }
 
   async update(id: string, input: UpdateIdeaInput, user: AuthUser) {
+    if (input.offeringId || input.segmentId) {
+      // an idea may only be about an offering and an audience of its project's business (docs/73)
+      const current = await this.prisma.idea.findUnique({
+        where: { id },
+        select: { topic: { select: { businessId: true } } },
+      });
+      if (!current) throw new NotFoundException('Idea not found');
+      const problem = await this.businesses.focusProblem(current.topic.businessId, input);
+      if (problem) throw new BadRequestException(problem);
+    }
     const idea = await this.prisma.idea.update({ where: { id }, data: input });
     this.audit.log({
       userId: user.id,

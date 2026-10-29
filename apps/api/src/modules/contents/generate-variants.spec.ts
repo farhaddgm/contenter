@@ -4,13 +4,14 @@ import type { AuthUser } from '../../common/auth.decorators';
 import type { PrismaService } from '../../infra/prisma/prisma.service';
 import type { AiJobsService } from '../ai/ai-jobs.service';
 import type { AuditService } from '../audit/audit.service';
+import type { BusinessApi } from '../businesses/business-api';
 import type { SettingsService } from '../settings/settings.module';
 import { withAngle } from '../ai/runners/content.runners';
 import { ContentsService } from './contents.module';
 
 const user = { id: 'u1', role: 'EDITOR' } as AuthUser;
 
-function setup(maxVariants = 3) {
+function setup(maxVariants = 3, opts: { idea?: Record<string, unknown> | null; problem?: string | null } = {}) {
   let n = 0;
   const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
     id: `c${++n}`,
@@ -18,9 +19,10 @@ function setup(maxVariants = 3) {
   }));
   const update = vi.fn(async () => ({}));
   const enqueue = vi.fn(async (_j: unknown) => ({ id: `j${n}` }));
+  const focusProblem = vi.fn(async (_b: unknown, _f: unknown) => opts.problem ?? null);
   const prisma = {
-    topic: { findUniqueOrThrow: async () => ({}) },
-    idea: { findFirst: async () => null },
+    topic: { findUniqueOrThrow: async () => ({ businessId: 'b1' }) },
+    idea: { findFirst: async () => opts.idea ?? null },
     content: { create, update },
   };
   const svc = new ContentsService(
@@ -33,8 +35,10 @@ function setup(maxVariants = 3) {
     { getVariants: async () => ({ maxVariants }) } as unknown as SettingsService,
     {} as never,
     {} as never,
+    {} as never,
+    { focusProblem: focusProblem } as unknown as BusinessApi,
   );
-  return { svc, create, enqueue };
+  return { svc, create, enqueue, focusProblem };
 }
 
 const brief = 'یک پست دربارهٔ قهوهٔ تازه';
@@ -93,5 +97,43 @@ describe('withAngle', () => {
     const out = withAngle('brief', 'STORY');
     expect(out.startsWith('brief\n\n')).toBe(true);
     expect(out).toContain('narrative');
+  });
+});
+
+describe('ContentsService.generate: what the drafts are about (docs/73)', () => {
+  const idea = { id: 'i1', title: 'ایده', format: 'POST', tags: [], offeringId: 'o-idea', segmentId: 's-idea' };
+
+  it('gives a draft the idea focus, unless one was chosen for it, and nothing when neither exists', async () => {
+    const fromIdea = setup(3, { idea });
+    await fromIdea.svc.generate('t1', { ideaId: 'i1' }, user);
+    expect(fromIdea.create.mock.calls[0]![0].data).toMatchObject({ offeringId: 'o-idea', segmentId: 's-idea' });
+
+    const chosen = setup(3, { idea });
+    await chosen.svc.generate('t1', { ideaId: 'i1', offeringId: 'o-pick' }, user);
+    expect(chosen.create.mock.calls[0]![0].data).toMatchObject({ offeringId: 'o-pick', segmentId: 's-idea' });
+
+    const plain = setup();
+    await plain.svc.generate('t1', { brief: 'یک پست دربارهٔ قهوهٔ تازه' }, user);
+    expect(plain.create.mock.calls[0]![0].data).toMatchObject({ offeringId: null, segmentId: null });
+  });
+
+  it('every draft of a group carries the same focus', async () => {
+    const { svc, create } = setup(3, { idea });
+    await svc.generate('t1', { ideaId: 'i1', variants: 3 }, user);
+    expect(create.mock.calls.map((c) => (c[0] as { data: { offeringId: string } }).data.offeringId)).toEqual([
+      'o-idea',
+      'o-idea',
+      'o-idea',
+    ]);
+  });
+
+  it('checks a chosen offering or audience against the project business, and creates nothing when refused', async () => {
+    const { svc, create, enqueue, focusProblem } = setup(3, { problem: 'Offering not found in this business' });
+    await expect(
+      svc.generate('t1', { brief: 'یک پست دربارهٔ قهوهٔ تازه', offeringId: 'x' }, user),
+    ).rejects.toThrow(BadRequestException);
+    expect(focusProblem).toHaveBeenCalledWith('b1', expect.objectContaining({ offeringId: 'x' }));
+    expect(create).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
   });
 });

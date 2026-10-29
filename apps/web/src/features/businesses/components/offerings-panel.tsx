@@ -98,11 +98,11 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
   const running = tracker.isRunning && !!jobId;
   const soon = peakingSoon(confirmed.filter((o) => o.isActive));
 
-  const propose = () =>
-    extract.mutate(undefined, {
+  const propose = (parentId?: string) =>
+    extract.mutate(parentId ? { parentId } : undefined, {
       onSuccess: (r) => {
         setJobId(r.jobId);
-        notify.success(t('businesses.offerings.queued'));
+        notify.success(t(parentId ? 'businesses.offerings.variantsQueued' : 'businesses.offerings.queued'));
       },
       onError: (e) => notify.error(t('common.error'), e.message),
     });
@@ -130,7 +130,7 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
                 icon={<Sparkles />}
                 disabled={full || running}
                 isLoading={extract.isPending}
-                onClick={propose}
+                onClick={() => propose()}
               >
                 {t('businesses.offerings.extract')}
               </Button>
@@ -194,6 +194,7 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
                     canEdit={canEdit}
                     canAddVariant={!full && offeringParentProblem({ parentId: o.id, rows: confirmed }) === null}
                     onAddVariant={() => setEditing({ offering: null, parentId: o.id })}
+                    onProposeVariants={running ? undefined : () => propose(o.id)}
                     onEdit={() => setEditing({ offering: o })}
                   />
                 ))}
@@ -231,6 +232,7 @@ function OfferingRow({
   canEdit,
   canAddVariant = false,
   onAddVariant,
+  onProposeVariants,
   onEdit,
 }: {
   businessId: string;
@@ -243,6 +245,8 @@ function OfferingRow({
   canEdit: boolean;
   canAddVariant?: boolean;
   onAddVariant?: () => void;
+  /** Ask the model for the variants of this line (docs/73). */
+  onProposeVariants?: () => void;
   onEdit: () => void;
 }) {
   const t = useT();
@@ -363,6 +367,17 @@ function OfferingRow({
                 onClick={onAddVariant}
               >
                 <Plus />
+              </Button>
+            )}
+            {canAddVariant && onProposeVariants && (
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={t('businesses.offerings.proposeVariants')}
+                title={t('businesses.offerings.proposeVariants')}
+                onClick={onProposeVariants}
+              >
+                <Sparkles />
               </Button>
             )}
             <Button size="icon" variant="ghost" aria-label={t('common.edit')} onClick={onEdit}>

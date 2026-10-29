@@ -102,6 +102,26 @@ export interface DocooBusinessExport {
     verified: boolean;
     isActive: boolean;
     updatedAt: string;
+    /** The line it belongs to (docs/73); null = a top-level offering. Additive. */
+    parentId: string | null;
+    /** Phrases never to write about it (docs/73). Additive. */
+    guardrails: string[];
+    /** Audiences it is for, main first (docs/73). Additive. */
+    audiences: { segmentId: string; fit: number }[];
+  }[];
+  /** Markets and personas (docs/73); no internal note. Additive; sorted by kind, order, name, id. */
+  segments: {
+    id: string;
+    kind: 'MARKET' | 'PERSONA';
+    name: string;
+    summary: string;
+    goals: string[];
+    pains: string[];
+    objections: string[];
+    channels: string[];
+    messageAngle: string;
+    isActive: boolean;
+    updatedAt: string;
   }[];
   terms: {
     id: string;

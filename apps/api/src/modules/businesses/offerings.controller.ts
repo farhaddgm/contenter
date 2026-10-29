@@ -1,9 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
 import {
   CreateBusinessOfferingSchema,
+  OfferingsExtractRequestSchema,
   SetOfferingSegmentsSchema,
   UpdateBusinessOfferingSchema,
   type CreateBusinessOfferingInput,
+  type OfferingsExtractRequest,
   type SetOfferingSegmentsInput,
   type UpdateBusinessOfferingInput,
 } from '@contenter/shared';
@@ -35,8 +37,12 @@ export class OfferingsController {
 
   @BusinessScoped('business')
   @Post('businesses/:id/offerings/extract')
-  extract(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.offerings.extract(id, user);
+  extract(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(OfferingsExtractRequestSchema)) body: OfferingsExtractRequest,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.offerings.extract(id, user, body);
   }
 
   @BusinessScoped('businessOffering')

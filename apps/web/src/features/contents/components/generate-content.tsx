@@ -11,6 +11,8 @@ import { notify } from '@/stores/notifications';
 import { formatNumber } from '@/utils/format';
 import { useIdeas } from '@/features/ideas/api/ideas';
 import { FocusNote } from '@/features/topics/components/focus-note';
+import { useFocusOptions } from '@/features/businesses/api/focus';
+import { useTopic } from '@/features/topics/api/topics';
 import { useGenerateContent } from '../api/contents';
 import { useVariantLimit } from '../api/variants';
 import { EconomyToggle } from './economy-toggle';
@@ -39,6 +41,11 @@ export function GenerateContentDialog({
   const limit = useVariantLimit(topicId);
   const maxVariants = limit.data?.maxVariants ?? 1;
   const [economy, setEconomy] = useState(false);
+  // what these drafts are about (docs/73); empty = the idea's, else the project's
+  const { data: topic } = useTopic(topicId);
+  const focus = useFocusOptions(topic?.businessId);
+  const [offeringId, setOfferingId] = useState('');
+  const [segmentId, setSegmentId] = useState('');
   const ideas = useIdeas(topicId, { page: 1, pageSize: 100 });
 
   const usable = ideas.data?.items.filter((i) => i.status !== 'REJECTED') ?? [];
@@ -52,6 +59,8 @@ export function GenerateContentDialog({
         format: (format || undefined) as (typeof ContentFormat)[number] | undefined,
         variants: Math.min(variants, maxVariants),
         economy: economy || undefined,
+        offeringId: offeringId || undefined,
+        segmentId: segmentId || undefined,
       },
       {
         onSuccess: (r) => {
@@ -131,6 +140,32 @@ export function GenerateContentDialog({
             />
           )}
         </Field>
+        {focus.offeringOptions.length > 0 && (
+          <Field label={t('contents.focusOffering')}>
+            {(id) => (
+              <Select
+                id={id}
+                value={offeringId}
+                onChange={(e) => setOfferingId(e.target.value)}
+                placeholder={t('contents.focusDefault')}
+                options={focus.offeringOptions}
+              />
+            )}
+          </Field>
+        )}
+        {focus.segmentOptions.length > 0 && (
+          <Field label={t('contents.focusSegment')}>
+            {(id) => (
+              <Select
+                id={id}
+                value={segmentId}
+                onChange={(e) => setSegmentId(e.target.value)}
+                placeholder={t('contents.focusDefault')}
+                options={focus.segmentOptions}
+              />
+            )}
+          </Field>
+        )}
         {maxVariants > 1 && (
           <Field label={t('variants.count')} hint={t('variants.costHint')}>
             {(id) => (

@@ -352,6 +352,17 @@ export function compareOfferings(
 /** Most rows one extraction may propose. */
 export const OFFERING_EXTRACT_MAX = 40;
 
+/**
+ * Body of `POST /businesses/:id/offerings/extract`: with a `parentId` the model is asked for the
+ * variants of that offering only (docs/73 §6 G); without one, for the offerings of the whole business.
+ */
+export const OfferingsExtractRequestSchema = z.object({
+  parentId: z.string().trim().min(1).max(64).optional(),
+});
+export type OfferingsExtractRequest = z.infer<typeof OfferingsExtractRequestSchema>;
+/** Most variants one proposal for a line may return. */
+export const OFFERING_VARIANTS_EXTRACT_MAX = 12;
+
 /** What BUSINESS_OFFERINGS_EXTRACT returns (the runner checks every row with code before saving). */
 export const OfferingsExtractSchema = z.object({
   offerings: z

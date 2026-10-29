@@ -208,6 +208,25 @@ describe('OfferingsPanel: product tree and audiences (docs/73)', () => {
     });
 }, 20_000);
 
+  it('asks the model for the variants of one line, not for the whole business', async () => {
+    state.rows = tree();
+    render(<OfferingsPanel businessId="b1" />);
+    const line = screen.getByText('تسهیلات ویپاد').closest('li')!;
+    await userEvent.click(within(line).getByRole('button', { name: t('businesses.offerings.proposeVariants') }));
+    expect(state.extract.mock.calls[0]![0]).toEqual({ parentId: 'l' });
+  });
+
+  it('offers no variant proposal below the last level', () => {
+    state.rows = [
+      row({ id: 'l', name: 'خط' }),
+      row({ id: 'p', name: 'محصول', parentId: 'l' }),
+      row({ id: 'v', name: 'گونه', parentId: 'p' }),
+    ];
+    render(<OfferingsPanel businessId="b1" />);
+    const variant = screen.getByText('گونه').closest('li')!;
+    expect(within(variant).queryByRole('button', { name: t('businesses.offerings.proposeVariants') })).toBeNull();
+  });
+
   it('offers no variant button below the last level', () => {
     state.rows = [
       row({ id: 'l', name: 'خط' }),

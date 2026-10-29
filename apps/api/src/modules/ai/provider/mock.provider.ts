@@ -5,6 +5,7 @@ import {
   type BusinessDiscoveryResult,
   type BusinessAssetAnalysis,
   type OfferingsExtract,
+  type SegmentsPropose,
   type StyleBuild,
   type BusinessAuditResult,
   type BusinessReviseResult,
@@ -300,6 +301,37 @@ export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvide
             : [],
           notes: 'خروجی آزمایشی (mock).',
         } satisfies OfferingsExtract;
+      }
+      case 'BUSINESS_SEGMENTS_PROPOSE': {
+        // proposes the first line of the first source as a persona, so its quote can be found
+        const sources = /<sources>\n([\s\S]*?)\n<\/sources>/.exec(req.user)?.[1] ?? '';
+        const line = sources
+          .split('\n')
+          .map((l) => l.trim())
+          .find((l) => l && !/^\[[SR]\d+\]/.test(l));
+        const quote = (line ?? '')
+          .replace(/^[-*#\s]+/, '')
+          .replace(/\*\*/g, '')
+          .slice(0, 80);
+        return {
+          segments: quote
+            ? [
+                {
+                  kind: 'PERSONA' as const,
+                  name: 'مخاطب آزمایشی',
+                  summary: '',
+                  goals: [],
+                  pains: [],
+                  objections: [],
+                  channels: [],
+                  messageAngle: '',
+                  offerings: [],
+                  evidence: quote,
+                },
+              ]
+            : [],
+          notes: 'خروجی آزمایشی (mock).',
+        } satisfies SegmentsPropose;
       }
       case 'BUSINESS_ASSET_ANALYZE':
         return {

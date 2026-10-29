@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Check, Pencil, Plus, Sparkles, Trash2, Users } from 'lucide-react';
 import {
   BUSINESS_SEGMENT_LIMIT,
   SEGMENT_POINTS_MAX,
@@ -15,12 +15,17 @@ import { Drawer } from '@/components/ui/dialog';
 import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-controls';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
+import { useTrackJob } from '@/features/jobs/api/jobs';
+import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { notify } from '@/stores/notifications';
 import { formatNumber } from '@/utils/format';
 import { useCanEditBusiness } from '../api/businesses';
 import {
+  segmentKeys,
+  useConfirmSegment,
   useCreateSegment,
   useDeleteSegment,
+  useProposeSegments,
   useSegments,
   useUpdateSegment,
 } from '../api/segments';
@@ -35,6 +40,24 @@ export function SegmentsPanel({ businessId }: { businessId: string }) {
   const { data: rows, isLoading } = useSegments(businessId);
   const [editing, setEditing] = useState<BusinessSegment | 'new' | null>(null);
   const full = (rows?.length ?? 0) >= BUSINESS_SEGMENT_LIMIT;
+  const propose = useProposeSegments(businessId);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const tracker = useTrackJob(jobId, {
+    invalidate: [segmentKeys.list(businessId)],
+    onDone: () => setJobId(null),
+  });
+  const running = tracker.isRunning && !!jobId;
+  // AI proposals wait apart from the audiences in use
+  const pending = (rows ?? []).filter((s) => !s.verified);
+  const confirmed = (rows ?? []).filter((s) => s.verified);
+  const ask = () =>
+    propose.mutate(undefined, {
+      onSuccess: (r) => {
+        setJobId(r.jobId);
+        notify.success(t('businesses.segments.queued'));
+      },
+      onError: (e) => notify.error(t('common.error'), e.message),
+    });
 
   return (
     <Card>
@@ -49,13 +72,31 @@ export function SegmentsPanel({ businessId }: { businessId: string }) {
         descriptionAsTip
         actions={
           canEdit && (
-            <Button size="sm" icon={<Plus />} disabled={full} onClick={() => setEditing('new')}>
-              {t('businesses.segments.new')}
-            </Button>
+            <>
+              <Button size="sm" icon={<Plus />} disabled={full} onClick={() => setEditing('new')}>
+                {t('businesses.segments.new')}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                icon={<Sparkles />}
+                disabled={full || running}
+                isLoading={propose.isPending}
+                onClick={ask}
+              >
+                {t('businesses.segments.propose')}
+              </Button>
+            </>
           )
         }
       />
       <CardBody className="space-y-3">
+        {running && (
+          <AiWorkingBanner
+            title={t('businesses.segments.proposing')}
+            hint={t('businesses.segments.proposingHint')}
+          />
+        )}
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Spinner />
@@ -65,17 +106,40 @@ export function SegmentsPanel({ businessId }: { businessId: string }) {
             {t('businesses.segments.empty')}
           </p>
         ) : (
-          <ul className="space-y-2">
-            {rows.map((s) => (
-              <SegmentRow
-                key={s.id}
-                businessId={businessId}
-                segment={s}
-                canEdit={canEdit}
-                onEdit={() => setEditing(s)}
-              />
-            ))}
-          </ul>
+          <>
+            {pending.length > 0 && (
+              <section className="space-y-2">
+                <div>
+                  <h3 className="text-sm font-semibold">{t('businesses.segments.pendingTitle')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('businesses.segments.pendingHint')}</p>
+                </div>
+                <ul className="space-y-2">
+                  {pending.map((s) => (
+                    <SegmentRow
+                      key={s.id}
+                      businessId={businessId}
+                      segment={s}
+                      canEdit={canEdit}
+                      onEdit={() => setEditing(s)}
+                    />
+                  ))}
+                </ul>
+              </section>
+            )}
+            {confirmed.length > 0 && (
+              <ul className="space-y-2">
+                {confirmed.map((s) => (
+                  <SegmentRow
+                    key={s.id}
+                    businessId={businessId}
+                    segment={s}
+                    canEdit={canEdit}
+                    onEdit={() => setEditing(s)}
+                  />
+                ))}
+              </ul>
+            )}
+          </>
         )}
         <p className="text-xs text-muted-foreground">
           {t('businesses.segments.limit', { count: formatNumber(BUSINESS_SEGMENT_LIMIT) })}
@@ -106,6 +170,7 @@ function SegmentRow({
   const t = useT();
   const remove = useDeleteSegment(businessId);
   const toggle = useUpdateSegment(businessId, s.id);
+  const confirm = useConfirmSegment(businessId);
   return (
     <li className="rounded-lg border px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -113,6 +178,7 @@ function SegmentRow({
           <p className="flex flex-wrap items-center gap-2 font-semibold" data-bidi="">
             {s.name}
             <Badge tone={s.kind === 'MARKET' ? 'primary' : 'outline'}>{t(`enums.segmentKind.${s.kind}`)}</Badge>
+            {s.source === 'AI' && <Badge tone="neutral">{t('businesses.segments.ai')}</Badge>}
             {s.offeringIds.length > 0 ? (
               <Badge tone="neutral">
                 {t('businesses.segments.linked', { count: formatNumber(s.offeringIds.length) })}
@@ -132,16 +198,38 @@ function SegmentRow({
               {s.messageAngle}
             </p>
           )}
+          {!s.verified && s.evidence && (
+            <blockquote className="border-s-2 ps-3 text-xs leading-6 text-muted-foreground" data-bidi="">
+              <span className="font-semibold">{t('businesses.segments.evidence')}: </span>
+              {s.evidence}
+            </blockquote>
+          )}
         </div>
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
-            <Switch
-              checked={s.isActive}
-              label={t('businesses.offerings.fields.active')}
-              onCheckedChange={(isActive) =>
-                toggle.mutate({ isActive }, { onError: (e) => notify.error(t('common.error'), e.message) })
-              }
-            />
+            {s.verified ? (
+              <Switch
+                checked={s.isActive}
+                label={t('businesses.offerings.fields.active')}
+                onCheckedChange={(isActive) =>
+                  toggle.mutate({ isActive }, { onError: (e) => notify.error(t('common.error'), e.message) })
+                }
+              />
+            ) : (
+              <Button
+                size="sm"
+                icon={<Check />}
+                isLoading={confirm.isPending}
+                onClick={() =>
+                  confirm.mutate(s.id, {
+                    onSuccess: () => notify.success(t('businesses.segments.confirmed')),
+                    onError: (e) => notify.error(t('common.error'), e.message),
+                  })
+                }
+              >
+                {t('businesses.segments.confirm')}
+              </Button>
+            )}
             <Button size="icon" variant="ghost" aria-label={t('common.edit')} onClick={onEdit}>
               <Pencil />
             </Button>

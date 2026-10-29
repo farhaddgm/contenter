@@ -303,6 +303,9 @@ export const UpdateIdeaSchema = z.object({
   title: z.string().trim().min(2).max(300).optional(),
   angle: z.string().trim().max(5000).optional(),
   hook: z.string().trim().max(2000).optional(),
+  /** The idea's own offering and audience (docs/73); null = the project's. */
+  offeringId: z.string().trim().min(1).max(64).nullable().optional(),
+  segmentId: z.string().trim().min(1).max(64).nullable().optional(),
 });
 export type UpdateIdeaInput = z.infer<typeof UpdateIdeaSchema>;
 
@@ -386,6 +389,9 @@ export const GenerateContentSchema = z
     variants: z.number().int().min(1).max(3).optional().default(1),
     /** Economy mode: about half the price, the result comes within 24 hours (docs/60). */
     economy: z.boolean().optional(),
+    /** The offering and audience these drafts are about; empty = the idea's, else the project's (docs/73). */
+    offeringId: z.string().trim().min(1).max(64).nullish(),
+    segmentId: z.string().trim().min(1).max(64).nullish(),
   })
   .refine((v) => !!v.ideaId || (v.brief ?? '').length >= 10, {
     message: 'Either ideaId or a brief (min 10 chars) is required',

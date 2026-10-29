@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, type AiJob } from '@prisma/client';
 import {
   BUSINESS_OFFERING_LIMIT,
+  OFFERING_VARIANTS_EXTRACT_MAX,
   OfferingsExtractSchema,
+  offeringParentProblem,
   resolveOfferingProposals,
 } from '@contenter/shared';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
@@ -11,13 +13,7 @@ import { AiExecutor } from '../ai-executor.service';
 import { formatBusiness } from '../context';
 import { NonRetryableAiError } from '../provider/ai-provider';
 import type { AiRunner, RunnerResult } from './runner';
-
-/** Text of the products & services section sent to the model, at most. */
-const SERVICES_CHARS = 8_000;
-/** Key facts sent, at most. */
-const FACTS_CHARS = 6_000;
-/** Reference text sent, shared equally between the references. */
-const REFERENCES_CHARS = 60_000;
+import { sourceBlocks } from './source-material';
 
 /**
  * Proposes catalog rows for a business from its stored material (docs/67-business-catalog.md): the
@@ -25,6 +21,7 @@ const REFERENCES_CHARS = 60_000;
  * what it finds; `resolveOfferingProposals` (code) keeps a row only when its quote really occurs in
  * the text the model was given, and keeps a price only when that quote states it. Rows are saved
  * inactive and unverified: they reach no prompt, check or export until the admin confirms them.
+ * With `input.parentId` it proposes only the variants of that offering (docs/73), saved under it.
  */
 @Injectable()
 export class BusinessOfferingsExtractRunner implements AiRunner {
@@ -42,10 +39,12 @@ export class BusinessOfferingsExtractRunner implements AiRunner {
     });
     if (!b) throw new NonRetryableAiError('The business no longer exists');
 
+    // the line whose variants are asked for: it must still be an offering of this business with room under it
+    const { parentId } = (job.input ?? {}) as { parentId?: string };
     const [existing, facts, refs] = await Promise.all([
       this.prisma.businessOffering.findMany({
         where: { businessId: b.id },
-        select: { name: true, aliases: true },
+        select: { id: true, parentId: true, name: true, aliases: true, summary: true, features: true },
       }),
       this.prisma.businessFact.findMany({
         where: { businessId: b.id, isActive: true },
@@ -58,34 +57,29 @@ export class BusinessOfferingsExtractRunner implements AiRunner {
         select: { title: true, url: true, content: true },
       }),
     ]);
-    const room = BUSINESS_OFFERING_LIMIT - existing.length;
+    const parent = parentId ? existing.find((o) => o.id === parentId) : undefined;
+    if (parentId) {
+      if (!parent) throw new NonRetryableAiError('The offering to add variants to no longer exists');
+      const problem = offeringParentProblem({ parentId, rows: existing });
+      if (problem) throw new NonRetryableAiError(problem);
+    }
+    const room = Math.min(
+      BUSINESS_OFFERING_LIMIT - existing.length,
+      parentId ? OFFERING_VARIANTS_EXTRACT_MAX : Infinity,
+    );
     if (room <= 0) throw new NonRetryableAiError('The catalog is full');
 
     // each source is cut before it is sent, and the evidence is checked against the cut text
-    const sourceTexts: string[] = [];
-    const blocks: string[] = [];
-    const add = (head: string, text: string) => {
-      const body = text.trim();
-      if (!body) return;
-      sourceTexts.push(body);
-      blocks.push(`${head}\n${body}`);
-    };
-    const services = b.sections.find((s) => s.key === 'SERVICES')?.content ?? '';
-    add('[S1] Products & services section of the profile', services.slice(0, SERVICES_CHARS));
-    add(
-      '[S2] Key facts',
-      facts
-        .map((f) => `${f.label}: ${f.value}`)
-        .join('\n')
-        .slice(0, FACTS_CHARS),
-    );
-    const share = Math.max(
-      2_000,
-      Math.floor(REFERENCES_CHARS / Math.max(1, refs.length)),
-    );
-    refs.forEach((r, i) =>
-      add(`[R${i + 1}] ${r.title || r.url || 'Untitled'}${r.url ? ` — ${r.url}` : ''}`, r.content.slice(0, share)),
-    );
+    const { blocks, texts: sourceTexts } = sourceBlocks({
+      sections: [
+        {
+          title: 'Products & services section of the profile',
+          text: b.sections.find((s) => s.key === 'SERVICES')?.content ?? '',
+        },
+      ],
+      facts,
+      references: refs,
+    });
     if (!sourceTexts.length) throw new NonRetryableAiError('There is nothing to read yet');
 
     const result = await this.ai.execute({
@@ -99,6 +93,11 @@ export class BusinessOfferingsExtractRunner implements AiRunner {
           ? existing.map((o) => [o.name, ...o.aliases].join(' | ')).join('\n')
           : '(none)',
         sources: blocks.join('\n\n'),
+        scope: parent
+          ? `Only the VARIANTS of "${parent.name}" (its types, plans, tiers or versions that the sources name)${
+              parent.summary ? `. About it: ${parent.summary}` : ''
+            }. Never list "${parent.name}" itself or any other offering.`
+          : '(all offerings of the business)',
       },
     });
 
@@ -125,6 +124,7 @@ export class BusinessOfferingsExtractRunner implements AiRunner {
             priceFrom: row.priceFrom,
             priceUnit: row.priceUnit,
             evidence: row.evidence,
+            parentId: parent?.id ?? null,
             // AI-proposed: unused until the admin confirms it
             source: 'AI',
             verified: false,

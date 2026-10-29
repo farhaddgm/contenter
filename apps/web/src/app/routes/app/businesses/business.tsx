@@ -58,6 +58,7 @@ import { ContextPreviewPanel } from '@/features/businesses/components/context-pr
 import { NotesCard } from '@/features/businesses/components/notes-card';
 import { ProfileQuestionsCard } from '@/features/businesses/components/profile-questions-card';
 import { CompetitorsPanel } from '@/features/businesses/components/competitors-panel';
+import { OfferingCoverageCard } from '@/features/pillars/components/offering-coverage';
 import { OfferingsPanel } from '@/features/businesses/components/offerings-panel';
 import { SegmentsPanel } from '@/features/businesses/components/segments-panel';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
@@ -311,6 +312,7 @@ export default function BusinessRoute() {
             {tab === 'coverage' && (
               <>
                 <CoverageMap businessId={business.id} />
+                <OfferingCoverageCard businessId={business.id} />
                 <StaleCard businessId={business.id} />
                 <PillarsCard businessId={business.id} />
               </>
@@ -331,6 +333,7 @@ export default function BusinessRoute() {
                   onGoto={(action, q) => {
                     if (action === 'GOTO_FACTS') return setTab('knowledge');
                     if (action === 'GOTO_OFFERINGS') return setTab('offerings');
+                    if (action === 'GOTO_AUDIENCES') return setTab('audiences');
                     if (action === 'GOTO_COMPETITORS') return setTab('competitors');
                     return jumpTo(`section-${q.sectionKey}`);
                   }}

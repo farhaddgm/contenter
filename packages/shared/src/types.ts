@@ -247,6 +247,9 @@ export interface Idea {
   rationale: string;
   score: number;
   status: IdeaStatus;
+  /** The idea's own offering and audience (docs/73); null = the project's. */
+  offeringId?: string | null;
+  segmentId?: string | null;
   createdAt: ISODate;
   tags?: Tag[];
 }

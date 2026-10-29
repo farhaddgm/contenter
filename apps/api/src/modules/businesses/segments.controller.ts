@@ -31,6 +31,19 @@ export class SegmentsController {
     return this.segments.create(id, body, user);
   }
 
+  /** Asks the model to propose audiences; they wait, unused, for the admin to confirm them. */
+  @BusinessScoped('business')
+  @Post('businesses/:id/segments/propose')
+  propose(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.segments.propose(id, user);
+  }
+
+  @BusinessScoped('businessSegment')
+  @Post('business-segments/:id/confirm')
+  confirm(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.segments.confirm(id, user);
+  }
+
   @BusinessScoped('businessSegment')
   @Patch('business-segments/:id')
   update(

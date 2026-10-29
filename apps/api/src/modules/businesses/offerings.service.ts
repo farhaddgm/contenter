@@ -9,6 +9,7 @@ import {
   parseClaims,
   SetOfferingSegmentsSchema,
   UpdateBusinessOfferingSchema,
+  type OfferingsExtractRequest,
   offeringProblems,
   priceText,
   type BusinessOffering,
@@ -327,7 +328,16 @@ export class OfferingsService {
    * Queues the model to propose rows from the profile and the references. It only reads what is
    * already stored; the runner checks every proposal against its quote before saving anything.
    */
-  async extract(businessId: string, user: AuthUser) {
+  async extract(businessId: string, user: AuthUser, request: OfferingsExtractRequest = {}) {
+    // variants of one line (docs/73): the line must be an offering of this business with room under it
+    if (request.parentId) {
+      const rows = await this.prisma.businessOffering.findMany({
+        where: { businessId },
+        select: { id: true, parentId: true },
+      });
+      const problem = offeringParentProblem({ parentId: request.parentId, rows });
+      if (problem) throw new BadRequestException(problem);
+    }
     const [services, facts, references, count, running] = await Promise.all([
       this.prisma.businessSection.count({ where: { businessId, key: 'SERVICES', content: { not: '' } } }),
       this.prisma.businessFact.count({ where: { businessId, isActive: true } }),
@@ -357,10 +367,10 @@ export class OfferingsService {
       type: 'BUSINESS_OFFERINGS_EXTRACT',
       targetType: 'Business',
       targetId: businessId,
-      input: {},
+      input: request.parentId ? { parentId: request.parentId } : {},
       userId: user.id,
     });
-    this.log(user, businessId, 'extract', { jobId: job.id });
+    this.log(user, businessId, 'extract', { jobId: job.id, ...(request.parentId ? { parentId: request.parentId } : {}) });
     return { jobId: job.id };
   }
 }

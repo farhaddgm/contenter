@@ -17,6 +17,14 @@ export const FOCUS_SIBLINGS_MAX = 8;
 /** Audiences of the focused offering shown in full when none was chosen (main audiences first). */
 export const FOCUS_SEGMENTS_MAX = 3;
 
+/**
+ * With an audience in focus, the brand-wide market and persona sections give way to it (docs/73 §4):
+ * they are cut to this many characters, and the audience itself is printed in full in `[FOCUS]`. The
+ * cut shows in the context preview as a cut section. Without a focused audience nothing changes.
+ */
+export const FOCUS_BRAND_SECTION_CHARS = 1_500;
+export const FOCUS_TRIMMED_SECTIONS = ['TARGET_MARKET', 'PERSONAS'] as const;
+
 const focusId = z.string().trim().min(1).max(64).nullish();
 
 /** Fields a topic and a content carry; `null` clears, absent leaves as it is. */

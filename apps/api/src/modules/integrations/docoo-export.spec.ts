@@ -107,6 +107,33 @@ function row(overrides: Partial<ExportRow> = {}): ExportRow {
         updatedById: 'person-77',
         createdAt: at(1),
         updatedAt: at(2),
+        parentId: 'o0',
+        guardrails: ['سود تضمینی'],
+        // unsorted on purpose: the document puts the main audience first
+        segmentLinks: [
+          { segmentId: 's2', fit: 1 },
+          { segmentId: 's1', fit: 2 },
+        ],
+      },
+    ],
+    segments: [
+      {
+        id: 's1',
+        businessId: 'biz1',
+        kind: 'PERSONA',
+        name: 'کارمند',
+        summary: 'حقوق‌بگیر',
+        goals: ['خرید لپ‌تاپ'],
+        pains: ['وثیقه'],
+        objections: [],
+        channels: ['اینستاگرام'],
+        messageAngle: 'بدون وثیقه',
+        note: 'یادداشت داخلی مخاطب',
+        isActive: true,
+        sortOrder: 3,
+        updatedById: 'person-77',
+        createdAt: at(1),
+        updatedAt: at(2),
       },
     ],
     terms: [
@@ -265,8 +292,31 @@ describe('Docoo export (docs/18)', () => {
         verified: true,
         isActive: true,
         updatedAt: at(2).toISOString(),
+        parentId: 'o0',
+        guardrails: ['سود تضمینی'],
+        audiences: [
+          { segmentId: 's1', fit: 2 },
+          { segmentId: 's2', fit: 1 },
+        ],
       },
     ]);
+    // audiences carry no internal note, no person and no order number
+    expect(out.segments).toEqual([
+      {
+        id: 's1',
+        kind: 'PERSONA',
+        name: 'کارمند',
+        summary: 'حقوق‌بگیر',
+        goals: ['خرید لپ‌تاپ'],
+        pains: ['وثیقه'],
+        objections: [],
+        channels: ['اینستاگرام'],
+        messageAngle: 'بدون وثیقه',
+        isActive: true,
+        updatedAt: at(2).toISOString(),
+      },
+    ]);
+    expect(JSON.stringify(out)).not.toContain('یادداشت داخلی مخاطب');
     expect(out.terms[0]).toMatchObject({
       term: 'ویپاد',
       kind: 'USE',

@@ -218,7 +218,12 @@ export class ContentsService {
   /** Creates the content shell (status GENERATING) and queues the AI draft. */
   async generate(topicId: string, input: GenerateContentInput, user: AuthUser) {
     const data = GenerateContentSchema.parse(input);
-    await this.prisma.topic.findUniqueOrThrow({ where: { id: topicId } });
+    const topic = await this.prisma.topic.findUniqueOrThrow({
+      where: { id: topicId },
+      select: { businessId: true },
+    });
+    const focusProblem = await this.businesses.focusProblem(topic.businessId, data);
+    if (focusProblem) throw new BadRequestException(focusProblem);
     const idea = data.ideaId
       ? await this.prisma.idea.findFirst({
           where: { id: data.ideaId, topicId },
@@ -249,6 +254,9 @@ export class ContentsService {
           createdById: user.id,
           variantGroupId,
           variantAngle: angle,
+          // what the draft is about: the one chosen for it, else the idea's; empty follows the project (docs/73)
+          offeringId: data.offeringId ?? idea?.offeringId ?? null,
+          segmentId: data.segmentId ?? idea?.segmentId ?? null,
           // a content written from a tagged idea starts with the idea's tags
           ...(idea?.tags.length ? { tags: { connect: idea.tags } } : {}),
         },
@@ -441,14 +449,8 @@ export class ContentsService {
         where: { id },
         select: { topic: { select: { businessId: true } } },
       });
-      const businessId = content?.topic.businessId;
-      if (!businessId) throw new BadRequestException('The project has no business');
-      if (input.offeringId && !(await this.businesses.hasOffering(businessId, input.offeringId))) {
-        throw new BadRequestException('Offering not found in this business');
-      }
-      if (input.segmentId && !(await this.businesses.hasSegment(businessId, input.segmentId))) {
-        throw new BadRequestException('Audience not found in this business');
-      }
+      const problem = await this.businesses.focusProblem(content?.topic.businessId, input);
+      if (problem) throw new BadRequestException(problem);
     }
     if (input.pillarId) {
       const content = await this.prisma.content.findUnique({

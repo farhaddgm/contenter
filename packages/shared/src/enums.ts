@@ -152,6 +152,7 @@ export const AiJobType = [
   'EMBED_REFERENCE',
   'BUSINESS_STYLE_BUILD',
   'BUSINESS_OFFERINGS_EXTRACT',
+  'BUSINESS_SEGMENTS_PROPOSE',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 

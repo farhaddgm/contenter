@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   BusinessSegment,
   CreateBusinessSegmentInput,
+  JobAccepted,
   UpdateBusinessSegmentInput,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
@@ -53,5 +54,21 @@ export function useDeleteSegment(businessId: string) {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/business-segments/${id}`),
     onSuccess: invalidate,
+  });
+}
+
+/** The admin read an AI-proposed audience and accepts it. */
+export function useConfirmSegment(businessId: string) {
+  const invalidate = useInvalidateSegments(businessId);
+  return useMutation({
+    mutationFn: (id: string) => api.post<BusinessSegment>(`/business-segments/${id}/confirm`),
+    onSuccess: invalidate,
+  });
+}
+
+/** Asks the model to propose audiences; they wait, unused, for the admin to confirm them. */
+export function useProposeSegments(businessId: string) {
+  return useMutation({
+    mutationFn: () => api.post<JobAccepted>(`/businesses/${businessId}/segments/propose`),
   });
 }

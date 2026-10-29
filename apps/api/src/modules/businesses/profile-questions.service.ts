@@ -2,18 +2,45 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   answerableSection,
   buildProfileQuestions,
+  isOfferingAvailable,
   isWriteBlocked,
   parseClaims,
   peakingSoon,
   unprovenClaims,
   type AnswerProfileQuestionInput,
   type BusinessSectionKey,
+  type OfferingCore,
   type ProfileQuestionList,
 } from '@contenter/shared';
 import { type AuthUser } from '../../common/auth.decorators';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { writeSection } from './section-writer';
+
+/**
+ * Which offerings have no audience and which audiences have no offering (docs/73). An offering that
+ * cannot be sold, is not to be pushed, or is a line whose variants carry the audiences is not asked
+ * about.
+ */
+export function audienceGaps(
+  offerings: readonly (Pick<OfferingCore, 'status' | 'stock' | 'push' | 'availableFrom' | 'availableUntil'> & {
+    id: string;
+    parentId: string | null;
+  })[],
+  segments: readonly { id: string }[],
+  links: readonly { offeringId: string; segmentId: string }[],
+  now: Date,
+) {
+  const hasChild = new Set(offerings.map((o) => o.parentId).filter((p): p is string => !!p));
+  const linkedOfferings = new Set(links.map((l) => l.offeringId));
+  const linkedSegments = new Set(links.map((l) => l.segmentId));
+  return {
+    offeringsWithoutAudience: offerings.filter(
+      (o) => !hasChild.has(o.id) && isOfferingAvailable(o, now) && o.push > 0 && !linkedOfferings.has(o.id),
+    ).length,
+    segmentsWithoutOffering: segments.filter((s) => !linkedSegments.has(s.id)).length,
+  };
+}
 
 /**
  * The questions that fill the gaps of a profile (docs/72). Everything here is read and counted by
@@ -29,7 +56,7 @@ export class ProfileQuestionsService {
 
   async list(businessId: string, user: AuthUser, now = new Date()): Promise<ProfileQuestionList> {
     const usable = { businessId, isActive: true, verified: true };
-    const [sections, facts, competitors, offerings, skips] = await Promise.all([
+    const [sections, facts, competitors, offerings, skips, segments, links] = await Promise.all([
       this.prisma.businessSection.findMany({
         where: { businessId },
         select: { key: true, content: true, source: true, reviewedAt: true, updatedAt: true, lock: true },
@@ -38,9 +65,24 @@ export class ProfileQuestionsService {
       this.prisma.businessCompetitor.count({ where: { businessId, isActive: true } }),
       this.prisma.businessOffering.findMany({
         where: usable,
-        select: { claims: true, status: true, stock: true, peakMonths: true, availableFrom: true, availableUntil: true },
+        select: {
+          id: true,
+          parentId: true,
+          push: true,
+          claims: true,
+          status: true,
+          stock: true,
+          peakMonths: true,
+          availableFrom: true,
+          availableUntil: true,
+        },
       }),
       this.prisma.businessQuestionSkip.findMany({ where: { businessId }, select: { code: true } }),
+      this.prisma.businessSegment.findMany({ where: { businessId, isActive: true }, select: { id: true } }),
+      this.prisma.offeringSegment.findMany({
+        where: { offering: usable, segment: { businessId, isActive: true } },
+        select: { offeringId: true, segmentId: true },
+      }),
     ]);
     const claims = offerings.map((o) => parseClaims(o.claims));
     const blocked = sections
@@ -55,6 +97,8 @@ export class ProfileQuestionsService {
         offeringsWithoutClaims: claims.filter((c) => c.length === 0).length,
         unprovenClaims: claims.reduce((n, c) => n + unprovenClaims(c), 0),
         peakSoon: peakingSoon(offerings, now).length,
+        segments: segments.length,
+        ...audienceGaps(offerings, segments, links, now),
       },
       skipped: skips.map((s) => s.code),
       blocked,

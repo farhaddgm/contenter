@@ -48,6 +48,7 @@ function setup(o: Opts = {}) {
     {
       visibleTopics: (u: AuthUser) => (u.role === 'ADMIN' ? undefined : { createdById: u.id }),
     } as unknown as AccessService,
+    {} as never,
   );
   return { svc, tx, calls, contentFind, log };
 }
