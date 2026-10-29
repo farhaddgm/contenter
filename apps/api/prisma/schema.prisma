@@ -659,24 +659,30 @@ enum SegmentKind {
 
 /// An audience of a business: a market segment or a persona, typed by the admin (docs/73)
 model BusinessSegment {
-  id           String      @id @default(cuid())
+  id           String        @id @default(cuid())
   businessId   String
-  kind         SegmentKind @default(PERSONA)
+  kind         SegmentKind   @default(PERSONA)
   name         String
-  summary      String      @default("")
+  summary      String        @default("")
   goals        String[]
   pains        String[]
   objections   String[]
   channels     String[]
   /// What message convinces them
-  messageAngle String      @default("")
+  messageAngle String        @default("")
   /// Internal note; never sent to a model or an integration
-  note         String      @default("")
-  isActive     Boolean     @default(true)
-  sortOrder    Int         @default(0)
+  note         String        @default("")
+  isActive     Boolean       @default(true)
+  /// Rows the admin types are verified; AI-proposed ones start unverified and inactive (docs/73)
+  source       SectionSource @default(ADMIN)
+  verified     Boolean       @default(true)
+  /// The text in a source that backs an AI-proposed audience (checked by code)
+  evidence     String        @default("")
+  jobId        String?
+  sortOrder    Int           @default(0)
   updatedById  String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   business  Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   updatedBy User?             @relation("SegmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
@@ -1595,6 +1601,8 @@ enum AiJobType {
   BUSINESS_STYLE_BUILD
   /// Proposes catalog rows from the profile and references; code checks each against its quote (docs/67)
   BUSINESS_OFFERINGS_EXTRACT
+  /// Proposes audiences (markets, personas) from the profile and references; code checks each against its quote (docs/73)
+  BUSINESS_SEGMENTS_PROPOSE
 }
 
 enum AiJobStatus {

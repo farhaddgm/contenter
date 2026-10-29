@@ -42,6 +42,7 @@ export default tseslint.config(
       'src/modules/ai/runners/business-extra.runners.ts',
       'src/modules/ai/runners/business-style.runner.ts',
       'src/modules/ai/runners/business-offerings.runner.ts',
+      'src/modules/ai/runners/business-segments.runner.ts',
       'src/modules/ai/runners/embed-reference.runner.ts',
       'src/common/access.ts',
       'src/modules/users/users.module.ts',

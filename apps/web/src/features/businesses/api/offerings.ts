@@ -80,8 +80,10 @@ export function useDeleteOffering(businessId: string) {
   });
 }
 
+/** Proposes offerings for the business, or (with `parentId`) the variants of one line (docs/73). */
 export function useExtractOfferings(businessId: string) {
   return useMutation({
-    mutationFn: () => api.post<JobAccepted>(`/businesses/${businessId}/offerings/extract`),
+    mutationFn: (request?: { parentId?: string }) =>
+      api.post<JobAccepted>(`/businesses/${businessId}/offerings/extract`, request),
   });
 }
