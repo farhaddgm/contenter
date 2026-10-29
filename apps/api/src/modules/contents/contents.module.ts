@@ -26,7 +26,7 @@ import {
   defaultFormatFor,
   variantAnglesFor,
   effectivePlatform,
-  offeringQualityRule,
+  offeringQualityRules,
   RepurposeContentSchema,
   EditContentVersionSchema,
   GenerateContentSchema,
@@ -173,7 +173,7 @@ export class ContentsService {
       format: c.format,
       terms,
       facts: topic?.business?.facts ?? [],
-      offerings: (topic?.business?.offerings ?? []).map((o) => offeringQualityRule(o)),
+      offerings: offeringQualityRules(topic?.business?.offerings ?? []),
       register: asRegister(topic?.business?.register),
     });
     return {

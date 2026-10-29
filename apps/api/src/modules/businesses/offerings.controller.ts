@@ -1,8 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
 import {
   CreateBusinessOfferingSchema,
+  SetOfferingSegmentsSchema,
   UpdateBusinessOfferingSchema,
   type CreateBusinessOfferingInput,
+  type SetOfferingSegmentsInput,
   type UpdateBusinessOfferingInput,
 } from '@contenter/shared';
 import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
@@ -45,6 +47,17 @@ export class OfferingsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.offerings.update(id, body, user);
+  }
+
+  /** Which audiences the offering is for (docs/73); replaces the list. */
+  @BusinessScoped('businessOffering')
+  @Put('business-offerings/:id/segments')
+  setSegments(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(SetOfferingSegmentsSchema)) body: SetOfferingSegmentsInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.offerings.setSegments(id, body, user);
   }
 
   @BusinessScoped('businessOffering')

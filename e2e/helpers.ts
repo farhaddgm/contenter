@@ -12,6 +12,19 @@ export const ADMIN = {
   password: process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!',
 };
 
+/**
+ * Signs in. The login route allows 10 a minute, which a fast run of the whole suite can pass: on a 429
+ * it waits for the time the server names (Retry-After) and tries again instead of failing the test.
+ */
+async function postLogin(request: APIRequestContext) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await request.post(`${API}/auth/login`, { data: ADMIN });
+    if (res.status() !== 429 || attempt >= 3) return res;
+    const wait = Number(res.headers()['retry-after']);
+    await new Promise((r) => setTimeout(r, (Number.isFinite(wait) && wait > 0 ? wait : 20) * 1000 + 500));
+  }
+}
+
 /** A small typed client of the API for setting up and checking state outside the browser. */
 export class Api {
   private constructor(
@@ -19,10 +32,17 @@ export class Api {
     private readonly token: string,
   ) {}
 
+  /** The access token of the last API login: it lives 15 minutes and needs no refresh token, so the
+   * tests share it instead of spending the login rate limit (10 a minute) twice per test. */
+  private static cached: { token: string; at: number } | null = null;
+
   static async login(request: APIRequestContext): Promise<Api> {
-    const res = await request.post(`${API}/auth/login`, { data: ADMIN });
+    if (Api.cached && Date.now() - Api.cached.at < 5 * 60_000) return new Api(request, Api.cached.token);
+    const res = await postLogin(request);
     if (!res.ok()) throw new Error(`API login failed: ${res.status()} ${await res.text()}`);
-    return new Api(request, (await res.json()).accessToken);
+    const token = (await res.json()).accessToken as string;
+    Api.cached = { token, at: Date.now() };
+    return new Api(request, token);
   }
 
   private headers() {
@@ -95,7 +115,7 @@ export const test = base.extend({
     await page.addInitScript(() =>
       localStorage.setItem('contenter-smart', JSON.stringify({ state: { enabled: false }, version: 0 })),
     );
-    const res = await page.request.post(`${API}/auth/login`, { data: ADMIN });
+    const res = await postLogin(page.request);
     if (!res.ok()) throw new Error(`sign-in failed: ${res.status()} ${await res.text()}`);
     await use(page);
   },

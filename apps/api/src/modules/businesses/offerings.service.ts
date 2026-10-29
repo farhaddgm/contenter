@@ -4,13 +4,17 @@ import {
   BUSINESS_OFFERING_LIMIT,
   CreateBusinessOfferingSchema,
   normalizeMonths,
+  offeringParentProblem,
+  orderSegmentLinks,
   parseClaims,
+  SetOfferingSegmentsSchema,
   UpdateBusinessOfferingSchema,
   offeringProblems,
   priceText,
   type BusinessOffering,
   type CreateBusinessOfferingInput,
   type PriceCurrency,
+  type SetOfferingSegmentsInput,
   type UpdateBusinessOfferingInput,
 } from '@contenter/shared';
 import { type AuthUser } from '../../common/auth.decorators';
@@ -23,7 +27,11 @@ const toDate = (v: string | null | undefined) =>
   v === undefined ? undefined : v ? new Date(`${v}T00:00:00.000Z`) : null;
 const dayOf = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
-export const offeringOf = (r: OfferingRow): BusinessOffering => ({
+/** Rows are read with their audience links (docs/73), so every response carries them. */
+const WITH_LINKS = { segmentLinks: { select: { segmentId: true, fit: true } } } as const;
+type OfferingWithLinks = OfferingRow & { segmentLinks?: { segmentId: string; fit: number }[] };
+
+export const offeringOf = (r: OfferingWithLinks): BusinessOffering => ({
   id: r.id,
   businessId: r.businessId,
   name: r.name,
@@ -32,6 +40,9 @@ export const offeringOf = (r: OfferingRow): BusinessOffering => ({
   status: r.status,
   push: r.push,
   stock: r.stock,
+  parentId: r.parentId,
+  guardrails: r.guardrails,
+  segments: orderSegmentLinks(r.segmentLinks ?? []),
   peakMonths: r.peakMonths,
   complementIds: r.complementIds,
   substituteIds: r.substituteIds,
@@ -86,7 +97,7 @@ export class OfferingsService {
   }
 
   private async find(id: string) {
-    const row = await this.prisma.businessOffering.findUnique({ where: { id } });
+    const row = await this.prisma.businessOffering.findUnique({ where: { id }, include: WITH_LINKS });
     if (!row) throw new NotFoundException('Offering not found');
     return row;
   }
@@ -95,6 +106,7 @@ export class OfferingsService {
     const rows = await this.prisma.businessOffering.findMany({
       where: { businessId },
       orderBy: [...ORDER],
+      include: WITH_LINKS,
     });
     return rows.map(offeringOf);
   }
@@ -123,6 +135,20 @@ export class OfferingsService {
     }
   }
 
+  /**
+   * The product tree stays a tree (docs/73): the parent is an offering of the same business, not the
+   * row itself or one of its variants, and the whole branch fits in the allowed levels.
+   */
+  private async assertParent(businessId: string, parentId: string | null | undefined, selfId?: string) {
+    if (!parentId) return;
+    const rows = await this.prisma.businessOffering.findMany({
+      where: { businessId },
+      select: { id: true, parentId: true },
+    });
+    const problem = offeringParentProblem({ id: selfId, parentId, rows });
+    if (problem) throw new BadRequestException(problem);
+  }
+
   async create(businessId: string, input: CreateBusinessOfferingInput, user: AuthUser) {
     const data = CreateBusinessOfferingSchema.parse(input);
     const business = await this.prisma.business.findUnique({
@@ -135,10 +161,14 @@ export class OfferingsService {
     }
     await this.assertNameFree(businessId, data.name);
     await this.assertRelated(businessId, [...data.complementIds, ...data.substituteIds]);
+    await this.assertParent(businessId, data.parentId);
     const row = await this.prisma.businessOffering.create({
+      include: WITH_LINKS,
       data: {
         businessId,
         name: data.name,
+        parentId: data.parentId || null,
+        guardrails: data.guardrails,
         aliases: data.aliases,
         kind: data.kind,
         status: data.status,
@@ -184,6 +214,7 @@ export class OfferingsService {
       [...(data.complementIds ?? []), ...(data.substituteIds ?? [])],
       id,
     );
+    if (data.parentId !== undefined) await this.assertParent(row.businessId, data.parentId, id);
     // the cross-field rules apply to the row as it will be, not only to the fields sent
     const price = data.priceAmount !== undefined ? data.priceAmount : priceText(row.priceAmount);
     // clearing the price clears its currency too, unless a currency is sent explicitly
@@ -207,8 +238,11 @@ export class OfferingsService {
     const hasPrice = !!price;
     const updated = await this.prisma.businessOffering.update({
       where: { id },
+      include: WITH_LINKS,
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.parentId !== undefined ? { parentId: data.parentId || null } : {}),
+        ...(data.guardrails !== undefined ? { guardrails: data.guardrails } : {}),
         ...(data.aliases !== undefined ? { aliases: data.aliases } : {}),
         ...(data.kind !== undefined ? { kind: data.kind } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
@@ -248,13 +282,43 @@ export class OfferingsService {
     const updated = await this.prisma.businessOffering.update({
       where: { id },
       data: { verified: true, isActive: true, updatedById: user.id },
+      include: WITH_LINKS,
     });
     this.log(user, row.businessId, 'confirm', { offeringId: id });
     return offeringOf(updated);
   }
 
+  /**
+   * Replaces the audiences of an offering (docs/73): each must be a segment of the same business,
+   * at most `OFFERING_SEGMENTS_MAX`, linked once. An empty list clears them.
+   */
+  async setSegments(id: string, input: SetOfferingSegmentsInput, user: AuthUser) {
+    const { links } = SetOfferingSegmentsSchema.parse(input);
+    const row = await this.find(id);
+    if (links.length) {
+      const found = await this.prisma.businessSegment.count({
+        where: { businessId: row.businessId, id: { in: links.map((l) => l.segmentId) } },
+      });
+      if (found !== links.length) {
+        throw new BadRequestException('Audiences must belong to the same business');
+      }
+    }
+    await this.prisma.$transaction([
+      this.prisma.offeringSegment.deleteMany({ where: { offeringId: id } }),
+      this.prisma.offeringSegment.createMany({
+        data: links.map((l) => ({ offeringId: id, segmentId: l.segmentId, fit: l.fit })),
+      }),
+    ]);
+    this.log(user, row.businessId, 'segments', { offeringId: id, count: links.length });
+    return offeringOf(await this.find(id));
+  }
+
   async remove(id: string, user: AuthUser) {
     const row = await this.find(id);
+    // a line with variants is not deleted from under them (the database refuses too)
+    if (await this.prisma.businessOffering.count({ where: { parentId: id } })) {
+      throw new BadRequestException('Move or delete its variants first');
+    }
     await this.prisma.businessOffering.delete({ where: { id } });
     this.log(user, row.businessId, 'delete', { offeringId: id });
   }

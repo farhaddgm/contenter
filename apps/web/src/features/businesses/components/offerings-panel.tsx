@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Check, CornerDownRight, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import {
   BUSINESS_OFFERING_LIMIT,
   OfferingKind,
@@ -7,17 +7,23 @@ import {
   OfferingStatus,
   OfferingStock,
   OFFERING_CLAIMS_MAX,
+  OFFERING_GUARDRAILS_MAX,
   OFFERING_RELATED_MAX,
   OFFERING_PUSH_MAX,
+  OFFERING_SEGMENTS_MAX,
   PriceCurrency,
   hasValidPrice,
   isOfferingAvailable,
   isPeakNow,
+  offeringParentProblem,
+  orderOfferingTree,
   peakingSoon,
   priceText,
   unprovenClaims,
   type BusinessOffering,
+  type BusinessSegment,
   type OfferingClaim,
+  type OfferingSegmentLink,
   type CreateBusinessOfferingInput,
 } from '@contenter/shared';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -40,8 +46,10 @@ import {
   useDeleteOffering,
   useExtractOfferings,
   useOfferings,
+  useSetOfferingSegments,
   useUpdateOffering,
 } from '../api/offerings';
+import { useSegments } from '../api/segments';
 
 /** Push level (0–3) → the key of its label. */
 const PUSH_KEY = ['none', 'normal', 'priority', 'hero'] as const;
@@ -77,10 +85,15 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
     invalidate: [offeringKeys.list(businessId)],
     onDone: () => setJobId(null),
   });
-  const [editing, setEditing] = useState<BusinessOffering | 'new' | null>(null);
+  /** The row being edited, or a new one (optionally a variant of `parentId`). */
+  const [editing, setEditing] = useState<{ offering: BusinessOffering | null; parentId?: string } | null>(null);
+  const { data: segments } = useSegments(businessId);
 
   const pending = (rows ?? []).filter((o) => !o.verified);
   const confirmed = (rows ?? []).filter((o) => o.verified);
+  const placed = orderOfferingTree(confirmed);
+  const nameOf = new Map((rows ?? []).map((o) => [o.id, o.name]));
+  const segmentName = new Map((segments ?? []).map((s) => [s.id, s.name]));
   const full = (rows?.length ?? 0) >= BUSINESS_OFFERING_LIMIT;
   const running = tracker.isRunning && !!jobId;
   const soon = peakingSoon(confirmed.filter((o) => o.isActive));
@@ -108,7 +121,7 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
         actions={
           canEdit && (
             <>
-              <Button size="sm" icon={<Plus />} disabled={full} onClick={() => setEditing('new')}>
+              <Button size="sm" icon={<Plus />} disabled={full} onClick={() => setEditing({ offering: null })}>
                 {t('businesses.offerings.new')}
               </Button>
               <Button
@@ -162,7 +175,7 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
                       businessId={businessId}
                       offering={o}
                       canEdit={canEdit}
-                      onEdit={() => setEditing(o)}
+                      onEdit={() => setEditing({ offering: o })}
                     />
                   ))}
                 </ul>
@@ -170,13 +183,18 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
             )}
             {confirmed.length > 0 && (
               <ul className="space-y-2">
-                {confirmed.map((o) => (
+                {placed.map(({ row: o, depth }) => (
                   <OfferingRow
                     key={o.id}
                     businessId={businessId}
                     offering={o}
+                    depth={depth}
+                    parentName={o.parentId ? nameOf.get(o.parentId) : undefined}
+                    audiences={o.segments.map((l) => segmentName.get(l.segmentId)).filter((n): n is string => !!n)}
                     canEdit={canEdit}
-                    onEdit={() => setEditing(o)}
+                    canAddVariant={!full && offeringParentProblem({ parentId: o.id, rows: confirmed }) === null}
+                    onAddVariant={() => setEditing({ offering: null, parentId: o.id })}
+                    onEdit={() => setEditing({ offering: o })}
                   />
                 ))}
               </ul>
@@ -190,8 +208,10 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
       {editing && (
         <OfferingDrawer
           businessId={businessId}
-          offering={editing === 'new' ? null : editing}
-          others={(rows ?? []).filter((o) => editing === 'new' || o.id !== editing.id)}
+          offering={editing.offering}
+          presetParentId={editing.parentId}
+          all={rows ?? []}
+          others={(rows ?? []).filter((o) => o.id !== editing.offering?.id)}
           onOpenChange={(open) => !open && setEditing(null)}
         />
       )}
@@ -199,15 +219,30 @@ export function OfferingsPanel({ businessId }: { businessId: string }) {
   );
 }
 
+/** Indent of a variant under its line (logical, so it follows RTL). */
+const DEPTH_INDENT = ['', 'ms-6', 'ms-12'] as const;
+
 function OfferingRow({
   businessId,
   offering: o,
+  depth = 0,
+  parentName,
+  audiences = [],
   canEdit,
+  canAddVariant = false,
+  onAddVariant,
   onEdit,
 }: {
   businessId: string;
   offering: BusinessOffering;
+  /** 0 = a line or a lone offering; 1–2 = variants (docs/73). */
+  depth?: number;
+  parentName?: string;
+  /** Names of the audiences the offering is linked to. */
+  audiences?: string[];
   canEdit: boolean;
+  canAddVariant?: boolean;
+  onAddVariant?: () => void;
   onEdit: () => void;
 }) {
   const t = useT();
@@ -219,7 +254,7 @@ function OfferingRow({
   const sellable = isOfferingAvailable(o);
 
   return (
-    <li className="rounded-lg border px-4 py-3">
+    <li className={`rounded-lg border px-4 py-3 ${DEPTH_INDENT[depth] ?? DEPTH_INDENT[2]}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <p className="flex flex-wrap items-center gap-2 font-semibold" data-bidi="">
@@ -237,6 +272,12 @@ function OfferingRow({
               <Badge tone="primary">{t(`businesses.offerings.push.${PUSH_KEY[o.push] ?? 'normal'}`)}</Badge>
             )}
           </p>
+          {depth > 0 && parentName && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground" data-bidi="">
+              <CornerDownRight className="size-3 rtl:-scale-x-100" />
+              {t('businesses.offerings.variantOf', { name: parentName })}
+            </p>
+          )}
           <p className="text-sm tabular-nums">
             {priceLabel(t, o)}
             {expired && (
@@ -271,6 +312,18 @@ function OfferingRow({
               {o.summary}
             </p>
           )}
+          {(audiences.length > 0 || o.guardrails.length > 0) && (
+            <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-bidi="">
+              {audiences.length > 0 && (
+                <span>{t('businesses.offerings.audiencesCount', { names: audiences.join('، ') })}</span>
+              )}
+              {o.guardrails.length > 0 && (
+                <Badge tone="warning">
+                  {t('businesses.offerings.guardrailsCount', { count: formatNumber(o.guardrails.length) })}
+                </Badge>
+              )}
+            </p>
+          )}
           {!o.verified && o.evidence && (
             <blockquote className="border-s-2 ps-3 text-xs leading-6 text-muted-foreground" data-bidi="">
               <span className="font-semibold">{t('businesses.offerings.evidence')}: </span>
@@ -299,6 +352,17 @@ function OfferingRow({
                 }
               >
                 {t('businesses.offerings.confirm')}
+              </Button>
+            )}
+            {canAddVariant && onAddVariant && (
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={t('businesses.offerings.addVariant')}
+                title={t('businesses.offerings.addVariant')}
+                onClick={onAddVariant}
+              >
+                <Plus />
               </Button>
             )}
             <Button size="icon" variant="ghost" aria-label={t('common.edit')} onClick={onEdit}>
@@ -332,6 +396,9 @@ interface FormState {
   status: string;
   push: string;
   stock: string;
+  parentId: string;
+  guardrails: string;
+  segments: OfferingSegmentLink[];
   peakMonths: number[];
   complementIds: string[];
   substituteIds: string[];
@@ -363,7 +430,7 @@ function lineToClaim(line: string): OfferingClaim {
   return { feature, benefit, proof };
 }
 
-function toForm(o: BusinessOffering | null): FormState {
+function toForm(o: BusinessOffering | null, parentId = ''): FormState {
   return {
     name: o?.name ?? '',
     aliases: o?.aliases.join('\n') ?? '',
@@ -371,6 +438,9 @@ function toForm(o: BusinessOffering | null): FormState {
     status: o?.status ?? 'ACTIVE',
     push: String(o?.push ?? 1),
     stock: o?.stock ?? 'IN_STOCK',
+    parentId: o ? (o.parentId ?? '') : parentId,
+    guardrails: o?.guardrails.join('\n') ?? '',
+    segments: o?.segments ?? [],
     peakMonths: o?.peakMonths ?? [],
     complementIds: o?.complementIds ?? [],
     substituteIds: o?.substituteIds ?? [],
@@ -399,6 +469,8 @@ function toInput(f: FormState): CreateBusinessOfferingInput {
     status: f.status as (typeof OfferingStatus)[number],
     push: Number(f.push),
     stock: f.stock as (typeof OfferingStock)[number],
+    parentId: f.parentId || null,
+    guardrails: lines(f.guardrails),
     peakMonths: f.peakMonths,
     complementIds: f.complementIds,
     substituteIds: f.substituteIds,
@@ -422,11 +494,17 @@ type Errors = Partial<Record<'name' | 'priceAmount' | 'season', string>>;
 function OfferingDrawer({
   businessId,
   offering,
+  presetParentId,
+  all,
   others,
   onOpenChange,
 }: {
   businessId: string;
   offering: BusinessOffering | null;
+  /** A new row starts as a variant of this one. */
+  presetParentId?: string;
+  /** Every offering of the business (the tree rule is checked against them). */
+  all: BusinessOffering[];
   /** The other offerings of the business, to pick complements and substitutes from. */
   others: BusinessOffering[];
   onOpenChange: (open: boolean) => void;
@@ -434,13 +512,22 @@ function OfferingDrawer({
   const t = useT();
   const create = useCreateOffering(businessId);
   const update = useUpdateOffering(businessId, offering?.id ?? '');
-  const [f, setF] = useState<FormState>(() => toForm(offering));
+  const setSegments = useSetOfferingSegments(businessId);
+  const { data: segmentList } = useSegments(businessId);
+  const [f, setF] = useState<FormState>(() => toForm(offering, presetParentId));
+  // lines and products this row may sit under: confirmed ones that keep the tree valid
+  const parents = all.filter(
+    (o) =>
+      o.verified &&
+      o.id !== offering?.id &&
+      offeringParentProblem({ id: offering?.id, parentId: o.id, rows: all }) === null,
+  );
   const [errors, setErrors] = useState<Errors>({});
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setF((prev) => ({ ...prev, [key]: value }));
-  const pending = create.isPending || update.isPending;
+  const pending = create.isPending || update.isPending || setSegments.isPending;
 
-  const submit = () => {
+  const submit = async () => {
     const next: Errors = {};
     if (!f.name.trim()) next.name = t('businesses.offerings.errors.name');
     if (f.priceAmount.trim() && !OfferingPriceAmount.safeParse(f.priceAmount).success) {
@@ -451,15 +538,18 @@ function OfferingDrawer({
     }
     setErrors(next);
     if (Object.keys(next).length) return;
-    const options = {
-      onSuccess: () => {
-        notify.success(t(offering ? 'businesses.offerings.saved' : 'businesses.offerings.created'));
-        onOpenChange(false);
-      },
-      onError: (e: Error) => notify.error(t('common.error'), e.message),
-    };
-    if (offering) update.mutate(toInput(f), options);
-    else create.mutate(toInput(f), options);
+    try {
+      const saved = offering
+        ? await update.mutateAsync(toInput(f))
+        : await create.mutateAsync(toInput(f));
+      if (JSON.stringify(f.segments) !== JSON.stringify(offering?.segments ?? [])) {
+        await setSegments.mutateAsync({ id: saved.id, links: f.segments });
+      }
+      notify.success(t(offering ? 'businesses.offerings.saved' : 'businesses.offerings.created'));
+      onOpenChange(false);
+    } catch (e) {
+      notify.error(t('common.error'), e instanceof Error ? e.message : undefined);
+    }
   };
 
   const priced = f.priceAmount.trim() !== '';
@@ -473,7 +563,7 @@ function OfferingDrawer({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
-          <Button isLoading={pending} onClick={submit}>
+          <Button isLoading={pending} onClick={() => void submit()}>
             {t('common.save')}
           </Button>
         </>
@@ -503,6 +593,22 @@ function OfferingDrawer({
               rows={2}
               value={f.aliases}
               onChange={(e) => set('aliases', e.target.value)}
+            />
+          )}
+        </Field>
+        <Field
+          label={t('businesses.offerings.fields.parent')}
+          hint={t('businesses.offerings.fields.parentHint')}
+        >
+          {(id) => (
+            <Select
+              id={id}
+              value={f.parentId}
+              onChange={(e) => set('parentId', e.target.value)}
+              options={[
+                { value: '', label: t('businesses.offerings.fields.parentNone') },
+                ...parents.map((o) => ({ value: o.id, label: o.name })),
+              ]}
             />
           )}
         </Field>
@@ -629,6 +735,27 @@ function OfferingDrawer({
             />
           )}
         </Field>
+
+        <Field
+          label={t('businesses.offerings.fields.guardrails')}
+          hint={t('businesses.offerings.fields.guardrailsHint', { count: formatNumber(OFFERING_GUARDRAILS_MAX) })}
+        >
+          {(id) => (
+            <Textarea
+              id={id}
+              data-bidi=""
+              rows={2}
+              value={f.guardrails}
+              onChange={(e) => set('guardrails', e.target.value)}
+            />
+          )}
+        </Field>
+
+        <SegmentPicker
+          segments={segmentList ?? []}
+          value={f.segments}
+          onChange={(v) => set('segments', v)}
+        />
 
         <Field
           label={t('businesses.offerings.fields.claims')}
@@ -809,6 +936,66 @@ function RelatedPicker({
             >
               {o.name}
             </Button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Which audiences an offering is for, each as main or secondary (docs/73). */
+function SegmentPicker({
+  segments,
+  value,
+  onChange,
+}: {
+  segments: BusinessSegment[];
+  value: OfferingSegmentLink[];
+  onChange: (links: OfferingSegmentLink[]) => void;
+}) {
+  const t = useT();
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">{t('businesses.offerings.fields.audiences')}</legend>
+      <p className="text-xs text-muted-foreground">
+        {segments.length
+          ? `${t('businesses.offerings.fields.audiencesHint')} ${t('businesses.offerings.fields.relatedMax', {
+              count: formatNumber(OFFERING_SEGMENTS_MAX),
+            })}`
+          : t('businesses.offerings.fields.audiencesNone')}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {segments.map((s) => {
+          const link = value.find((l) => l.segmentId === s.id);
+          return (
+            <span key={s.id} className="inline-flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={link ? 'default' : 'outline'}
+                aria-pressed={!!link}
+                disabled={!link && value.length >= OFFERING_SEGMENTS_MAX}
+                onClick={() =>
+                  onChange(
+                    link ? value.filter((l) => l.segmentId !== s.id) : [...value, { segmentId: s.id, fit: 2 }],
+                  )
+                }
+              >
+                {s.name}
+              </Button>
+              {link && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    onChange(value.map((l) => (l.segmentId === s.id ? { ...l, fit: l.fit === 2 ? 1 : 2 } : l)))
+                  }
+                >
+                  {t(link.fit === 2 ? 'businesses.offerings.fields.fitMain' : 'businesses.offerings.fields.fitSecondary')}
+                </Button>
+              )}
+            </span>
           );
         })}
       </div>

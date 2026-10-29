@@ -1,7 +1,7 @@
 import { Global, Injectable, Module } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
-  offeringQualityRule,
+  offeringQualityRules,
   type DocooBusinessListQuery,
   type InstagramStats,
   type QualityOfferingRule,
@@ -13,6 +13,10 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 /** The fields of a catalog row that the prompt and the quality check read (docs/67). */
 export const OFFERING_CORE_SELECT = {
   id: true,
+  parentId: true,
+  guardrails: true,
+  // the line and its parent, switched on or not: their never-say phrases still bind this variant
+  parent: { select: { guardrails: true, parent: { select: { guardrails: true } } } },
   stock: true,
   peakMonths: true,
   complementIds: true,
@@ -170,7 +174,7 @@ export class BusinessApi {
       where: { businessId, ...USABLE_OFFERING },
       select: OFFERING_CORE_SELECT,
     });
-    return rows.map((r) => offeringQualityRule(r, now));
+    return offeringQualityRules(rows, now);
   }
 
   /** The business's latest Instagram statistics (computed in code, docs/28), or null. */

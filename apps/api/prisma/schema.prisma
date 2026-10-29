@@ -56,6 +56,7 @@ model User {
   businessFacts       BusinessFact[]
   businessOfferings   BusinessOffering[]         @relation("OfferingUpdatedBy")
   businessCompetitors BusinessCompetitor[]       @relation("CompetitorUpdatedBy")
+  businessSegments    BusinessSegment[]          @relation("SegmentUpdatedBy")
   competitorSources   BusinessCompetitorSource[] @relation("CompetitorSourceCreatedBy")
   sectionRevisions    BusinessSectionRevision[]
   businessDiscovery   BusinessDiscovery[]
@@ -204,6 +205,7 @@ model Business {
   styles        BusinessStyle[]
   offerings     BusinessOffering[]
   competitors   BusinessCompetitor[]
+  segments      BusinessSegment[]
   questionSkips BusinessQuestionSkip[]
 
   @@index([status, updatedAt])
@@ -600,6 +602,10 @@ model BusinessOffering {
   stock           OfferingStock  @default(IN_STOCK)
   /// Persian months (1 = Farvardin … 12 = Esfand) when demand peaks
   peakMonths      Int[]
+  /// The line or product this one belongs to (same business, at most 3 levels — checked by the service, docs/73)
+  parentId        String?
+  /// Phrases never to write about this offering or its variants; found in a text → quality warning
+  guardrails      String[]
   /// Offerings of the same business that sell well together / stand in for this one (checked by the service)
   complementIds   String[]
   substituteIds   String[]
@@ -630,11 +636,64 @@ model BusinessOffering {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  updatedBy User?    @relation("OfferingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  business     Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy    User?              @relation("OfferingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  /// Deleting a line is refused while it has variants (the service answers 400); NoAction backs it up and,
+  /// unlike Restrict, still lets deleting the whole business cascade through a line and its variants
+  parent       BusinessOffering?  @relation("OfferingTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children     BusinessOffering[] @relation("OfferingTree")
+  segmentLinks OfferingSegment[]
 
   @@unique([businessId, name])
   @@index([businessId, status])
+  @@index([parentId])
+}
+
+enum SegmentKind {
+  MARKET
+  PERSONA
+}
+
+/// An audience of a business: a market segment or a persona, typed by the admin (docs/73)
+model BusinessSegment {
+  id           String      @id @default(cuid())
+  businessId   String
+  kind         SegmentKind @default(PERSONA)
+  name         String
+  summary      String      @default("")
+  goals        String[]
+  pains        String[]
+  objections   String[]
+  channels     String[]
+  /// What message convinces them
+  messageAngle String      @default("")
+  /// Internal note; never sent to a model or an integration
+  note         String      @default("")
+  isActive     Boolean     @default(true)
+  sortOrder    Int         @default(0)
+  updatedById  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  business  Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User?             @relation("SegmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  offerings OfferingSegment[]
+
+  @@unique([businessId, name])
+  @@index([businessId, kind])
+}
+
+/// Which audiences an offering is for; fit 2 = main, 1 = secondary
+model OfferingSegment {
+  offeringId String
+  segmentId  String
+  fit        Int    @default(2)
+
+  offering BusinessOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  segment  BusinessSegment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@id([offeringId, segmentId])
+  @@index([segmentId])
 }
 
 enum CompetitorKind {

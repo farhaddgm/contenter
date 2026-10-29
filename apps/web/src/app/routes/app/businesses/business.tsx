@@ -59,6 +59,7 @@ import { NotesCard } from '@/features/businesses/components/notes-card';
 import { ProfileQuestionsCard } from '@/features/businesses/components/profile-questions-card';
 import { CompetitorsPanel } from '@/features/businesses/components/competitors-panel';
 import { OfferingsPanel } from '@/features/businesses/components/offerings-panel';
+import { SegmentsPanel } from '@/features/businesses/components/segments-panel';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
 import { StylesPanel } from '@/features/businesses/components/styles-panel';
 import { SectionCard } from '@/features/businesses/components/section-card';
@@ -73,6 +74,7 @@ const TABS = [
   'assets',
   'styles',
   'offerings',
+  'audiences',
   'competitors',
   'context',
 ] as const;
@@ -317,6 +319,7 @@ export default function BusinessRoute() {
             {tab === 'assets' && <AssetsPanel businessId={business.id} />}
             {tab === 'styles' && <StylesPanel businessId={business.id} />}
             {tab === 'offerings' && <OfferingsPanel businessId={business.id} />}
+            {tab === 'audiences' && <SegmentsPanel businessId={business.id} />}
             {tab === 'competitors' && <CompetitorsPanel businessId={business.id} />}
             {tab === 'context' && (
               <ContextPreviewPanel businessId={business.id} topics={business.topics ?? []} />

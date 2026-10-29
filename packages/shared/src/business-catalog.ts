@@ -17,6 +17,7 @@ import {
   type QualityOfferingRule,
 } from './quality';
 import { patchOf } from './schemas';
+import type { OfferingSegmentLink } from './business-segments';
 
 export const OfferingKind = ['PRODUCT', 'SERVICE', 'PLAN', 'BUNDLE'] as const;
 export type OfferingKind = (typeof OfferingKind)[number];
@@ -33,6 +34,10 @@ export const OFFERING_CLAIMS_MAX = 8;
 export const OFFERING_RELATED_MAX = 6;
 export const OFFERING_ALIASES_MAX = 6;
 export const OFFERING_FEATURES_MAX = 8;
+/** Phrases an offering (and its variants) must never be described with (docs/73 §3). */
+export const OFFERING_GUARDRAILS_MAX = 8;
+/** Levels of the product tree: line → product → variant (docs/73). */
+export const OFFERING_TREE_DEPTH_MAX = 3;
 /** Total text of the `[CATALOG]` block in one prompt. */
 export const MAX_CATALOG_TEXT = 6_000;
 /** Push levels: 0 = do not promote · 1 = normal · 2 = priority · 3 = hero. */
@@ -111,6 +116,14 @@ const BusinessOfferingBase = z.object({
     .max(12)
     .optional()
     .default([]),
+  /** The line or product this one belongs to (same business, tree of at most 3 levels); null = a root. */
+  parentId: z.string().trim().min(1).max(64).nullish(),
+  /** Phrases never to write about this offering or its variants ("guaranteed profit"); checked by code. */
+  guardrails: z
+    .array(z.string().trim().min(2).max(160))
+    .max(OFFERING_GUARDRAILS_MAX)
+    .optional()
+    .default([]),
   /** Other offerings of this business that go well with this one / can replace it. */
   complementIds: z.array(z.string().trim().min(1).max(64)).max(OFFERING_RELATED_MAX).optional().default([]),
   substituteIds: z.array(z.string().trim().min(1).max(64)).max(OFFERING_RELATED_MAX).optional().default([]),
@@ -177,6 +190,10 @@ export interface BusinessOffering {
   push: number;
   stock: OfferingStock;
   peakMonths: number[];
+  parentId: string | null;
+  guardrails: string[];
+  /** The audiences (markets and personas) this offering is for, strongest fit first (docs/73). */
+  segments: OfferingSegmentLink[];
   complementIds: string[];
   substituteIds: string[];
   summary: string;
@@ -206,10 +223,21 @@ export interface BusinessOffering {
 /** A decimal as text or as the database driver's decimal object (its `toString` is exact). */
 export type DecimalLike = string | { toString(): string };
 
+/** An ancestor of an offering, with only what the never-say inheritance needs (docs/73). */
+export interface GuardrailAncestor {
+  guardrails?: readonly string[];
+  parent?: GuardrailAncestor | null;
+}
+
 /** The fields the prompt, the quality check and the export read (a database row fits). */
 export interface OfferingCore {
   /** Needed to resolve `complementIds` / `substituteIds` (absent in hand-made rows). */
   id?: string;
+  /** Tree position and never-say phrases (docs/73); absent in hand-made rows. */
+  parentId?: string | null;
+  guardrails?: string[];
+  /** The line it belongs to and that line's own parent, read whether or not they are switched on (`effectiveGuardrails`). */
+  parent?: GuardrailAncestor | null;
   stock?: string;
   peakMonths?: number[];
   complementIds?: string[];
@@ -286,8 +314,14 @@ export function formatOfferingPrice(o: OfferingCore): string {
 }
 
 /** The rule the quality gate applies to one offering. */
-export function offeringQualityRule(o: OfferingCore, now = new Date()): QualityOfferingRule {
+export function offeringQualityRule(
+  o: OfferingCore,
+  now = new Date(),
+  /** The never-say phrases of the offering and its ancestors (`effectiveGuardrails`); default = its own. */
+  guardrails: readonly string[] = o.guardrails ?? [],
+): QualityOfferingRule {
   return {
+    ...(guardrails.length ? { guardrails } : {}),
     name: o.name,
     aliases: o.aliases,
     priceAmount: priceText(o.priceAmount),
