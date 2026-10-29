@@ -214,6 +214,25 @@ export class BusinessApi {
     return !!(await this.prisma.businessOffering.findFirst({ where: { id, businessId }, select: { id: true } }));
   }
 
+  /**
+   * Why a project, idea or content cannot be about this offering and audience, or null when it can:
+   * both must belong to the business (docs/73). Nothing to check when neither is given.
+   */
+  async focusProblem(
+    businessId: string | null | undefined,
+    focus: { offeringId?: string | null; segmentId?: string | null },
+  ): Promise<string | null> {
+    if (!focus.offeringId && !focus.segmentId) return null;
+    if (!businessId) return 'The project has no business to choose an offering or audience from';
+    if (focus.offeringId && !(await this.hasOffering(businessId, focus.offeringId))) {
+      return 'Offering not found in this business';
+    }
+    if (focus.segmentId && !(await this.hasSegment(businessId, focus.segmentId))) {
+      return 'Audience not found in this business';
+    }
+    return null;
+  }
+
   /** Whether `id` is an audience of the business. */
   async hasSegment(businessId: string, id: string): Promise<boolean> {
     return !!(await this.prisma.businessSegment.findFirst({ where: { id, businessId }, select: { id: true } }));

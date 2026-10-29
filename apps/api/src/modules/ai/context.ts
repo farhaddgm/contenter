@@ -27,6 +27,8 @@ import {
   isClaimProven,
   isOfferingAvailable,
   isPeakNow,
+  FOCUS_BRAND_SECTION_CHARS,
+  FOCUS_TRIMMED_SECTIONS,
   MAX_FOCUS_TEXT,
   parseClaims,
   isRegister,
@@ -596,7 +598,9 @@ export function buildBusinessParts(
       parts.push(part(id, `${title}\n[omitted — business profile budget exhausted]`, draft));
       continue;
     }
-    const cap = Math.min(MAX_BUSINESS_SECTION, left);
+    // the brand-wide audience sections give way when one audience is in focus (printed in [FOCUS])
+    const yields = !!b.focus?.segments.length && (FOCUS_TRIMMED_SECTIONS as readonly string[]).includes(key);
+    const cap = Math.min(MAX_BUSINESS_SECTION, left, yields ? FOCUS_BRAND_SECTION_CHARS : Infinity);
     parts.push(
       part(
         id,

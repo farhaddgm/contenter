@@ -645,6 +645,7 @@ model BusinessOffering {
   segmentLinks OfferingSegment[]
   topics       Topic[]            @relation("TopicOffering")
   contents     Content[]          @relation("ContentOffering")
+  ideas        Idea[]             @relation("IdeaOffering")
 
   @@unique([businessId, name])
   @@index([businessId, status])
@@ -682,6 +683,7 @@ model BusinessSegment {
   offerings OfferingSegment[]
   topics    Topic[]           @relation("TopicSegment")
   contents  Content[]         @relation("ContentSegment")
+  ideas     Idea[]            @relation("IdeaSegment")
 
   @@unique([businessId, name])
   @@index([businessId, kind])
@@ -1155,26 +1157,33 @@ model IdeationRequest {
 }
 
 model Idea {
-  id        String        @id @default(cuid())
-  topicId   String
-  requestId String?
-  title     String
-  angle     String        @default("")
-  hook      String        @default("")
-  format    ContentFormat @default(POST)
-  outline   String[]
-  rationale String        @default("")
-  score     Float         @default(0)
-  status    IdeaStatus    @default(PROPOSED)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id         String        @id @default(cuid())
+  topicId    String
+  requestId  String?
+  title      String
+  angle      String        @default("")
+  hook       String        @default("")
+  format     ContentFormat @default(POST)
+  outline    String[]
+  rationale  String        @default("")
+  score      Float         @default(0)
+  status     IdeaStatus    @default(PROPOSED)
+  /// The offering and audience this idea is about; null = the project's (docs/73). Copied to a content written from it.
+  offeringId String?
+  segmentId  String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
-  topic    Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  request  IdeationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  topic    Topic             @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  request  IdeationRequest?  @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  offering BusinessOffering? @relation("IdeaOffering", fields: [offeringId], references: [id], onDelete: SetNull)
+  segment  BusinessSegment?  @relation("IdeaSegment", fields: [segmentId], references: [id], onDelete: SetNull)
   contents Content[]
   tags     Tag[]
 
   @@index([topicId, status, createdAt])
+  @@index([offeringId])
+  @@index([segmentId])
 }
 
 // ─────────────────────────────── Contents ───────────────────────────────

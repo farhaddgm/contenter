@@ -150,6 +150,60 @@ describe('[FOCUS] block (docs/73 §4)', () => {
   });
 });
 
+describe('brand-wide audience sections give way to a focused audience (docs/73 §4)', () => {
+  const long = 'پرسونا '.repeat(900); // about 6,300 characters
+  const withSections: BusinessForPrompt = {
+    ...base,
+    sections: [
+      { key: 'OVERVIEW', content: 'We sell tea. '.repeat(300) },
+      { key: 'TARGET_MARKET', content: long },
+      { key: 'PERSONAS', content: long },
+    ],
+  };
+  const section = (b: BusinessForPrompt, key: string) =>
+    buildBusinessParts(b).find((p) => p.id === `SECTION:${key}`)!;
+
+  it('cuts the market and persona sections only when an audience is in focus', () => {
+    const plain = section(withSections, 'PERSONAS');
+    expect(plain.chars).toBeGreaterThan(5_000);
+
+    const focused = { ...withSections, focus: focus() };
+    const personas = section(focused, 'PERSONAS');
+    expect(personas.chars).toBeLessThan(1_700);
+    expect(personas.text).toContain('[truncated]');
+    expect(personas.cut).toBe(true);
+    expect(section(focused, 'TARGET_MARKET').chars).toBeLessThan(1_700);
+  });
+
+  it('leaves the other sections whole', () => {
+    const plain = section(withSections, 'OVERVIEW');
+    expect(section({ ...withSections, focus: focus() }, 'OVERVIEW').text).toBe(plain.text);
+  });
+
+  it('does nothing when the focus has no audience, or only an offering', () => {
+    const plain = formatBusiness(withSections);
+    const offeringOnly = formatBusiness({ ...withSections, focus: focus({ segments: [] }) });
+    expect(offeringOnly).toContain(plain.slice(0, 4_000));
+    expect(section({ ...withSections, focus: focus({ segments: [] }) }, 'PERSONAS').chars).toBe(
+      section(withSections, 'PERSONAS').chars,
+    );
+  });
+
+  it('frees room for the sections after it', () => {
+    const many: BusinessForPrompt = {
+      ...base,
+      sections: [
+        { key: 'TARGET_MARKET', content: long },
+        { key: 'PERSONAS', content: long },
+        { key: 'FAQ', content: 'پرسش '.repeat(400) },
+      ],
+    };
+    const focused = buildBusinessParts({ ...many, focus: focus() }).reduce((n, p) => n + p.chars, 0);
+    const plain = buildBusinessParts(many).reduce((n, p) => n + p.chars, 0);
+    expect(focused).toBeLessThan(plain - 8_000);
+  });
+});
+
 describe('ContextLoader: the focus of a job', () => {
   function setup(topic: { offeringId: string | null; segmentId: string | null }, content?: unknown) {
     const focusForPrompt = vi.fn(async (_b: string, f: unknown) => ({ ...focus(), asked: f }));
@@ -289,15 +343,29 @@ describe('BusinessApi.focusForPrompt', () => {
   });
 });
 
+/** The real `focusProblem` over a fake database that knows these offerings and audiences of `b1`. */
+function businessApi(offerings: string[], segments: string[]) {
+  const prisma = {
+    businessOffering: {
+      findFirst: vi.fn(async ({ where }: { where: { id: string; businessId: string } }) =>
+        where.businessId === 'b1' && offerings.includes(where.id) ? { id: where.id } : null,
+      ),
+    },
+    businessSegment: {
+      findFirst: vi.fn(async ({ where }: { where: { id: string; businessId: string } }) =>
+        where.businessId === 'b1' && segments.includes(where.id) ? { id: where.id } : null,
+      ),
+    },
+  };
+  return { api: new BusinessApi(prisma as unknown as PrismaService), prisma };
+}
+
 describe('TopicsService: focus rules (docs/73)', () => {
   function setup(opts: { offerings?: string[]; segments?: string[] } = {}) {
     const update = vi.fn(async () => ({}));
     const create = vi.fn(async () => ({ id: 't1' }));
-    const businesses = {
-      hasOffering: vi.fn(async (_b: string, id: string) => (opts.offerings ?? ['o1']).includes(id)),
-      hasSegment: vi.fn(async (_b: string, id: string) => (opts.segments ?? ['s1']).includes(id)),
-      styleForPrompt: vi.fn(),
-    };
+    const { api, prisma: lookups } = businessApi(opts.offerings ?? ['o1'], opts.segments ?? ['s1']);
+    const businesses = Object.assign(api, { styleForPrompt: vi.fn() });
     const svc = new TopicsService(
       {
         topic: {
@@ -311,7 +379,7 @@ describe('TopicsService: focus rules (docs/73)', () => {
       { accessTo: async () => 'EDIT', canEditBusiness: async () => true } as unknown as AccessService,
       businesses as unknown as BusinessApi,
     );
-    return { svc, update, create, businesses };
+    return { svc, update, create, lookups };
   }
 
   it('accepts an offering and an audience of the same business', async () => {
@@ -330,16 +398,16 @@ describe('TopicsService: focus rules (docs/73)', () => {
   });
 
   it('null clears them without asking the business', async () => {
-    const { svc, update, businesses } = setup();
+    const { svc, update, lookups } = setup();
     await svc.update('t1', { offeringId: null, segmentId: null }, user);
-    expect(businesses.hasOffering).not.toHaveBeenCalled();
+    expect(lookups.businessOffering.findFirst).not.toHaveBeenCalled();
     expect(update.mock.calls[0]![0].data).toMatchObject({ offeringId: null, segmentId: null });
   });
 
   it('leaves them alone when other fields change', async () => {
-    const { svc, update, businesses } = setup();
+    const { svc, update, lookups } = setup();
     await svc.update('t1', { title: 'عنوان تازه' }, user);
-    expect(businesses.hasOffering).not.toHaveBeenCalled();
+    expect(lookups.businessOffering.findFirst).not.toHaveBeenCalled();
     expect(update.mock.calls[0]![0].data).not.toHaveProperty('offeringId');
     expect(update.mock.calls[0]![0].data).not.toHaveProperty('segmentId');
   });
@@ -371,10 +439,7 @@ describe('TopicsService: focus rules (docs/73)', () => {
 describe('ContentsService.update: focus rules (docs/73)', () => {
   function setup(opts: { businessId?: string | null; offerings?: string[]; segments?: string[] } = {}) {
     const update = vi.fn(async () => ({}));
-    const businesses = {
-      hasOffering: async (_b: string, id: string) => (opts.offerings ?? ['o1']).includes(id),
-      hasSegment: async (_b: string, id: string) => (opts.segments ?? ['s1']).includes(id),
-    };
+    const businesses = businessApi(opts.offerings ?? ['o1'], opts.segments ?? ['s1']).api;
     const businessId = opts.businessId === undefined ? 'b1' : opts.businessId;
     const prisma = {
       content: { findUnique: async () => ({ topic: { businessId } }), update },

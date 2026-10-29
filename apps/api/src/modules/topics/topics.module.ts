@@ -117,14 +117,8 @@ export class TopicsService {
     offeringId: string | null | undefined,
     segmentId: string | null | undefined,
   ) {
-    if (!offeringId && !segmentId) return;
-    if (!businessId) throw new BadRequestException('Choose a business before choosing an offering or audience');
-    if (offeringId && !(await this.businesses.hasOffering(businessId, offeringId))) {
-      throw new BadRequestException('Offering not found in this business');
-    }
-    if (segmentId && !(await this.businesses.hasSegment(businessId, segmentId))) {
-      throw new BadRequestException('Audience not found in this business');
-    }
+    const problem = await this.businesses.focusProblem(businessId, { offeringId, segmentId });
+    if (problem) throw new BadRequestException(problem);
   }
 
   async create(input: CreateTopicInput, user: AuthUser) {
