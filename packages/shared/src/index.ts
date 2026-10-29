@@ -41,6 +41,7 @@ export * from './business-catalog';
 export * from './business-competitors';
 export * from './business-segments';
 export * from './business-focus';
+export * from './offering-coverage';
 export * from './offering-tree';
 export * from './brand-compare';
 export * from './profile-questions';

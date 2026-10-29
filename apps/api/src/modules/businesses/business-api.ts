@@ -84,7 +84,9 @@ export const EXPORT_INCLUDE = {
   sections: true,
   facts: { orderBy: [{ category: 'asc' }, { createdAt: 'asc' }] },
   terms: { orderBy: { createdAt: 'asc' } },
-  offerings: { orderBy: OFFERING_ORDER },
+  // audiences (docs/73) ride along: the link rows are sorted in the builder, so the document is stable
+  offerings: { orderBy: OFFERING_ORDER, include: { segmentLinks: { select: { segmentId: true, fit: true } } } },
+  segments: { orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }] },
   notes: { orderBy: { createdAt: 'desc' }, take: 50 },
   references: { orderBy: { createdAt: 'asc' } },
   assets: { orderBy: { createdAt: 'desc' }, take: 200 },
@@ -181,6 +183,30 @@ export class BusinessApi {
       select: OFFERING_CORE_SELECT,
     });
     return offeringQualityRules(rows, now);
+  }
+
+  /**
+   * What the offering coverage report needs (docs/73): the usable offerings in prompt order, the
+   * active audiences, and which audience is linked to which offering. Read-only.
+   */
+  async catalogForCoverage(businessId: string) {
+    const [offerings, segments, links] = await Promise.all([
+      this.prisma.businessOffering.findMany({
+        where: { businessId, ...USABLE_OFFERING },
+        orderBy: OFFERING_ORDER,
+        select: OFFERING_CORE_SELECT,
+      }),
+      this.prisma.businessSegment.findMany({
+        where: { businessId, isActive: true },
+        orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+        select: { id: true, name: true, kind: true },
+      }),
+      this.prisma.offeringSegment.findMany({
+        where: { offering: { businessId, ...USABLE_OFFERING }, segment: { businessId, isActive: true } },
+        select: { offeringId: true, segmentId: true, fit: true },
+      }),
+    ]);
+    return { offerings, segments, links };
   }
 
   /** Whether `id` is an offering of the business (a project or content may only focus on its own). */

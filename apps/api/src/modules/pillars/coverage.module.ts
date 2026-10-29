@@ -12,11 +12,16 @@ import {
 } from '@nestjs/common';
 import {
   CoverageQuerySchema,
+  OfferingCoverageQuerySchema,
   SavePillarsSchema,
   buildCoverage,
+  buildOfferingCoverage,
+  effectiveFocus,
   type ContentPillar,
   type CoverageQuery,
   type CoverageReport,
+  type OfferingCoverageQuery,
+  type OfferingCoverageReport,
   type SavePillarsInput,
 } from '@contenter/shared';
 import { AccessService, BusinessScoped, TopicScoped } from '../../common/access';
@@ -24,6 +29,7 @@ import { CurrentUser, type AuthUser } from '../../common/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { BusinessApi } from '../businesses/business-api';
 
 const DAY = 86_400_000;
 
@@ -38,6 +44,7 @@ export class CoverageService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly access: AccessService,
+    private readonly businesses: BusinessApi,
   ) {}
 
   async pillars(businessId: string): Promise<ContentPillar[]> {
@@ -164,6 +171,58 @@ export class CoverageService {
       { days: query.days, by: query.by, staleDays: query.staleDays, now },
     );
   }
+
+  /**
+   * Coverage of the catalog by approved or published content of the last 90 days, only from the
+   * projects the caller can see. A content's offering and audience are its own, else its project's.
+   */
+  async offeringCoverage(
+    businessId: string,
+    query: OfferingCoverageQuery,
+    user: AuthUser,
+  ): Promise<OfferingCoverageReport> {
+    const now = new Date();
+    const since = new Date(now.getTime() - 90 * DAY);
+    const visible = this.access.visibleTopics(user);
+    const [catalog, rows] = await Promise.all([
+      this.businesses.catalogForCoverage(businessId),
+      this.prisma.content.findMany({
+        where: {
+          topic: visible ? { AND: [{ businessId }, visible] } : { businessId },
+          currentVersionId: { not: null },
+          AND: [
+            { OR: [{ status: 'APPROVED' }, { publishedAt: { not: null } }] },
+            {
+              OR: [
+                { publishedAt: { gte: since } },
+                { scheduledAt: { gte: since } },
+                { createdAt: { gte: since } },
+              ],
+            },
+          ],
+        },
+        select: {
+          offeringId: true,
+          segmentId: true,
+          publishedAt: true,
+          scheduledAt: true,
+          createdAt: true,
+          topic: { select: { offeringId: true, segmentId: true } },
+        },
+      }),
+    ]);
+    return buildOfferingCoverage({
+      offerings: catalog.offerings,
+      segments: catalog.segments,
+      links: catalog.links,
+      contents: rows.map((r) => ({
+        ...effectiveFocus(r, r.topic),
+        at: r.publishedAt ?? r.scheduledAt ?? r.createdAt,
+      })),
+      staleDays: query.staleDays,
+      now,
+    });
+  }
 }
 
 @Controller()
@@ -194,6 +253,17 @@ export class CoverageController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.coverage.coverage(id, query, user);
+  }
+
+  /** Which offerings and offering × audience pairs were written about lately (docs/73). */
+  @BusinessScoped('business')
+  @Get('businesses/:id/offering-coverage')
+  offeringCoverage(
+    @Param('id') id: string,
+    @Query(new ZodValidationPipe(OfferingCoverageQuerySchema)) query: OfferingCoverageQuery,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.coverage.offeringCoverage(id, query, user);
   }
 
   @TopicScoped('topic')

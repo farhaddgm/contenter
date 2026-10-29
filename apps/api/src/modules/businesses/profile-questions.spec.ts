@@ -9,7 +9,13 @@ const admin = { id: 'u1', role: 'ADMIN' } as AuthUser;
 const editor = { id: 'u2', role: 'EDITOR' } as AuthUser;
 const NOW = new Date('2026-10-23T00:00:00Z');
 
-function setup(opts: { content?: string; lock?: string } = {}) {
+interface Audiences {
+  segments?: { id: string }[];
+  links?: { offeringId: string; segmentId: string }[];
+  offerings?: Record<string, unknown>[];
+}
+
+function setup(opts: { content?: string; lock?: string; audiences?: Audiences } = {}) {
   const writes: Record<string, unknown>[] = [];
   const skips: { code: string }[] = [];
   const tx = {
@@ -32,12 +38,15 @@ function setup(opts: { content?: string; lock?: string } = {}) {
     businessFact: { count: async () => 1 },
     businessCompetitor: { count: async () => 1 },
     businessOffering: {
-      findMany: async () => [
-        { claims: [] },
-        { claims: [{ feature: 'a', benefit: '', proof: '' }, { feature: 'b', benefit: '', proof: 'x' }] },
-        { claims: 'broken' },
-      ],
+      findMany: async () =>
+        opts.audiences?.offerings ?? [
+          { claims: [] },
+          { claims: [{ feature: 'a', benefit: '', proof: '' }, { feature: 'b', benefit: '', proof: 'x' }] },
+          { claims: 'broken' },
+        ],
     },
+    businessSegment: { findMany: async () => opts.audiences?.segments ?? [] },
+    offeringSegment: { findMany: async () => opts.audiences?.links ?? [] },
     businessQuestionSkip: {
       findMany: async () => skips,
       upsert: vi.fn(async ({ create }: { create: { code: string } }) => {
@@ -91,5 +100,67 @@ describe('ProfileQuestionsService', () => {
     expect(skipped.skipped).toBe(1);
     const back = await svc.resetSkips('b1', admin);
     expect(back.questions.map((q) => q.code)).toContain('OFFERINGS_NO_CLAIMS');
+  });
+});
+
+describe('audience questions (docs/73)', () => {
+  const offering = (id: string, over: Record<string, unknown> = {}) => ({
+    id,
+    parentId: null,
+    push: 1,
+    status: 'ACTIVE',
+    stock: 'IN_STOCK',
+    claims: [{ feature: 'a', benefit: 'b', proof: 'p' }],
+    peakMonths: [],
+    availableFrom: null,
+    availableUntil: null,
+    ...over,
+  });
+  const codes = async (audiences: Audiences) =>
+    (await setup({ audiences }).svc.list('b1', admin, NOW)).questions.map((q) => [q.code, q.count] as const);
+
+  it('asks for audiences when there are products but none', async () => {
+    const out = await codes({ offerings: [offering('o1')] });
+    expect(out).toContainEqual(['NO_SEGMENTS', 0]);
+    expect(out.map(([c]) => c)).not.toContain('OFFERINGS_NO_AUDIENCE');
+  });
+
+  it('counts the sellable products no audience is linked to, and the audiences linked to no product', async () => {
+    const out = await codes({
+      offerings: [offering('o1'), offering('o2'), offering('o3', { status: 'PAUSED' }), offering('o4', { push: 0 })],
+      segments: [{ id: 's1' }, { id: 's2' }],
+      links: [{ offeringId: 'o1', segmentId: 's1' }],
+    });
+    expect(out).toContainEqual(['OFFERINGS_NO_AUDIENCE', 1]);
+    expect(out).toContainEqual(['SEGMENTS_NO_OFFERING', 1]);
+    expect(out.map(([c]) => c)).not.toContain('NO_SEGMENTS');
+  });
+
+  it('does not ask about a line whose variants carry the audiences', async () => {
+    const out = await codes({
+      offerings: [offering('L'), offering('V', { parentId: 'L' })],
+      segments: [{ id: 's1' }],
+      links: [{ offeringId: 'V', segmentId: 's1' }],
+    });
+    expect(out.map(([c]) => c)).not.toContain('OFFERINGS_NO_AUDIENCE');
+  });
+
+  it('is quiet when every product has an audience and every audience a product', async () => {
+    const out = await codes({
+      offerings: [offering('o1')],
+      segments: [{ id: 's1' }],
+      links: [{ offeringId: 'o1', segmentId: 's1' }],
+    });
+    const found = out.map(([c]) => c);
+    expect(found).not.toContain('NO_SEGMENTS');
+    expect(found).not.toContain('OFFERINGS_NO_AUDIENCE');
+    expect(found).not.toContain('SEGMENTS_NO_OFFERING');
+  });
+
+  it('can be skipped like every other question', async () => {
+    const { svc } = setup({ audiences: { offerings: [offering('o1')] } });
+    const after = await svc.skip('b1', 'NO_SEGMENTS', admin);
+    expect(after.questions.map((q) => q.code)).not.toContain('NO_SEGMENTS');
+    expect(after.skipped).toBeGreaterThan(0);
   });
 });

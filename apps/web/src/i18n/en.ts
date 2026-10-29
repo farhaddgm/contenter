@@ -497,6 +497,25 @@ export const en: DeepStrings<Dictionary> = {
     published: 'Published {{date}}',
   },
   coverage: {
+    offerings: {
+      title: 'Product and service coverage',
+      subtitle:
+        'How many approved or published contents each offering had in the last 30, 60 and 90 days. A content goes to the offering and audience it (or its project) chose; counted by code. An offering with no content for {{days}} days is flagged, unless it cannot be sold or is not to be promoted.',
+      empty: 'No active offering in the catalog yet.',
+      offering: 'Offering',
+      last: 'Latest content',
+      never: 'Never',
+      daysAgo: '{{n}} days ago',
+      stale: 'No content',
+      notPromotable: 'Not promoted',
+      own: 'itself {{n}}',
+      withoutOffering: '{{n}} contents of the last 90 days are not tied to any offering.',
+      withoutAudience: '{{n}} contents have an offering but no audience.',
+      matrix: 'Offering × audience',
+      matrixHint: 'Contents of the last {{n}} days. A marked cell is an audience linked to the offering with no content for it.',
+      gap: 'Linked, but no content',
+      notLinked: 'Not linked, but has content',
+    },
     title: 'Content coverage map',
     subtitle:
       'How many approved or published contents each content pillar had in the period. Counted by code from the labels you set.',
@@ -2249,6 +2268,7 @@ export const en: DeepStrings<Dictionary> = {
         GOTO_PROFILE: 'Go to the section',
         GOTO_FACTS: 'Add key facts',
         GOTO_OFFERINGS: 'Go to products',
+        GOTO_AUDIENCES: 'Go to audiences',
         GOTO_COMPETITORS: 'Add competitors',
       },
       items: {
@@ -2259,6 +2279,9 @@ export const en: DeepStrings<Dictionary> = {
         noCompetitors: 'No competitor is listed yet. Who are your three main competitors?',
         noFacts: 'No key facts (prices, phone, opening hours …) are stored. Without them AI avoids stating these.',
         noOfferings: 'The products & services list is empty. What do you sell?',
+        noSegments: 'No audience (market or persona) is recorded yet. Who are your products for?',
+        offeringsNoAudience: '{{count}} products have no audience. Link each to its main audience.',
+        segmentsNoOffering: '{{count}} audiences are linked to no product. Which products do you write for them?',
         offeringsNoClaims: '{{count}} products have no selling point yet. For each, write what the customer gets.',
         peakSoon: 'The peak season of {{count}} products starts next month. Plan content for them.',
         claimsUnproven: '{{count}} selling points have no proof. Add a number, certificate or example.',

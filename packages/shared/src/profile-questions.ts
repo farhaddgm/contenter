@@ -13,6 +13,7 @@ export const ProfileQuestionAction = [
   'GOTO_PROFILE',
   'GOTO_FACTS',
   'GOTO_OFFERINGS',
+  'GOTO_AUDIENCES',
   'GOTO_COMPETITORS',
 ] as const;
 export type ProfileQuestionAction = (typeof ProfileQuestionAction)[number];
@@ -51,6 +52,12 @@ export interface QuestionInput {
     unprovenClaims: number;
     /** Offerings whose peak season starts next month (`peakingSoon`). */
     peakSoon?: number;
+    /** Active audiences (docs/73). Absent = not counted (no audience questions). */
+    segments?: number;
+    /** Promotable offerings, with no variant of their own, that no active audience is linked to. */
+    offeringsWithoutAudience?: number;
+    /** Active audiences linked to no usable offering. */
+    segmentsWithoutOffering?: number;
   };
   /** Codes the admin skipped. */
   skipped: readonly string[];
@@ -118,6 +125,17 @@ export function buildProfileQuestions(input: QuestionInput): {
     if (c.unprovenClaims > 0) {
       add({ code: 'CLAIMS_UNPROVEN', action: 'GOTO_OFFERINGS', sectionKey: 'SERVICES', priority: 245, count: c.unprovenClaims });
     }
+    // audiences (docs/73): found by code from the links the admin made
+    if (c.segments !== undefined) {
+      if (c.segments === 0) {
+        add({ code: 'NO_SEGMENTS', action: 'GOTO_AUDIENCES', sectionKey: 'PERSONAS', priority: 235 });
+      } else if ((c.offeringsWithoutAudience ?? 0) > 0) {
+        add({ code: 'OFFERINGS_NO_AUDIENCE', action: 'GOTO_OFFERINGS', sectionKey: 'PERSONAS', priority: 238, count: c.offeringsWithoutAudience });
+      }
+    }
+  }
+  if ((c.segmentsWithoutOffering ?? 0) > 0) {
+    add({ code: 'SEGMENTS_NO_OFFERING', action: 'GOTO_AUDIENCES', sectionKey: 'PERSONAS', priority: 236, count: c.segmentsWithoutOffering });
   }
 
   const open = all.filter((q) => !skipped.has(q.code));

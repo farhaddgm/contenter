@@ -3,6 +3,7 @@ import type {
   ContentPillar,
   CoverageBy,
   CoverageReport,
+  OfferingCoverageReport,
   SavePillarsInput,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
@@ -35,6 +36,16 @@ export interface CoverageParams {
   days: number;
   by: CoverageBy;
   staleDays: number;
+}
+
+/** Coverage of the catalog by content in the last 30 / 60 / 90 days, and the offering × audience matrix (docs/73). */
+export function useOfferingCoverage(businessId: string, staleDays: number) {
+  return useQuery({
+    queryKey: ['businesses', businessId, 'offering-coverage', staleDays],
+    queryFn: () =>
+      api.get<OfferingCoverageReport>(`/businesses/${businessId}/offering-coverage`, { staleDays }),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useCoverage(businessId: string, params: CoverageParams) {

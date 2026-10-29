@@ -104,6 +104,24 @@ export function buildDocooExport(b: ExportRow, now: Date = new Date()): DocooBus
       verified: o.verified,
       isActive: o.isActive,
       updatedAt: iso(o.updatedAt),
+      parentId: o.parentId,
+      guardrails: o.guardrails,
+      audiences: [...o.segmentLinks]
+        .sort((a, b) => b.fit - a.fit || a.segmentId.localeCompare(b.segmentId))
+        .map((l) => ({ segmentId: l.segmentId, fit: l.fit })),
+    })),
+    segments: b.segments.map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      name: s.name,
+      summary: s.summary,
+      goals: s.goals,
+      pains: s.pains,
+      objections: s.objections,
+      channels: s.channels,
+      messageAngle: s.messageAngle,
+      isActive: s.isActive,
+      updatedAt: iso(s.updatedAt),
     })),
     terms: b.terms.map((t) => ({
       id: t.id,
