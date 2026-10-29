@@ -381,6 +381,9 @@ export class ContentsService {
           status: 'GENERATING',
           // same campaign and tags as the original
           campaignId: source.campaignId,
+          // the same offering and audience as the original (docs/73); null still follows the project
+          offeringId: source.offeringId,
+          segmentId: source.segmentId,
           tags: source.tags.length ? { connect: source.tags } : undefined,
           createdById: user.id,
         },

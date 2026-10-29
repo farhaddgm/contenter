@@ -266,6 +266,16 @@ describe('BusinessApi.focusForPrompt', () => {
     expect(out?.segments[0]).not.toHaveProperty('id');
   });
 
+  it('leaves out an offering that is paused or not to be pushed, but keeps the chosen audience', async () => {
+    const paused = { ...core('p', 'متوقف'), status: 'PAUSED' as const };
+    const quiet = { ...core('q', 'بی‌تبلیغ'), push: 0 };
+    const { api: a } = api({ rows: [paused, quiet], segmentRow: seg('انتخابی') });
+    const one = await a.focusForPrompt('b1', { offeringId: 'p', segmentId: 's1' });
+    expect(one?.chain).toEqual([]);
+    expect(one?.segments).toHaveLength(1);
+    expect(await a.focusForPrompt('b1', { offeringId: 'q' })).toBeNull();
+  });
+
   it('is null when the offering is not usable and no audience is left', async () => {
     const { api: a } = api({ rows: [core('x', 'مستقل')] });
     expect(await a.focusForPrompt('b1', { offeringId: 'gone', segmentId: 'zz' })).toBeNull();

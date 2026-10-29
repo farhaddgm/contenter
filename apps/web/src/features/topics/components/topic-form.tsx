@@ -104,13 +104,20 @@ export function TopicFormDrawer({
   // an offering and an audience of the chosen business (docs/73)
   const focus = useFocusOptions(chosenBusiness, topic);
 
+  // An offering or audience is dropped only when the business changed (the server checks the rest);
+  // while the option lists are still loading or failed, a saved choice must not be wiped by a save.
+  const keepFocus = (value: string | null | undefined, options: { value: string }[]) =>
+    value && ((topic && form.getValues('businessId') === topic.businessId) || options.some((o) => o.value === value))
+      ? value
+      : null;
+
   const onSubmit = form.handleSubmit((raw) => {
     // a style, offering or audience left over from another business is dropped
     const values = {
       ...raw,
       styleId: styleOptions.some((o) => o.value === raw.styleId) ? raw.styleId : null,
-      offeringId: focus.offeringOptions.some((o) => o.value === raw.offeringId) ? raw.offeringId : null,
-      segmentId: focus.segmentOptions.some((o) => o.value === raw.segmentId) ? raw.segmentId : null,
+      offeringId: keepFocus(raw.offeringId, focus.offeringOptions),
+      segmentId: keepFocus(raw.segmentId, focus.segmentOptions),
     };
     if (topic) {
       update.mutate(values, {

@@ -2,6 +2,7 @@ import { Global, Injectable, Module } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
   FOCUS_SEGMENTS_MAX,
+  isOfferingAvailable,
   FOCUS_SIBLINGS_MAX,
   offeringAncestors,
   offeringQualityRules,
@@ -212,7 +213,9 @@ export class BusinessApi {
       });
       const byId = new Map(rows.map((r) => [r.id, r]));
       const self = byId.get(focus.offeringId);
-      if (self) {
+      // an offering that cannot be sold today, or that the admin does not want pushed, is not written
+      // about (the catalog already says so); leaving it out avoids a block that contradicts itself
+      if (self && isOfferingAvailable(self) && self.push > 0) {
         const above = offeringAncestors(self.id, byId)
           .reverse()
           .flatMap((id) => byId.get(id) ?? []);
