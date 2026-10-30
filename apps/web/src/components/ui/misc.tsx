@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useContext, useState, type ComponentProps, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronRight, Copy } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -7,11 +8,15 @@ import { DropdownMenu as DM } from 'radix-ui';
 import { useT } from '@/i18n';
 import { cn } from '@/utils/cn';
 import { Button } from './button';
+import { InfoTip } from './info-tip';
+import { PageHeaderSlot } from './page-header-slot';
 
 /**
- * Page title block. Actions are authored primary-first; `flex-row-reverse` makes the primary action
- * the last one in reading order (Bee Researcher rule), in both RTL and LTR. On phones the actions
- * take their own full-width row.
+ * Page title block. Inside the dashboard layout the page name goes to the top bar (between the menu
+ * button and the search box) with the description in an "i" popup; only the breadcrumb and the
+ * actions stay in the page. Without the layout (tests, standalone) everything renders inline.
+ * Actions are authored primary-first; `flex-row-reverse` makes the primary action the last one in
+ * reading order (Bee Researcher rule), in both RTL and LTR.
  */
 export function PageHeader({
   title,
@@ -24,23 +29,56 @@ export function PageHeader({
   actions?: ReactNode;
   breadcrumb?: ReactNode;
 }) {
+  const slot = useContext(PageHeaderSlot);
+  const heading = (
+    <h1
+      className={cn(
+        'text-balance font-extrabold leading-snug tracking-tight',
+        slot ? 'truncate text-lg sm:text-xl' : 'text-2xl sm:text-[1.65rem]',
+      )}
+    >
+      {title}
+    </h1>
+  );
+  const actionRow = actions && (
+    <div className="flex max-w-full flex-row-reverse flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-start">
+      {actions}
+    </div>
+  );
+  if (slot) {
+    return (
+      <>
+        {createPortal(
+          <>
+            {heading}
+            {description && <InfoTip>{description}</InfoTip>}
+          </>,
+          slot,
+        )}
+        {(breadcrumb || actionRow) && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            {breadcrumb ? (
+              <div className="min-w-0 text-sm text-muted-foreground">{breadcrumb}</div>
+            ) : (
+              <span />
+            )}
+            {actionRow}
+          </div>
+        )}
+      </>
+    );
+  }
   return (
     <div className="mb-7 space-y-3">
       {breadcrumb && <div className="text-sm text-muted-foreground">{breadcrumb}</div>}
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
         <div className="min-w-0 flex-1 basis-80 space-y-1.5">
-          <h1 className="text-balance text-2xl font-extrabold leading-snug tracking-tight sm:text-[1.65rem]">
-            {title}
-          </h1>
+          {heading}
           {description && (
             <p className="max-w-3xl text-sm leading-7 text-muted-foreground">{description}</p>
           )}
         </div>
-        {actions && (
-          <div className="flex max-w-full flex-row-reverse flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-start">
-            {actions}
-          </div>
-        )}
+        {actionRow}
       </div>
     </div>
   );
@@ -155,7 +193,8 @@ export function Segmented<T extends string>({
 }
 
 export const Dropdown = {
-  Root: DM.Root,
+  // non-modal: a modal menu locks body scroll, which hides the page scrollbar and shifts the layout
+  Root: (props: ComponentProps<typeof DM.Root>) => <DM.Root modal={false} {...props} />,
   Trigger: DM.Trigger,
   Content: ({
     children,

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } from 'react-router';
 import { paths } from '@/config/paths';
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { PageSpinner } from '@/components/ui/spinner';
@@ -18,6 +18,13 @@ function AppRoot() {
       </DashboardLayout>
     </ProtectedRoute>
   );
+}
+
+/** Old per-page Smart URLs now live as tabs of one page; keeps the query (e.g. ?id=). */
+function SmartRedirect({ tab }: { tab: 'errors' | 'issues' | 'interactions' }) {
+  const params = new URLSearchParams(useLocation().search);
+  params.set('tab', tab);
+  return <Navigate to={`${paths.app.admin.smart.getHref()}?${params}`} replace />;
 }
 
 function AdminOnly() {
@@ -82,7 +89,7 @@ const router = createBrowserRouter([
         children: [
           {
             path: paths.app.admin.users.path,
-            lazy: lazyRoute(() => import('./routes/app/admin/users')),
+            element: <Navigate to="/app/admin/settings?tab=users" replace />,
           },
           {
             path: paths.app.admin.jobs.path,
@@ -105,16 +112,14 @@ const router = createBrowserRouter([
             lazy: lazyRoute(() => import('./routes/app/admin/audit')),
           },
           {
-            path: paths.app.admin.smartErrors.path,
-            lazy: lazyRoute(() => import('./routes/app/admin/smart-errors')),
+            path: paths.app.admin.smart.path,
+            lazy: lazyRoute(() => import('./routes/app/admin/smart')),
           },
-          {
-            path: paths.app.admin.smartIssues.path,
-            lazy: lazyRoute(() => import('./routes/app/admin/smart-issues')),
-          },
+          { path: paths.app.admin.smartErrors.path, element: <SmartRedirect tab="errors" /> },
+          { path: paths.app.admin.smartIssues.path, element: <SmartRedirect tab="issues" /> },
           {
             path: paths.app.admin.smartInteractions.path,
-            lazy: lazyRoute(() => import('./routes/app/admin/smart-interactions')),
+            element: <SmartRedirect tab="interactions" />,
           },
         ],
       },

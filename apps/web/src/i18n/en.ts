@@ -1496,8 +1496,9 @@ export const en: DeepStrings<Dictionary> = {
     builtIn: 'Built-in default',
   },
   settings: {
-    title: 'System settings',
-    subtitle: 'AI model and effort level per job type.',
+    title: 'Settings',
+    subtitle: 'AI model and effort per job type, users, content quality and integrations.',
+    tabs: { ai: 'AI', users: 'Users', quality: 'Workflow & quality', integrations: 'Notifications & integrations' },
     provider: 'AI provider',
     defaultModel: 'Default model',
     modelFor: 'Model',
@@ -1586,6 +1587,7 @@ export const en: DeepStrings<Dictionary> = {
   },
   smart: {
     name: 'Smart',
+    subtitle: 'Error tracker, Walker issue log, interaction log and Smart collection settings.',
     toggleOn: 'Turn Smart on',
     toggleOff: 'Turn Smart off',
     tabs: { walker: 'Walker', chat: 'Chat', errors: 'Errors' },
@@ -1772,6 +1774,7 @@ export const en: DeepStrings<Dictionary> = {
       user: 'User',
     },
     settings: {
+      tab: 'Settings',
       title: 'Smart — detailed interaction logging',
       description:
         'When on, every user interaction (each API request with a sanitized body, page views, clicks and Walker actions) is stored in the database so Walker and Smart can analyze more precisely. When off, only the existing audit log is collected.',
