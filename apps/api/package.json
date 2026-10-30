@@ -41,7 +41,7 @@
     "jszip": "^3.10.2",
     "linkedom": "^0.18.12",
     "mammoth": "^1.13.0",
-    "multer": "^2.4.0",
+    "multer": "^2.5.0",
     "nodemailer": "^10.1.2",
     "openai": "^7.37.0",
     "reflect-metadata": "^0.2.2",
