@@ -8,6 +8,8 @@ import {
   type SegmentsPropose,
   type StyleBuild,
   type BusinessAuditResult,
+  type BusinessChatDigest,
+  type BusinessChatReply,
   type BusinessReviseResult,
   type BusinessSuggestResult,
   type ContentDraftResult,
@@ -258,6 +260,30 @@ export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvide
           ],
           gaps: ['قیمت‌ها از منابع عمومی تأیید نشد (mock).'],
         } satisfies BusinessReviseResult;
+      case 'BUSINESS_CHAT': {
+        // transcript lines look like "ADMIN: …"; the digest prompt ends with its own marker
+        const said = [...req.user.matchAll(/^ADMIN: (.+)$/gm)].map((m) => m[1]!.trim());
+        const last = said.at(-1) ?? '';
+        const point = {
+          point: last.slice(0, 200) || 'نکتهٔ آزمایشی (mock)',
+          kind: 'FACT' as const,
+          sections: ['OVERVIEW', 'VALUE_PROPOSITION'] as BusinessSectionKey[],
+        };
+        if (req.user.includes('Write the digest of this conversation')) {
+          return {
+            summary: 'خلاصهٔ آزمایشی (mock) از گفتگو.',
+            noteText: said.length ? said.join('\n') : 'یادداشت آزمایشی (mock).',
+            points: [point],
+            openQuestions: [],
+          } satisfies BusinessChatDigest;
+        }
+        return {
+          reply: `متوجه شدم (mock): «${last.slice(0, 120)}». این مورد معرفی و ارزش پیشنهادی را تغییر می‌دهد.`,
+          understood: [point],
+          questions: [],
+          conflicts: [],
+        } satisfies BusinessChatReply;
+      }
       case 'BUSINESS_STYLE_BUILD':
         return {
           summary: 'سبک آزمایشی (mock): جمله‌های کوتاه، لحن صمیمی و پایان با یک دعوت ساده.',

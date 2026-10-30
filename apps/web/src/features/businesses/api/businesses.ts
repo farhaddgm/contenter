@@ -4,6 +4,8 @@ import type {
   AddReferenceInput,
   BlockedSource,
   BusinessAsset,
+  BusinessChat,
+  ApplyChatInput,
   BusinessNote,
   BusinessReference,
   CreateBusinessNoteInput,
@@ -47,6 +49,7 @@ export const businessKeys = {
   drive: ['google-drive'] as const,
   instagram: ['businesses', 'instagram-status'] as const,
   notes: (id: string) => ['businesses', id, 'notes'] as const,
+  chat: (id: string) => ['businesses', id, 'chat'] as const,
   assets: (id: string) => ['businesses', id, 'assets'] as const,
   asset: (id: string) => ['business-assets', id] as const,
 };
@@ -513,4 +516,60 @@ export function useDeleteAsset(businessId: string) {
     mutationFn: (id: string) => api.delete(`/business-assets/${id}`),
     onSuccess: invalidate,
   });
+}
+
+// ---------- conversation with AI about the profile (docs/75) ----------
+
+/** The open conversation, or null. Polls while AI is answering or writing the digest. */
+export function useProfileChat(businessId: string) {
+  return useQuery({
+    queryKey: businessKeys.chat(businessId),
+    queryFn: async () =>
+      (await api.get<{ chat: BusinessChat | null }>(`/businesses/${businessId}/chat`)).chat,
+    refetchInterval: (q) => {
+      const chat = q.state.data;
+      const busy =
+        chat?.digestStatus === 'PENDING' || chat?.messages.some((m) => m.status === 'PENDING');
+      return busy ? 2500 : false;
+    },
+  });
+}
+
+function useChatMutation<T, V>(businessId: string, fn: (v: V) => Promise<T>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: businessKeys.chat(businessId) });
+      void qc.invalidateQueries({ queryKey: businessKeys.notes(businessId) });
+    },
+  });
+}
+
+export function useSendChatMessage(businessId: string) {
+  return useChatMutation(businessId, (text: string) =>
+    api.post<{ id: string }>(`/businesses/${businessId}/chat/messages`, { text }),
+  );
+}
+
+export function useRetryChatReply(businessId: string) {
+  return useChatMutation(businessId, (chatId: string) =>
+    api.post<{ id: string }>(`/business-chats/${chatId}/retry`, {}),
+  );
+}
+
+export function useChatDigest(businessId: string) {
+  return useChatMutation(businessId, (chatId: string) =>
+    api.post<{ id: string }>(`/business-chats/${chatId}/digest`, {}),
+  );
+}
+
+export function useApplyChat(businessId: string) {
+  return useChatMutation(businessId, ({ chatId, ...data }: ApplyChatInput & { chatId: string }) =>
+    api.post<{ id: string; jobId: string }>(`/business-chats/${chatId}/apply`, data),
+  );
+}
+
+export function useDiscardChat(businessId: string) {
+  return useChatMutation(businessId, (chatId: string) => api.delete(`/business-chats/${chatId}`));
 }

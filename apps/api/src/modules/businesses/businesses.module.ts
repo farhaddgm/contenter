@@ -75,6 +75,8 @@ import { AiJobsService } from '../ai/ai-jobs.service';
 import { GoogleDriveModule } from '../google-drive/google-drive.module';
 import { SamplesCoreModule } from '../samples/samples-core.module';
 import { FileStorageService } from '../../infra/storage/file-storage.service';
+import { BusinessChatController } from './business-chat.controller';
+import { BusinessChatService } from './business-chat.service';
 import { BusinessNotesAssetsController } from './notes-assets.controller';
 import {
   AssetUploadInterceptor,
@@ -1141,6 +1143,7 @@ export class BusinessItemsController {
     BusinessesController,
     BusinessItemsController,
     BusinessNotesAssetsController,
+    BusinessChatController,
     ProfileKnowledgeController,
     StylesController,
     OfferingsController,
@@ -1157,6 +1160,7 @@ export class BusinessItemsController {
     PodSpaceService,
     AssetImportService,
     BusinessNotesService,
+    BusinessChatService,
     BusinessAssetsService,
     AssetUploadInterceptor,
     ProfileKnowledgeService,

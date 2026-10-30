@@ -64,6 +64,7 @@ model User {
   businessReferences  BusinessReference[]
   googleDriveAccounts GoogleDriveAccount[]
   businessNotes       BusinessNote[]
+  businessChats       BusinessChat[]
   businessStyles      BusinessStyle[]
   styleSources        StyleSource[]
   businessAssets      BusinessAsset[]
@@ -195,6 +196,7 @@ model Business {
   discoveries   BusinessDiscovery[]
   references    BusinessReference[]
   notes         BusinessNote[]
+  chats         BusinessChat[]
   assets        BusinessAsset[]
   facts         BusinessFact[]
   terms         BusinessTerm[]
@@ -434,6 +436,67 @@ model BusinessNote {
   createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([businessId, createdAt])
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+enum ChatMessageStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+enum ChatState {
+  OPEN
+  APPLIED
+}
+
+/// The admin's conversation with AI about a business profile (docs/75). Nothing in the profile
+/// changes while it runs; applying the digest creates a BusinessNote (BUSINESS_REVISE).
+model BusinessChat {
+  id           String    @id @default(cuid())
+  businessId   String
+  state        ChatState @default(OPEN)
+  /// BusinessChatDigest (JSON), written by the BUSINESS_CHAT digest step
+  digest       Json?
+  /// NONE / PENDING / DONE / FAILED
+  digestStatus String    @default("NONE")
+  digestError  String?
+  digestJobId  String?
+  /// Number of messages the digest was made from
+  digestUpTo   Int       @default(0)
+  noteId       String?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  business  Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  messages  BusinessChatMessage[]
+
+  @@index([businessId, state])
+}
+
+model BusinessChatMessage {
+  id         String            @id @default(cuid())
+  chatId     String
+  role       ChatRole
+  text       String            @default("")
+  status     ChatMessageStatus @default(DONE)
+  error      String?
+  /// ChatPoint[] — the running list of what AI understood (assistant messages)
+  understood Json?
+  questions  String[]
+  conflicts  String[]
+  jobId      String?
+  createdAt  DateTime          @default(now())
+
+  chat BusinessChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
 }
 
 enum BusinessAssetKind {
@@ -1607,6 +1670,8 @@ enum AiJobType {
   BUSINESS_OFFERINGS_EXTRACT
   /// Proposes audiences (markets, personas) from the profile and references; code checks each against its quote (docs/73)
   BUSINESS_SEGMENTS_PROPOSE
+  /// One turn (or the closing digest) of the admin's conversation about a business profile (docs/75)
+  BUSINESS_CHAT
 }
 
 enum AiJobStatus {

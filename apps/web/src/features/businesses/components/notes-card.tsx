@@ -21,6 +21,7 @@ import {
   useReferences,
   useUpdateNote,
 } from '../api/businesses';
+import { ProfileChat } from './profile-chat';
 import { ScopePicker, scopeIsUsable, type ScopeValue } from './scope-picker';
 
 const HISTORY_PREVIEW = 3;
@@ -53,6 +54,7 @@ export function NotesCard({
   const [scope, setScope] = useState<ScopeValue>({ scope: 'NONE', referenceIds: null });
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [mode, setMode] = useState<'chat' | 'quick'>('chat');
 
   const pending = notes.data?.find((n) => n.status === 'PENDING');
   const tracker = useTrackJob(pending?.jobId, {
@@ -103,6 +105,25 @@ export function NotesCard({
           />
         )}
         {editable && (
+          <div className="flex gap-2" role="tablist">
+            {(['chat', 'quick'] as const).map((m) => (
+              <Button
+                key={m}
+                size="sm"
+                role="tab"
+                aria-selected={mode === m}
+                variant={mode === m ? 'default' : 'outline'}
+                onClick={() => setMode(m)}
+              >
+                {t(m === 'chat' ? 'businesses.notes.chat.tabChat' : 'businesses.notes.chat.tabQuick')}
+              </Button>
+            ))}
+          </div>
+        )}
+        {editable && mode === 'chat' && (
+          <ProfileChat businessId={businessId} hasWebsite={hasWebsite} disabled={disabled} />
+        )}
+        {editable && mode === 'quick' && (
           <div className="space-y-3">
             <Textarea
               rows={4}
