@@ -613,6 +613,10 @@ model BusinessOffering {
   features        String[]
   /// [{ feature, benefit, proof }] — what it has, what the customer gets, what backs it (docs/67 §4.9)
   claims          Json           @default("[]")
+  /// [{ name, kind, ourEdge, theirEdge, checkedOn }] — what a customer could pick instead (docs/74)
+  alternatives    Json           @default("[]")
+  /// Who should not buy this; keeps content from overselling (docs/74)
+  notFor          String[]
   priceAmount     Decimal?       @db.Decimal(18, 2)
   /// IRT (toman) | IRR (rial) | USD | EUR — always given with a price, never converted
   priceCurrency   String?

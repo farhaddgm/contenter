@@ -30,6 +30,8 @@ import {
   FOCUS_BRAND_SECTION_CHARS,
   FOCUS_TRIMMED_SECTIONS,
   MAX_FOCUS_TEXT,
+  isAlternativeStale,
+  parseAlternatives,
   parseClaims,
   isRegister,
   MAX_CATALOG_TEXT,
@@ -41,6 +43,7 @@ import {
   type FetchedMedia,
   type FocusForPrompt,
   type FocusSegmentForPrompt,
+  type OfferingAlternative,
   type OfferingClaim,
   type OfferingCore,
   type SampleAnalysisResult,
@@ -227,6 +230,22 @@ const claimLine = (c: OfferingClaim): string =>
     isClaimProven(c) ? ` (proof: ${c.proof})` : ' (no proof — do not state as certain)'
   }`;
 
+const ALTERNATIVE_LABEL: Record<OfferingAlternative['kind'], string> = {
+  COMPETITOR: 'competitor',
+  DIY: 'do it yourself',
+  STATUS_QUO: 'do nothing',
+  OTHER: 'other',
+};
+const alternativeLine = (a: OfferingAlternative, now: Date): string => {
+  const stale = isAlternativeStale(a, now) ? ' (unchecked or old — do not state as certain)' : '';
+  const ours = a.ourEdge ? `
+      we are better: ${a.ourEdge}` : '';
+  const theirs = a.theirEdge ? `
+      it is better: ${a.theirEdge}` : '';
+  return `
+    - ${a.name} [${ALTERNATIVE_LABEL[a.kind]}]${stale}${ours}${theirs}`;
+};
+
 /**
  * What the business sells (docs/67-business-catalog.md), in the order they arrive (push level, then
  * the admin's order). A price shows only while it is valid; an offering that cannot be sold today is
@@ -280,7 +299,14 @@ function catalogLines(offerings: OfferingForPrompt[], now: Date) {
     const claims = list.length ? `\n  Selling points:${list.map(claimLine).join('')}` : '';
     const never = o.id ? effectiveGuardrails(o.id, byId) : (o.guardrails ?? []);
     const guard = never.length ? `\n  Never say: ${never.join(' | ')}` : '';
-    return `${head}${alias}${summary}${features}${claims}${guard}${pairs}`;
+    const rivals = parseAlternatives(o.alternatives);
+    const versus = rivals.length
+      ? `
+  Versus alternatives (for positioning only; never name a competitor in the copy, never run it down):${rivals.map((a) => alternativeLine(a, now)).join('')}`
+      : '';
+    const notFor = o.notFor?.length ? `
+  Not for: ${o.notFor.join(' | ')}` : '';
+    return `${head}${alias}${summary}${features}${claims}${versus}${notFor}${guard}${pairs}`;
   }
   const lines = placed.map(({ row: o, depth }) => {
     const text = catalogLine(o);
@@ -303,6 +329,9 @@ export function formatBusinessCatalog(offerings: OfferingForPrompt[], now = new 
         : '') +
       (hasGuardrails
         ? ' Never write the phrases listed after "Never say" about that item (a variant is bound by its line\'s phrases too).'
+        : '') +
+      (offerings.some((o) => parseAlternatives(o.alternatives).length || o.notFor?.length)
+        ? ' "Versus alternatives" and "Not for" shape the angle only: claim an edge over an alternative only as listed, admit where it is better when asked, and do not pitch an item to the people it is not for.'
         : ''),
     ...budgeted(lines, MAX_CATALOG_TEXT),
   ].join('\n');
