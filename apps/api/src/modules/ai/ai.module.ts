@@ -27,6 +27,7 @@ import {
   ReviseContentRunner,
 } from './runners/content.runners';
 import { BusinessOfferingsExtractRunner } from './runners/business-offerings.runner';
+import { BusinessCompetitorsProposeRunner } from './runners/business-competitors.runner';
 import { BusinessChatRunner } from './runners/business-chat.runner';
 import { BusinessSegmentsProposeRunner } from './runners/business-segments.runner';
 import { BusinessStyleBuildRunner } from './runners/business-style.runner';
@@ -57,6 +58,7 @@ const RUNNERS = [
   BusinessOfferingsExtractRunner,
   BusinessSegmentsProposeRunner,
   BusinessChatRunner,
+  BusinessCompetitorsProposeRunner,
 ];
 
 @Global()

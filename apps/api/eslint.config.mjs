@@ -44,6 +44,7 @@ export default tseslint.config(
       'src/modules/ai/runners/business-offerings.runner.ts',
       'src/modules/ai/runners/business-segments.runner.ts',
       'src/modules/ai/runners/business-chat.runner.ts',
+      'src/modules/ai/runners/business-competitors.runner.ts',
       'src/modules/ai/runners/embed-reference.runner.ts',
       'src/common/access.ts',
       'src/modules/users/users.module.ts',

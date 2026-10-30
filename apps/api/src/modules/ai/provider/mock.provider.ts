@@ -9,6 +9,7 @@ import {
   type StyleBuild,
   type BusinessAuditResult,
   type BusinessChatDigest,
+  type CompetitorsPropose,
   type BusinessChatReply,
   type BusinessReviseResult,
   type BusinessSuggestResult,
@@ -327,6 +328,37 @@ export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvide
             : [],
           notes: 'خروجی آزمایشی (mock).',
         } satisfies OfferingsExtract;
+      }
+      case 'BUSINESS_COMPETITORS_PROPOSE': {
+        // names the first two words of the first source line, so its quote names it and is found
+        const sources = /<sources>\n([\s\S]*?)\n<\/sources>/.exec(req.user)?.[1] ?? '';
+        const line = sources
+          .split('\n')
+          .map((l) => l.trim())
+          .find((l) => l && !/^\[[SR]\d+\]/.test(l));
+        const quote = (line ?? '')
+          .replace(/^[-*#\s]+/, '')
+          .replace(/\*\*/g, '')
+          .slice(0, 80);
+        const name = quote.split(/\s+/).slice(0, 2).join(' ');
+        return {
+          competitors: quote
+            ? [
+                {
+                  name,
+                  kind: 'DIRECT' as const,
+                  website: '',
+                  positioning: '',
+                  pricing: '',
+                  strengths: [],
+                  weaknesses: [],
+                  difference: '',
+                  evidence: quote,
+                },
+              ]
+            : [],
+          notes: 'پیشنهاد آزمایشی (mock).',
+        } satisfies CompetitorsPropose;
       }
       case 'BUSINESS_SEGMENTS_PROPOSE': {
         // proposes the first line of the first source as a persona, so its quote can be found

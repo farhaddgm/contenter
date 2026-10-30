@@ -5,6 +5,7 @@ import type {
   CompareReport,
   CompetitorSourceSummary,
   CreateBusinessCompetitorInput,
+  JobAccepted,
   UpdateBusinessCompetitorInput,
 } from '@contenter/shared';
 import { api } from '@/lib/api-client';
@@ -124,5 +125,20 @@ export function useCompetitorCompare(businessId: string, enabled: boolean) {
     queryKey: competitorSourceKeys.compare(businessId),
     queryFn: () => api.get<CompareReport>(`/businesses/${businessId}/competitors/compare`),
     enabled,
+  });
+}
+
+/** Asks the model to propose cards from the stored material; they wait, unused, for confirmation. */
+export function useProposeCompetitors(businessId: string) {
+  return useMutation({
+    mutationFn: () => api.post<JobAccepted>(`/businesses/${businessId}/competitors/propose`),
+  });
+}
+
+export function useConfirmCompetitor(businessId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<BusinessCompetitor>(`/business-competitors/${id}/confirm`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: competitorKeys.list(businessId) }),
   });
 }

@@ -154,6 +154,7 @@ export const AiJobType = [
   'BUSINESS_OFFERINGS_EXTRACT',
   'BUSINESS_SEGMENTS_PROPOSE',
   'BUSINESS_CHAT',
+  'BUSINESS_COMPETITORS_PROPOSE',
 ] as const;
 export type AiJobType = (typeof AiJobType)[number];
 

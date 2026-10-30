@@ -12,6 +12,7 @@ import {
 } from '@contenter/shared';
 import { type AuthUser } from '../../common/auth.decorators';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { AiJobsService } from '../ai/ai-jobs.service';
 import { AuditService } from '../audit/audit.service';
 import { writeSection } from './section-writer';
 
@@ -30,10 +31,14 @@ export const competitorOf = (r: CompetitorRow): BusinessCompetitor => ({
   note: r.note,
   isActive: r.isActive,
   sortOrder: r.sortOrder,
+  source: r.source,
+  verified: r.verified,
+  evidence: r.evidence,
   createdAt: r.createdAt.toISOString(),
   updatedAt: r.updatedAt.toISOString(),
 });
 
+const RUNNING = ['QUEUED', 'RUNNING', 'WAITING'] as const;
 const ORDER = [{ kind: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }] as const;
 
 /**
@@ -46,6 +51,7 @@ export class CompetitorsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly jobs: AiJobsService,
   ) {}
 
   private log(user: AuthUser, businessId: string, action: string, meta?: Record<string, unknown>) {
@@ -106,6 +112,8 @@ export class CompetitorsService {
   async update(id: string, input: UpdateBusinessCompetitorInput, user: AuthUser) {
     const data = UpdateBusinessCompetitorSchema.parse(input);
     const row = await this.find(id);
+    // a card the model proposed is switched on only by confirming it
+    if (data.isActive === true && !row.verified) throw new BadRequestException('Confirm this competitor first');
     if (data.name !== undefined && data.name.toLowerCase() !== row.name.toLowerCase()) {
       await this.assertNameFree(row.businessId, data.name, id);
     }
@@ -115,6 +123,55 @@ export class CompetitorsService {
     });
     this.log(user, row.businessId, 'update', { competitorId: id });
     return competitorOf(updated);
+  }
+
+  /** The admin read an AI-proposed card and accepts it: from now on it can go to the profile. */
+  async confirm(id: string, user: AuthUser) {
+    const row = await this.find(id);
+    const updated = await this.prisma.businessCompetitor.update({
+      where: { id },
+      data: { verified: true, isActive: true, updatedById: user.id },
+    });
+    this.log(user, row.businessId, 'confirm', { competitorId: id });
+    return competitorOf(updated);
+  }
+
+  /**
+   * Queues the model to propose cards from what is already stored (docs/70 §11). It reads the
+   * COMPETITORS section, key facts and references only; the runner checks every card against its
+   * quote before saving it, inactive.
+   */
+  async propose(businessId: string, user: AuthUser) {
+    const [section, facts, references, count, running] = await Promise.all([
+      this.prisma.businessSection.count({
+        where: { businessId, key: 'COMPETITORS', content: { not: '' } },
+      }),
+      this.prisma.businessFact.count({ where: { businessId, isActive: true } }),
+      this.prisma.businessReference.count({
+        where: { businessId, status: 'READY', isActive: true, content: { not: '' } },
+      }),
+      this.prisma.businessCompetitor.count({ where: { businessId } }),
+      this.prisma.aiJob.findFirst({
+        where: { type: 'BUSINESS_COMPETITORS_PROPOSE', targetId: businessId, status: { in: [...RUNNING] } },
+        select: { id: true },
+      }),
+    ]);
+    if (running) throw new BadRequestException('A proposal is already being prepared');
+    if (!section && !facts && !references) {
+      throw new BadRequestException('Write the competitors section, add key facts or add a reference first');
+    }
+    if (count >= BUSINESS_COMPETITOR_LIMIT) {
+      throw new BadRequestException(`A business can have at most ${BUSINESS_COMPETITOR_LIMIT} competitors`);
+    }
+    const job = await this.jobs.enqueue({
+      type: 'BUSINESS_COMPETITORS_PROPOSE',
+      targetType: 'Business',
+      targetId: businessId,
+      input: {},
+      userId: user.id,
+    });
+    this.log(user, businessId, 'propose', { jobId: job.id });
+    return { jobId: job.id };
   }
 
   async remove(id: string, user: AuthUser) {

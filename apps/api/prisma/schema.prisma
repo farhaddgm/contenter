@@ -803,6 +803,12 @@ model BusinessCompetitor {
   note        String         @default("")
   isActive    Boolean        @default(true)
   sortOrder   Int            @default(0)
+  /// ADMIN typed it; AI proposed it (inactive and unverified until the admin confirms it)
+  source      SectionSource  @default(ADMIN)
+  verified    Boolean        @default(true)
+  /// The quote from a source that backed an AI proposal
+  evidence    String         @default("")
+  jobId       String?
   updatedById String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
@@ -1672,6 +1678,8 @@ enum AiJobType {
   BUSINESS_SEGMENTS_PROPOSE
   /// One turn (or the closing digest) of the admin's conversation about a business profile (docs/75)
   BUSINESS_CHAT
+  /// Proposes competitor cards from the profile and the references; code keeps only rows whose quote is in a source (docs/70 §11)
+  BUSINESS_COMPETITORS_PROPOSE
 }
 
 enum AiJobStatus {

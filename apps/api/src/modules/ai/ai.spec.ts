@@ -112,6 +112,7 @@ describe('renderTemplate', () => {
         'research',
         'note',
       ],
+      business_competitors_propose: ['language', 'business', 'existing', 'sources'],
       business_chat: ['language', 'sections_spec', 'business', 'standing_notes', 'transcript'],
       business_chat_digest: ['language', 'sections_spec', 'business', 'transcript'],
       business_asset_analyze: [

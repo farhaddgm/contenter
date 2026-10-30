@@ -32,6 +32,7 @@ export const AI_TASK_WEIGHT: Record<AiJobType, AiTaskWeight> = {
   BUSINESS_OFFERINGS_EXTRACT: 'light',
   BUSINESS_SEGMENTS_PROPOSE: 'light',
   BUSINESS_CHAT: 'heavy',
+  BUSINESS_COMPETITORS_PROPOSE: 'light',
 };
 
 /**

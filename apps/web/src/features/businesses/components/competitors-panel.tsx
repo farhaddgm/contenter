@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileInput, Pencil, Plus, Swords, Trash2 } from 'lucide-react';
+import { Check, FileInput, Pencil, Plus, Sparkles, Swords, Trash2 } from 'lucide-react';
 import {
   BUSINESS_COMPETITOR_LIMIT,
   CompetitorKind,
@@ -16,12 +16,17 @@ import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
 import { notify } from '@/stores/notifications';
 import { formatNumber } from '@/utils/format';
+import { useTrackJob } from '@/features/jobs/api/jobs';
+import { AiWorkingBanner } from '@/features/jobs/components/job-status';
 import { useCanEditBusiness } from '../api/businesses';
 import { CompetitorCompareCard } from './competitor-compare-card';
 import { CompetitorSources } from './competitor-sources';
 import {
+  competitorKeys,
   useAddCompetitorsToProfile,
+  useConfirmCompetitor,
   useCompetitors,
+  useProposeCompetitors,
   useCreateCompetitor,
   useDeleteCompetitor,
   useUpdateCompetitor,
@@ -44,6 +49,24 @@ export function CompetitorsPanel({ businessId }: { businessId: string }) {
   const addToProfile = useAddCompetitorsToProfile(businessId);
   const [editing, setEditing] = useState<BusinessCompetitor | 'new' | null>(null);
   const full = (rows?.length ?? 0) >= BUSINESS_COMPETITOR_LIMIT;
+  const propose = useProposeCompetitors(businessId);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const tracker = useTrackJob(jobId, {
+    invalidate: [competitorKeys.list(businessId)],
+    onDone: () => setJobId(null),
+  });
+  const running = tracker.isRunning && !!jobId;
+  // AI proposals wait apart from the cards in use
+  const pending = (rows ?? []).filter((c) => !c.verified);
+  const confirmed = (rows ?? []).filter((c) => c.verified);
+  const ask = () =>
+    propose.mutate(undefined, {
+      onSuccess: (r) => {
+        setJobId(r.jobId);
+        notify.success(t('businesses.competitors.queued'));
+      },
+      onError: (e) => notify.error(t('common.error'), e.message),
+    });
   const hasActive = (rows ?? []).some((c) => c.isActive);
 
   return (
@@ -67,6 +90,16 @@ export function CompetitorsPanel({ businessId }: { businessId: string }) {
                 <Button
                   size="sm"
                   variant="outline"
+                  icon={<Sparkles />}
+                  disabled={full || running}
+                  isLoading={propose.isPending}
+                  onClick={ask}
+                >
+                  {t('businesses.competitors.propose')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   icon={<FileInput />}
                   disabled={!hasActive}
                   isLoading={addToProfile.isPending}
@@ -84,6 +117,12 @@ export function CompetitorsPanel({ businessId }: { businessId: string }) {
           }
         />
         <CardBody className="space-y-3">
+          {running && (
+            <AiWorkingBanner
+              title={t('businesses.competitors.proposing')}
+              hint={t('businesses.competitors.proposingHint')}
+            />
+          )}
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Spinner />
@@ -93,17 +132,37 @@ export function CompetitorsPanel({ businessId }: { businessId: string }) {
               {t('businesses.competitors.empty')}
             </p>
           ) : (
-            <ul className="space-y-2">
-              {rows.map((c) => (
-                <CompetitorRow
-                  key={c.id}
-                  businessId={businessId}
-                  competitor={c}
-                  canEdit={canEdit}
-                  onEdit={() => setEditing(c)}
-                />
-              ))}
-            </ul>
+            <>
+              {pending.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">{t('businesses.competitors.pendingTitle')}</h3>
+                  <ul className="space-y-2">
+                    {pending.map((c) => (
+                      <CompetitorRow
+                        key={c.id}
+                        businessId={businessId}
+                        competitor={c}
+                        canEdit={canEdit}
+                        onEdit={() => setEditing(c)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {confirmed.length > 0 && (
+                <ul className="space-y-2">
+                  {confirmed.map((c) => (
+                    <CompetitorRow
+                      key={c.id}
+                      businessId={businessId}
+                      competitor={c}
+                      canEdit={canEdit}
+                      onEdit={() => setEditing(c)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </>
           )}
           <p className="text-xs text-muted-foreground">
             {t('businesses.competitors.limit', { count: formatNumber(BUSINESS_COMPETITOR_LIMIT) })}
@@ -136,6 +195,7 @@ function CompetitorRow({
   const t = useT();
   const remove = useDeleteCompetitor(businessId);
   const toggle = useUpdateCompetitor(businessId, c.id);
+  const confirm = useConfirmCompetitor(businessId);
 
   return (
     <li className="rounded-lg border px-4 py-3">
@@ -171,6 +231,12 @@ function CompetitorRow({
               {c.weaknesses.join('، ')}
             </p>
           )}
+          {!c.verified && c.evidence && (
+            <blockquote className="border-s-2 ps-3 text-xs leading-6 text-muted-foreground" data-bidi="">
+              <span className="font-semibold">{t('businesses.competitors.evidence')}: </span>
+              {c.evidence}
+            </blockquote>
+          )}
           {c.difference && (
             <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
               <span className="font-semibold">
@@ -182,16 +248,32 @@ function CompetitorRow({
         </div>
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
-            <Switch
-              checked={c.isActive}
-              label={t('businesses.competitors.fields.active')}
-              onCheckedChange={(isActive) =>
-                toggle.mutate(
-                  { isActive },
-                  { onError: (e) => notify.error(t('common.error'), e.message) },
-                )
-              }
-            />
+            {c.verified ? (
+              <Switch
+                checked={c.isActive}
+                label={t('businesses.competitors.fields.active')}
+                onCheckedChange={(isActive) =>
+                  toggle.mutate(
+                    { isActive },
+                    { onError: (e) => notify.error(t('common.error'), e.message) },
+                  )
+                }
+              />
+            ) : (
+              <Button
+                size="sm"
+                icon={<Check />}
+                isLoading={confirm.isPending}
+                onClick={() =>
+                  confirm.mutate(c.id, {
+                    onSuccess: () => notify.success(t('businesses.competitors.confirmed')),
+                    onError: (e) => notify.error(t('common.error'), e.message),
+                  })
+                }
+              >
+                {t('businesses.competitors.confirm')}
+              </Button>
+            )}
             <Button size="icon" variant="ghost" aria-label={t('common.edit')} onClick={onEdit}>
               <Pencil />
             </Button>
