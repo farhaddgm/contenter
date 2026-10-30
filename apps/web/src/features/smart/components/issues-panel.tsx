@@ -4,11 +4,11 @@ import { NotebookPen, Search, Trash2 } from 'lucide-react';
 import { IssueStatus, type WalkerIssue } from '@contenter/shared';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Drawer } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/form-controls';
-import { CopyButton, MarkdownView, PageHeader, Segmented } from '@/components/ui/misc';
+import { CopyButton, MarkdownView, Segmented } from '@/components/ui/misc';
 import { EmptyState, Pagination, Table, type Column } from '@/components/ui/table';
 import { useT } from '@/i18n';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -152,7 +152,7 @@ function IssueDrawer({ issue, onClose }: { issue: WalkerIssue; onClose: () => vo
   );
 }
 
-export default function SmartIssuesRoute() {
+export function SmartIssuesPanel() {
   const t = useT();
   const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(1);
@@ -206,8 +206,12 @@ export default function SmartIssuesRoute() {
 
   return (
     <>
-      <PageHeader title={t('smart.issues.title')} description={t('smart.issues.subtitle')} />
       <Card>
+        <CardHeader
+          title={t('smart.issues.title')}
+          description={t('smart.issues.subtitle')}
+          descriptionAsTip
+        />
         <div className="flex flex-wrap items-center gap-3 border-b p-4">
           <div className="relative w-full max-w-xs">
             <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

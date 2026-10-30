@@ -6,12 +6,16 @@ import {
   OfferingPriceAmount,
   OfferingStatus,
   OfferingStock,
+  OFFERING_ALTERNATIVES_MAX,
   OFFERING_CLAIMS_MAX,
+  OFFERING_NOT_FOR_MAX,
   OFFERING_GUARDRAILS_MAX,
   OFFERING_RELATED_MAX,
   OFFERING_PUSH_MAX,
   OFFERING_SEGMENTS_MAX,
   PriceCurrency,
+  AlternativeKind as AlternativeKinds,
+  normalizeDigits,
   hasValidPrice,
   isOfferingAvailable,
   isPeakNow,
@@ -19,9 +23,12 @@ import {
   orderOfferingTree,
   peakingSoon,
   priceText,
+  staleAlternatives,
   unprovenClaims,
+  type AlternativeKind,
   type BusinessOffering,
   type BusinessSegment,
+  type OfferingAlternative,
   type OfferingClaim,
   type OfferingSegmentLink,
   type CreateBusinessOfferingInput,
@@ -311,6 +318,18 @@ function OfferingRow({
               )}
             </p>
           )}
+          {o.alternatives.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t('businesses.offerings.alternativesCount', { count: formatNumber(o.alternatives.length) })}
+              {staleAlternatives(o.alternatives) > 0 && (
+                <Badge tone="warning" className="ms-2">
+                  {t('businesses.offerings.alternativesStale', {
+                    count: formatNumber(staleAlternatives(o.alternatives)),
+                  })}
+                </Badge>
+              )}
+            </p>
+          )}
           {o.summary && (
             <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
               {o.summary}
@@ -420,6 +439,8 @@ interface FormState {
   summary: string;
   features: string;
   claims: string;
+  alternatives: string;
+  notFor: string;
   priceAmount: string;
   priceCurrency: string;
   priceFrom: boolean;
@@ -445,7 +466,29 @@ function lineToClaim(line: string): OfferingClaim {
   return { feature, benefit, proof };
 }
 
-function toForm(o: BusinessOffering | null, parentId = ''): FormState {
+/**
+ * One alternative per line: "name | kind | where we are better | where it is better | checked on".
+ * The kind is a word of the current language (or the code); everything after the name may be left out.
+ */
+const kindLabels = (t: TFn): Record<AlternativeKind, string> => ({
+  COMPETITOR: t('businesses.offerings.alternativeKinds.COMPETITOR'),
+  DIY: t('businesses.offerings.alternativeKinds.DIY'),
+  STATUS_QUO: t('businesses.offerings.alternativeKinds.STATUS_QUO'),
+  OTHER: t('businesses.offerings.alternativeKinds.OTHER'),
+});
+const alternativeToLine = (a: OfferingAlternative, labels: Record<AlternativeKind, string>) =>
+  [a.name, labels[a.kind], a.ourEdge, a.theirEdge, a.checkedOn].join(' | ').replace(/( \| )+$/, '');
+function lineToAlternative(line: string, labels: Record<AlternativeKind, string>): OfferingAlternative {
+  const [name = '', kindWord = '', ourEdge = '', theirEdge = '', date = ''] = line
+    .split('|')
+    .map((p) => p.trim());
+  const kind =
+    AlternativeKinds.find((k) => k === kindWord.toUpperCase() || labels[k] === kindWord) ?? 'COMPETITOR';
+  const day = normalizeDigits(date);
+  return { name, kind, ourEdge, theirEdge, checkedOn: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : '' };
+}
+
+function toForm(o: BusinessOffering | null, labels: Record<AlternativeKind, string>, parentId = ''): FormState {
   return {
     name: o?.name ?? '',
     aliases: o?.aliases.join('\n') ?? '',
@@ -462,6 +505,8 @@ function toForm(o: BusinessOffering | null, parentId = ''): FormState {
     summary: o?.summary ?? '',
     features: o?.features.join('\n') ?? '',
     claims: o?.claims.map(claimToLine).join('\n') ?? '',
+    alternatives: o?.alternatives.map((a) => alternativeToLine(a, labels)).join('\n') ?? '',
+    notFor: o?.notFor.join('\n') ?? '',
     priceAmount: priceText(o?.priceAmount) ?? '',
     priceCurrency: o?.priceCurrency ?? 'IRT',
     priceFrom: o?.priceFrom ?? false,
@@ -475,7 +520,7 @@ function toForm(o: BusinessOffering | null, parentId = ''): FormState {
 }
 
 /** The request body; an empty price sends no currency either. */
-function toInput(f: FormState): CreateBusinessOfferingInput {
+function toInput(f: FormState, labels: Record<AlternativeKind, string>): CreateBusinessOfferingInput {
   const priced = f.priceAmount.trim() !== '';
   return {
     name: f.name,
@@ -492,6 +537,8 @@ function toInput(f: FormState): CreateBusinessOfferingInput {
     summary: f.summary,
     features: lines(f.features),
     claims: lines(f.claims).map(lineToClaim),
+    alternatives: lines(f.alternatives).map((l) => lineToAlternative(l, labels)),
+    notFor: lines(f.notFor),
     priceAmount: f.priceAmount,
     priceCurrency: priced ? (f.priceCurrency as (typeof PriceCurrency)[number]) : null,
     priceFrom: priced && f.priceFrom,
@@ -529,7 +576,7 @@ function OfferingDrawer({
   const update = useUpdateOffering(businessId, offering?.id ?? '');
   const setSegments = useSetOfferingSegments(businessId);
   const { data: segmentList } = useSegments(businessId);
-  const [f, setF] = useState<FormState>(() => toForm(offering, presetParentId));
+  const [f, setF] = useState<FormState>(() => toForm(offering, kindLabels(t), presetParentId));
   // lines and products this row may sit under: confirmed ones that keep the tree valid
   const parents = all.filter(
     (o) =>
@@ -555,8 +602,8 @@ function OfferingDrawer({
     if (Object.keys(next).length) return;
     try {
       const saved = offering
-        ? await update.mutateAsync(toInput(f))
-        : await create.mutateAsync(toInput(f));
+        ? await update.mutateAsync(toInput(f, kindLabels(t)))
+        : await create.mutateAsync(toInput(f, kindLabels(t)));
       if (JSON.stringify(f.segments) !== JSON.stringify(offering?.segments ?? [])) {
         await setSegments.mutateAsync({ id: saved.id, links: f.segments });
       }
@@ -783,6 +830,39 @@ function OfferingDrawer({
               rows={4}
               value={f.claims}
               onChange={(e) => set('claims', e.target.value)}
+            />
+          )}
+        </Field>
+
+        <Field
+          label={t('businesses.offerings.fields.alternatives')}
+          hint={t('businesses.offerings.fields.alternativesHint', {
+            count: formatNumber(OFFERING_ALTERNATIVES_MAX),
+            kinds: Object.values(kindLabels(t)).join('، '),
+          })}
+        >
+          {(id) => (
+            <Textarea
+              id={id}
+              data-bidi=""
+              rows={4}
+              value={f.alternatives}
+              onChange={(e) => set('alternatives', e.target.value)}
+            />
+          )}
+        </Field>
+
+        <Field
+          label={t('businesses.offerings.fields.notFor')}
+          hint={t('businesses.offerings.fields.notForHint', { count: formatNumber(OFFERING_NOT_FOR_MAX) })}
+        >
+          {(id) => (
+            <Textarea
+              id={id}
+              data-bidi=""
+              rows={2}
+              value={f.notFor}
+              onChange={(e) => set('notFor', e.target.value)}
             />
           )}
         </Field>

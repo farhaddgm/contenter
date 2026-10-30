@@ -28,12 +28,12 @@ export function SmartPanel() {
       <button
         onClick={() => setMinimized(false)}
         className={cn(
-          'fixed bottom-4 z-[60] flex items-center gap-2 rounded-full bg-sidebar px-4 py-3 text-sm font-bold text-white shadow-pop ring-2 ring-brand transition hover:scale-105',
+          'fixed bottom-4 z-[60] flex items-center gap-2 rounded-full bg-sidebar px-4 py-3 text-sm font-bold text-white shadow-pop ring-2 ring-sidebar-active transition hover:scale-105',
           edge,
         )}
         aria-label={t('smart.expand')}
       >
-        <Sparkles className="size-4 text-brand" />
+        <Sparkles className="size-4 text-white" />
         {t('smart.name')}
         {openErrors > 0 && (
           <span className="rounded-full bg-white/25 px-1.5 text-[11px]">{openErrors}</span>
@@ -58,7 +58,7 @@ export function SmartPanel() {
     >
       <header className="flex items-center justify-between gap-2 bg-sidebar px-4 py-3 text-white">
         <span className="flex items-center gap-2 font-semibold">
-          <Sparkles className="size-4 text-brand" /> {t('smart.name')}
+          <Sparkles className="size-4 text-white" /> {t('smart.name')}
         </span>
         <div className="flex items-center gap-1">
           <button

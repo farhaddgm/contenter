@@ -7,6 +7,8 @@ import {
   parseClaims,
   peakingSoon,
   unprovenClaims,
+  parseAlternatives,
+  staleAlternatives,
   type AnswerProfileQuestionInput,
   type BusinessSectionKey,
   type OfferingCore,
@@ -70,6 +72,7 @@ export class ProfileQuestionsService {
           parentId: true,
           push: true,
           claims: true,
+          alternatives: true,
           status: true,
           stock: true,
           peakMonths: true,
@@ -85,6 +88,7 @@ export class ProfileQuestionsService {
       }),
     ]);
     const claims = offerings.map((o) => parseClaims(o.claims));
+    const rivals = offerings.map((o) => parseAlternatives(o.alternatives));
     const blocked = sections
       .filter((s) => isWriteBlocked(s.lock, { kind: 'USER', role: user.role }))
       .map((s) => s.key);
@@ -96,6 +100,8 @@ export class ProfileQuestionsService {
         offerings: offerings.length,
         offeringsWithoutClaims: claims.filter((c) => c.length === 0).length,
         unprovenClaims: claims.reduce((n, c) => n + unprovenClaims(c), 0),
+        offeringsWithoutAlternatives: offerings.filter((o, i) => o.push >= 2 && rivals[i]!.length === 0).length,
+        staleAlternatives: rivals.reduce((n, r) => n + staleAlternatives(r, now), 0),
         peakSoon: peakingSoon(offerings, now).length,
         segments: segments.length,
         ...audienceGaps(offerings, segments, links, now),

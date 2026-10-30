@@ -2,16 +2,15 @@ import { useState } from 'react';
 import { Info, Search } from 'lucide-react';
 import { InteractionType, type InteractionLog } from '@contenter/shared';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/form-controls';
-import { PageHeader } from '@/components/ui/misc';
 import { Pagination, Table, type Column } from '@/components/ui/table';
 import { useT } from '@/i18n';
 import { useDebounce } from '@/hooks/use-debounce';
 import { formatDate, formatNumber } from '@/utils/format';
 import { useInteractions, useSmartConfig } from '@/features/smart/api';
 
-export default function SmartInteractionsRoute() {
+export function SmartInteractionsPanel() {
   const t = useT();
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
@@ -79,16 +78,17 @@ export default function SmartInteractionsRoute() {
 
   return (
     <>
-      <PageHeader
-        title={t('smart.interactions.title')}
-        description={t('smart.interactions.subtitle')}
-      />
       {config.data && !config.data.detailedLogging && (
         <p className="mb-4 flex items-center gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm">
           <Info className="size-4 shrink-0" /> {t('smart.interactions.off')}
         </p>
       )}
       <Card>
+        <CardHeader
+          title={t('smart.interactions.title')}
+          description={t('smart.interactions.subtitle')}
+          descriptionAsTip
+        />
         <div className="flex flex-wrap gap-3 border-b p-4">
           <div className="relative w-full max-w-xs">
             <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

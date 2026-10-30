@@ -1,11 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Dialog as D } from 'radix-ui';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router';
 import {
   Activity,
-  Bug,
-  MousePointerClick,
-  NotebookPen,
   Bot,
   Building2,
   CalendarDays,
@@ -19,11 +16,9 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
-  Check,
   ChevronUp,
-  Palette,
+  Sparkles,
   UserCircle,
-  Users,
 } from 'lucide-react';
 import { paths } from '@/config/paths';
 import { useT, type TranslationKey } from '@/i18n';
@@ -31,10 +26,9 @@ import { useAuthorization, useLogout } from '@/lib/auth';
 import { useUi } from '@/stores/ui';
 import { cn } from '@/utils/cn';
 import { Dropdown } from '@/components/ui/misc';
-import { ThemeSwatch } from '@/components/ui/theme-picker';
-import { THEMES } from '@/stores/ui';
 import { NotificationBell } from '@/features/inbox/components/notification-bell';
 import { SearchBox } from '@/features/search/components/search-box';
+import { PageHeaderSlot } from '@/components/ui/page-header-slot';
 import { SmartRoot } from '@/features/smart/components/smart-root';
 import { SmartToggle } from '@/features/smart/components/smart-toggle';
 
@@ -53,23 +47,13 @@ const contentNav: NavItem[] = [
   { to: paths.app.calendar.getHref(), label: 'nav.calendar', icon: <CalendarDays /> },
 ];
 
-const smartNav: NavItem[] = [
-  { to: paths.app.admin.smartErrors.getHref(), label: 'smart.nav.errors', icon: <Bug /> },
-  { to: paths.app.admin.smartIssues.getHref(), label: 'smart.nav.issues', icon: <NotebookPen /> },
-  {
-    to: paths.app.admin.smartInteractions.getHref(),
-    label: 'smart.nav.interactions',
-    icon: <MousePointerClick />,
-  },
-];
-
 const adminNav: NavItem[] = [
   { to: paths.app.admin.jobs.getHref(), label: 'nav.jobs', icon: <Activity /> },
   { to: paths.app.admin.prompts.getHref(), label: 'nav.prompts', icon: <Bot /> },
   { to: paths.app.admin.principles.getHref(), label: 'nav.principles', icon: <ShieldCheck /> },
-  { to: paths.app.admin.users.getHref(), label: 'nav.users', icon: <Users /> },
   { to: paths.app.admin.settings.getHref(), label: 'nav.settings', icon: <Settings /> },
   { to: paths.app.admin.audit.getHref(), label: 'nav.audit', icon: <ScrollText /> },
+  { to: paths.app.admin.smart.getHref(), label: 'smart.name', icon: <Sparkles /> },
 ];
 
 function SidebarBrand({ collapsed }: { collapsed?: boolean }) {
@@ -146,7 +130,6 @@ function AccountMenu({ collapsed }: { collapsed?: boolean }) {
   const navigate = useNavigate();
   const { user } = useAuthorization();
   const logout = useLogout();
-  const { theme, setTheme, lang, setLang } = useUi();
   if (!user) return null;
   return (
     <div className={cn('border-t border-white/15 pb-2.5 pt-4', collapsed ? 'px-0' : 'px-2')}>
@@ -189,26 +172,6 @@ function AccountMenu({ collapsed }: { collapsed?: boolean }) {
           >
             {t('nav.account')}
           </Dropdown.Item>
-          <Dropdown.Sub>
-            <Dropdown.SubTrigger icon={<Palette />}>{t('nav.theme')}</Dropdown.SubTrigger>
-            <Dropdown.SubContent>
-              {THEMES.map((value) => (
-                <Dropdown.Item
-                  key={value}
-                  icon={<ThemeSwatch theme={value} className="size-4" />}
-                  onSelect={() => setTheme(value)}
-                >
-                  <span className={cn('flex-1', theme === value && 'font-bold text-primary')}>
-                    {t(`theme.${value}`)}
-                  </span>
-                  {theme === value && <Check className="text-primary" />}
-                </Dropdown.Item>
-              ))}
-            </Dropdown.SubContent>
-          </Dropdown.Sub>
-          <Dropdown.Item icon={<Globe />} onSelect={() => setLang(lang === 'fa' ? 'en' : 'fa')}>
-            {lang === 'fa' ? 'English' : 'فارسی'}
-          </Dropdown.Item>
           <Dropdown.Item icon={<KeyRound />} onSelect={() => navigate(paths.app.account.getHref())}>
             {t('auth.changePassword')}
           </Dropdown.Item>
@@ -247,9 +210,6 @@ function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
         {can('backoffice:access') && (
           <NavSection title={t('nav.backoffice')} items={adminNav} collapsed={collapsed} />
         )}
-        {can('backoffice:access') && (
-          <NavSection title={t('smart.name')} items={smartNav} collapsed={collapsed} />
-        )}
       </nav>
       <AccountMenu collapsed={collapsed} />
     </div>
@@ -258,8 +218,10 @@ function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const t = useT();
-  const { sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useUi();
+  const { sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed, lang, setLang } =
+    useUi();
   const location = useLocation();
+  const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => setSidebarOpen(false), [location.pathname, setSidebarOpen]);
 
@@ -314,10 +276,20 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           >
             <Menu className="size-5" />
           </button>
+          {/* the page name (PageHeader portals into it) sits between the menu button and the search box */}
+          <div ref={setTitleSlot} className="flex min-w-0 max-w-[45%] shrink-0 items-center gap-2" />
           <SearchBox />
           <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
             <NotificationBell />
             <SmartToggle />
+            <button
+              type="button"
+              onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}
+              className="inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-semibold text-muted-foreground transition-colors hover:border-ring/60 hover:text-foreground"
+            >
+              <Globe className="size-4" />
+              <span className="hidden sm:inline">{lang === 'fa' ? 'English' : 'فارسی'}</span>
+            </button>
           </div>
         </header>
         <main
@@ -325,7 +297,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           tabIndex={-1}
           className="mx-auto w-full max-w-[96rem] min-w-0 flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8"
         >
-          {children}
+          <PageHeaderSlot.Provider value={titleSlot}>{children}</PageHeaderSlot.Provider>
         </main>
         <SmartRoot />
       </div>

@@ -45,6 +45,8 @@ const row = (over: Partial<BusinessOffering> = {}): BusinessOffering => ({
   name: 'اشتراک طلایی',
   aliases: [],
   claims: [],
+  alternatives: [],
+  notFor: [],
   stock: 'IN_STOCK',
   parentId: null,
   guardrails: [],

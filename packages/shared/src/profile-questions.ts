@@ -52,6 +52,10 @@ export interface QuestionInput {
     unprovenClaims: number;
     /** Offerings whose peak season starts next month (`peakingSoon`). */
     peakSoon?: number;
+    /** Priority offerings (push ≥ 2) with no alternative recorded; absent = not counted (docs/74). */
+    offeringsWithoutAlternatives?: number;
+    /** Named rivals with no check date or checked long ago; absent = not counted. */
+    staleAlternatives?: number;
     /** Active audiences (docs/73). Absent = not counted (no audience questions). */
     segments?: number;
     /** Promotable offerings, with no variant of their own, that no active audience is linked to. */
@@ -124,6 +128,12 @@ export function buildProfileQuestions(input: QuestionInput): {
     }
     if (c.unprovenClaims > 0) {
       add({ code: 'CLAIMS_UNPROVEN', action: 'GOTO_OFFERINGS', sectionKey: 'SERVICES', priority: 245, count: c.unprovenClaims });
+    }
+    if ((c.offeringsWithoutAlternatives ?? 0) > 0) {
+      add({ code: 'OFFERINGS_NO_ALTERNATIVES', action: 'GOTO_OFFERINGS', sectionKey: 'COMPETITORS', priority: 232, count: c.offeringsWithoutAlternatives });
+    }
+    if ((c.staleAlternatives ?? 0) > 0) {
+      add({ code: 'ALTERNATIVES_STALE', action: 'GOTO_OFFERINGS', sectionKey: 'COMPETITORS', priority: 231, count: c.staleAlternatives });
     }
     // audiences (docs/73): found by code from the links the admin made
     if (c.segments !== undefined) {

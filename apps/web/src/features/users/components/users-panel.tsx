@@ -15,11 +15,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { OwnerBadge } from '@/components/ui/owner-badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Drawer } from '@/components/ui/dialog';
 import { Field, Input, Select, Switch } from '@/components/ui/form-controls';
-import { PageHeader, Segmented } from '@/components/ui/misc';
+import { Segmented } from '@/components/ui/misc';
 import { Pagination, Table, type Column } from '@/components/ui/table';
 import { useT } from '@/i18n';
 import { useUser } from '@/lib/auth';
@@ -192,7 +192,7 @@ function UserDrawer({ user, onClose }: { user: User | null; onClose: () => void 
   );
 }
 
-export default function UsersRoute() {
+export function UsersPanel() {
   const t = useT();
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
@@ -327,16 +327,17 @@ export default function UsersRoute() {
 
   return (
     <>
-      <PageHeader
-        title={t('users.title')}
-        description={t('users.subtitle')}
-        actions={
-          <Button icon={<Plus />} onClick={() => setDrawer({ user: null })}>
-            {t('users.new')}
-          </Button>
-        }
-      />
       <Card>
+        <CardHeader
+          title={t('users.title')}
+          description={t('users.subtitle')}
+          descriptionAsTip
+          actions={
+            <Button icon={<Plus />} onClick={() => setDrawer({ user: null })}>
+              {t('users.new')}
+            </Button>
+          }
+        />
         <div className="border-b p-4">
           <div className="relative max-w-xs">
             <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

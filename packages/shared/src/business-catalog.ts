@@ -32,6 +32,12 @@ export type OfferingStatus = (typeof OfferingStatus)[number];
 export const BUSINESS_OFFERING_LIMIT = 60;
 export const OFFERING_CLAIMS_MAX = 8;
 export const OFFERING_RELATED_MAX = 6;
+/** Outside alternatives a customer weighs against one offering (docs/74). */
+export const OFFERING_ALTERNATIVES_MAX = 6;
+/** Who an offering is not for (docs/74). */
+export const OFFERING_NOT_FOR_MAX = 4;
+/** A rival's facts older than this are told to the model as unchecked (docs/74). */
+export const ALTERNATIVE_STALE_DAYS = 180;
 export const OFFERING_ALIASES_MAX = 6;
 export const OFFERING_FEATURES_MAX = 8;
 /** Phrases an offering (and its variants) must never be described with (docs/73 §3). */
@@ -98,6 +104,54 @@ export const isClaimProven = (c: Pick<OfferingClaim, 'proof'>) => c.proof.trim()
 export const unprovenClaims = (claims: readonly Pick<OfferingClaim, 'proof'>[] | undefined) =>
   (claims ?? []).filter((c) => !isClaimProven(c)).length;
 
+/** What a customer could choose instead of an offering: a rival, doing it themselves, or nothing. */
+export const AlternativeKind = ['COMPETITOR', 'DIY', 'STATUS_QUO', 'OTHER'] as const;
+export type AlternativeKind = (typeof AlternativeKind)[number];
+
+/**
+ * One outside alternative (docs/74): where we are better, where it is better (said honestly, so
+ * content never bluffs), and the day a person last checked it. For positioning only — a rival's
+ * name must not appear in published copy (`ALTERNATIVE_NAMED`).
+ */
+export const OfferingAlternativeSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  kind: z.enum(AlternativeKind).optional().default('COMPETITOR'),
+  ourEdge: z.string().trim().max(240).optional().default(''),
+  theirEdge: z.string().trim().max(240).optional().default(''),
+  checkedOn: z.union([isoDate, z.literal('')]).optional().default(''),
+});
+export type OfferingAlternative = z.infer<typeof OfferingAlternativeSchema>;
+
+/** The stored JSON as alternatives; anything malformed is dropped rather than shown. */
+export const parseAlternatives = (raw: unknown): OfferingAlternative[] =>
+  z.array(OfferingAlternativeSchema).catch([]).parse(raw);
+
+/**
+ * Whether what we know about a rival may be out of date. Only a named competitor goes stale: doing
+ * it yourself or doing nothing does not change. No check date counts as stale.
+ */
+export function isAlternativeStale(
+  a: Pick<OfferingAlternative, 'kind' | 'checkedOn'>,
+  now = new Date(),
+): boolean {
+  if (a.kind !== 'COMPETITOR') return false;
+  if (!a.checkedOn) return true;
+  const age = (now.getTime() - new Date(`${a.checkedOn}T00:00:00Z`).getTime()) / 86_400_000;
+  return age > ALTERNATIVE_STALE_DAYS;
+}
+
+/** How many alternatives of an offering need a new look. */
+export const staleAlternatives = (
+  list: readonly Pick<OfferingAlternative, 'kind' | 'checkedOn'>[] | undefined,
+  now = new Date(),
+) => (list ?? []).filter((a) => isAlternativeStale(a, now)).length;
+
+/** Names of the named rivals of an offering, for the quality check. */
+export const rivalNames = (raw: unknown): string[] =>
+  parseAlternatives(raw)
+    .filter((a) => a.kind === 'COMPETITOR')
+    .map((a) => a.name);
+
 const BusinessOfferingBase = z.object({
   name: z.string().trim().min(1).max(120),
   /** Other spellings (Persian, Latin, short forms) that count as this offering in the quality check. */
@@ -134,6 +188,18 @@ const BusinessOfferingBase = z.object({
     .optional()
     .default([]),
   claims: z.array(OfferingClaimSchema).max(OFFERING_CLAIMS_MAX).optional().default([]),
+  /** Outside alternatives and where each stands against this offering (docs/74). */
+  alternatives: z
+    .array(OfferingAlternativeSchema)
+    .max(OFFERING_ALTERNATIVES_MAX)
+    .optional()
+    .default([]),
+  /** Who should not buy this ("needs a garden"); keeps content from overselling. */
+  notFor: z
+    .array(z.string().trim().min(2).max(160))
+    .max(OFFERING_NOT_FOR_MAX)
+    .optional()
+    .default([]),
   priceAmount: OfferingPriceAmount,
   priceCurrency: z.enum(PriceCurrency).nullish(),
   /** The price is "from …". */
@@ -199,6 +265,8 @@ export interface BusinessOffering {
   summary: string;
   features: string[];
   claims: OfferingClaim[];
+  alternatives: OfferingAlternative[];
+  notFor: string[];
   priceAmount: string | null;
   priceCurrency: PriceCurrency | null;
   priceFrom: boolean;
@@ -251,6 +319,9 @@ export interface OfferingCore {
   features: string[];
   /** Feature → benefit → proof triples as stored (JSON); read them with `parseClaims`. */
   claims?: unknown;
+  /** Outside alternatives as stored (JSON); read them with `parseAlternatives`. */
+  alternatives?: unknown;
+  notFor?: string[];
   priceAmount: DecimalLike | null;
   priceCurrency: string | null;
   priceFrom: boolean;
@@ -322,6 +393,7 @@ export function offeringQualityRule(
 ): QualityOfferingRule {
   return {
     ...(guardrails.length ? { guardrails } : {}),
+    ...(rivalNames(o.alternatives).length ? { rivals: rivalNames(o.alternatives) } : {}),
     ...(o.id ? { id: o.id } : {}),
     ...(o.features.length ? { features: o.features } : {}),
     name: o.name,

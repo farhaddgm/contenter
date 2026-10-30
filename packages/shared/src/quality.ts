@@ -374,6 +374,7 @@ export const QualityIssueCode = [
   'OFFERING_UNAVAILABLE',
   'GUARDRAIL_HIT',
   'OFFERING_CROSSED',
+  'ALTERNATIVE_NAMED',
 ] as const;
 export type QualityIssueCode = (typeof QualityIssueCode)[number];
 
@@ -413,6 +414,8 @@ export interface QualityOfferingRule {
   available: boolean;
   /** Phrases never to write about this offering (its own and its line's); found in the text → warn. */
   guardrails?: readonly string[];
+  /** Names of its competitors (docs/74): naming one in a text about this offering → warn. */
+  rivals?: readonly string[];
 }
 
 export interface QualityInput {
@@ -627,6 +630,22 @@ export function checkContentQuality(input: QualityInput): QualityReport {
             params: {
               name: o.name,
               phrase,
+              sentence: hit.length > 140 ? `${hit.slice(0, 137)}…` : hit,
+            },
+          });
+        }
+      }
+    }
+    if (talksAbout) {
+      for (const rival of o.rivals ?? []) {
+        const hit = sentences.find((sentence) => countPhrase(normalizeTermText(sentence), rival) > 0);
+        if (hit) {
+          issues.push({
+            code: 'ALTERNATIVE_NAMED',
+            severity: 'warn',
+            params: {
+              name: o.name,
+              rival,
               sentence: hit.length > 140 ? `${hit.slice(0, 137)}…` : hit,
             },
           });

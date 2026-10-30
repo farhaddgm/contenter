@@ -6,7 +6,7 @@ import { cn } from '@/utils/cn';
 import { useSmartSummary } from '../api';
 import { useSmart } from '../store';
 
-/** Header on/off switch for Smart (admins only), with the open-error count. */
+/** Header button that opens the Smart panel (admins only), with the open-error count. */
 export function SmartToggle() {
   const t = useT();
   const { can } = useAuthorization();
@@ -18,36 +18,18 @@ export function SmartToggle() {
   return (
     <button
       type="button"
-      role="switch"
-      aria-checked={enabled}
-      title={enabled ? t('smart.toggleOff') : t('smart.toggleOn')}
       onClick={() => {
-        track('smart.toggle', { target: enabled ? 'off' : 'on' });
-        setEnabled(!enabled);
-        if (!enabled) setMinimized(false);
+        track('smart.toggle', { target: 'open' });
+        setEnabled(true);
+        setMinimized(false);
       }}
       className={cn(
-        'relative inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-semibold transition-colors',
-        enabled
-          ? 'border-primary/40 bg-accent text-accent-foreground hover:bg-accent/70'
-          : 'text-muted-foreground hover:border-ring/60 hover:text-foreground',
+        'relative inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-semibold transition-colors hover:border-ring/60',
+        enabled ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       <Sparkles className={cn('size-4', enabled && 'fill-primary/20')} />
       <span className="hidden sm:inline">{t('smart.name')}</span>
-      <span
-        className={cn(
-          'relative h-4 w-7 rounded-full transition-colors max-sm:hidden',
-          enabled ? 'bg-primary' : 'bg-input',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-0.5 size-3 rounded-full bg-white shadow transition-all',
-            enabled ? 'start-3.5' : 'start-0.5',
-          )}
-        />
-      </span>
       {open > 0 && (
         <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
           {open > 99 ? '99+' : open}

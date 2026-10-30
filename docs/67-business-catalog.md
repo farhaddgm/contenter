@@ -180,3 +180,5 @@ M. ترتیب: مدل + Zod + CRUD ← `[CATALOG]` ← بررسی قیمت ← �
 ## ۱۱. سلسله‌مراتب
 
 محصول‌ها حالا می‌توانند درخت سه‌سطحی باشند و مخاطب و عبارت ممنوع داشته باشند: [73-offering-hierarchy.md](73-offering-hierarchy.md).
+
+جایگزین/رقیب بیرونی هر محصول و «مناسب چه کسانی نیست»: [74-offering-alternatives.md](74-offering-alternatives.md).

@@ -35,6 +35,8 @@ export const OFFERING_CORE_SELECT = {
   summary: true,
   features: true,
   claims: true,
+  alternatives: true,
+  notFor: true,
   priceAmount: true,
   priceCurrency: true,
   priceFrom: true,

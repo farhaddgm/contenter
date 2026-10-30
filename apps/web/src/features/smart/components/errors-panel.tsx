@@ -3,10 +3,9 @@ import { useSearchParams } from 'react-router';
 import { Search } from 'lucide-react';
 import { ErrorSource, ErrorStatus, type AppError } from '@contenter/shared';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader } from '@/components/ui/card';
 import { Drawer } from '@/components/ui/dialog';
 import { Input, Select } from '@/components/ui/form-controls';
-import { PageHeader } from '@/components/ui/misc';
 import { PageSpinner } from '@/components/ui/spinner';
 import { Pagination, Table, type Column } from '@/components/ui/table';
 import { useT } from '@/i18n';
@@ -16,7 +15,7 @@ import { useSmartError, useSmartErrors } from '@/features/smart/api';
 import { ErrorDetail, errorStatusTone } from '@/features/smart/components/error-detail';
 import { useSmart } from '@/features/smart/store';
 
-export default function SmartErrorsRoute() {
+export function SmartErrorsPanel() {
   const t = useT();
   const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(1);
@@ -85,8 +84,12 @@ export default function SmartErrorsRoute() {
 
   return (
     <>
-      <PageHeader title={t('smart.errors.title')} description={t('smart.errors.subtitle')} />
       <Card>
+        <CardHeader
+          title={t('smart.errors.title')}
+          description={t('smart.errors.subtitle')}
+          descriptionAsTip
+        />
         <div className="flex flex-wrap gap-3 border-b p-4">
           <div className="relative w-full max-w-xs">
             <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

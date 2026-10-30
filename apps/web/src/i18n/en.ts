@@ -1088,6 +1088,8 @@ export const en: DeepStrings<Dictionary> = {
           '"{{name}}" is paused, discontinued or out of its season in the catalog, but the text mentions it.',
         OFFERING_CROSSED:
           'This text is about "{{focus}}", but the price or a feature of "{{other}}" is in it: "{{sentence}}"',
+        ALTERNATIVE_NAMED:
+          'The competitor "{{rival}}" is named in a text about "{{name}}"; keep rivals out of published copy: "{{sentence}}"',
         GUARDRAIL_HIT:
           'The banned phrase "{{phrase}}" for "{{name}}" is in the text: "{{sentence}}"',
         PLACEHOLDER: 'A placeholder is left in the text: "{{found}}".',
@@ -1494,8 +1496,9 @@ export const en: DeepStrings<Dictionary> = {
     builtIn: 'Built-in default',
   },
   settings: {
-    title: 'System settings',
-    subtitle: 'AI model and effort level per job type.',
+    title: 'Settings',
+    subtitle: 'AI model and effort per job type, users, content quality and integrations.',
+    tabs: { ai: 'AI', users: 'Users', quality: 'Workflow & quality', integrations: 'Notifications & integrations' },
     provider: 'AI provider',
     defaultModel: 'Default model',
     modelFor: 'Model',
@@ -1584,6 +1587,7 @@ export const en: DeepStrings<Dictionary> = {
   },
   smart: {
     name: 'Smart',
+    subtitle: 'Error tracker, Walker issue log, interaction log and Smart collection settings.',
     toggleOn: 'Turn Smart on',
     toggleOff: 'Turn Smart off',
     tabs: { walker: 'Walker', chat: 'Chat', errors: 'Errors' },
@@ -1770,6 +1774,7 @@ export const en: DeepStrings<Dictionary> = {
       user: 'User',
     },
     settings: {
+      tab: 'Settings',
       title: 'Smart — detailed interaction logging',
       description:
         'When on, every user interaction (each API request with a sanitized body, page views, clicks and Walker actions) is stored in the database so Walker and Smart can analyze more precisely. When off, only the existing audit log is collected.',
@@ -2288,6 +2293,8 @@ export const en: DeepStrings<Dictionary> = {
         segmentsNoOffering: '{{count}} audiences are linked to no product. Which products do you write for them?',
         offeringsNoClaims: '{{count}} products have no selling point yet. For each, write what the customer gets.',
         peakSoon: 'The peak season of {{count}} products starts next month. Plan content for them.',
+        offeringsNoAlternatives: '{{count}} priority products have no alternative or rival recorded. What does the customer weigh this against?',
+        alternativesStale: '{{count}} recorded rivals are unchecked or over 180 days old. Look at them again.',
         claimsUnproven: '{{count}} selling points have no proof. Add a number, certificate or example.',
       },
     },
@@ -2421,6 +2428,9 @@ export const en: DeepStrings<Dictionary> = {
       peakSoon: 'Peak season for these starts next month: {{names}}. Time to plan content.',
       peakNow: 'Peak season',
       months: { m1: 'Farvardin', m2: 'Ordibehesht', m3: 'Khordad', m4: 'Tir', m5: 'Mordad', m6: 'Shahrivar', m7: 'Mehr', m8: 'Aban', m9: 'Azar', m10: 'Dey', m11: 'Bahman', m12: 'Esfand' },
+      alternativesCount: '{{count}} alternatives/rivals recorded',
+      alternativesStale: '{{count}} need a new look',
+      alternativeKinds: { COMPETITOR: 'competitor', DIY: 'DIY', STATUS_QUO: 'do nothing', OTHER: 'other' },
       claimsCount: '{{count}} selling points',
       unproven: '{{count}} without proof',
       priceExpired: 'Price expired',
@@ -2462,6 +2472,10 @@ export const en: DeepStrings<Dictionary> = {
         substitutes: 'Substitutes',
         substitutesHint: 'If this one runs out or is paused, AI offers these instead.',
         relatedMax: '(up to {{count}})',
+        alternatives: 'Alternatives & rivals (outside)',
+        alternativesHint: 'One per line: "name | kind | where we are better | where it is better | checked on (2026-10-30)" (up to {{count}} lines; kind is one of: {{kinds}}). Say honestly where it is better so AI does not bluff. A rival with no check date, or checked over 180 days ago, is given to AI as unchecked. A rival must not be named in published text.',
+        notFor: 'Not a fit for',
+        notForHint: 'One per line (up to {{count}}). AI will not pitch this to these people.',
         claims: 'Selling points & proof',
         claimsHint: 'One selling point per line as "feature | benefit for the customer | proof" (up to {{count}} lines). A point without proof is given to AI as unproven and is not stated as certain.',
         priceAmount: 'Price',

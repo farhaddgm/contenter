@@ -70,7 +70,7 @@ export function ErrorsTab() {
           <button
             className="flex items-center gap-1 text-xs text-primary hover:underline"
             onClick={() =>
-              navigate(`${paths.app.admin.smartErrors.getHref()}?id=${selectedErrorId}`)
+              navigate(`${paths.app.admin.smart.getHref('errors')}&id=${selectedErrorId}`)
             }
           >
             <ExternalLink className="size-3" /> {t('smart.errors.openInPage')}
