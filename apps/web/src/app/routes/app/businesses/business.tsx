@@ -64,6 +64,7 @@ import { SegmentsPanel } from '@/features/businesses/components/segments-panel';
 import { ReferencesCard } from '@/features/businesses/components/references-card';
 import { StylesPanel } from '@/features/businesses/components/styles-panel';
 import { SectionCard } from '@/features/businesses/components/section-card';
+import { TabAiBar } from '@/features/businesses/components/tab-ai-bar';
 import { SourceList } from '@/features/businesses/components/source-dialogs';
 
 const SOURCES_PREVIEW = 12;
@@ -302,6 +303,20 @@ export default function BusinessRoute() {
                 label: t(`businesses.tabs.${value}`),
               }))}
             />
+            {editable &&
+              (tab === 'knowledge' ||
+                tab === 'coverage' ||
+                tab === 'references' ||
+                tab === 'assets' ||
+                tab === 'styles' ||
+                tab === 'competitors') && (
+                <TabAiBar
+                  businessId={business.id}
+                  tab={tab}
+                  disabled={building}
+                  onSuggest={setSuggestKeys}
+                />
+              )}
             {tab === 'knowledge' && (
               <>
                 <KnowledgePanel businessId={business.id} />

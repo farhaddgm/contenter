@@ -2,7 +2,9 @@ import {
   AlertOctagon,
   ArrowLeftRight,
   Footprints,
+  Maximize2,
   MessageSquareText,
+  Minimize2,
   Minus,
   Sparkles,
 } from 'lucide-react';
@@ -18,7 +20,8 @@ import { WalkerTab } from './walker-tab';
 /** Medium-size floating window docked to the inline-start or inline-end edge of the browser. */
 export function SmartPanel() {
   const t = useT();
-  const { side, toggleSide, minimized, setMinimized, tab, setTab } = useSmart();
+  const { side, toggleSide, minimized, setMinimized, maximized, setMaximized, tab, setTab } =
+    useSmart();
   const summary = useSmartSummary(true);
   const openErrors = summary.data?.openErrors ?? 0;
   const edge = side === 'end' ? 'end-4' : 'start-4';
@@ -52,8 +55,10 @@ export function SmartPanel() {
     <section
       aria-label={t('smart.name')}
       className={cn(
-        'fixed bottom-4 z-[60] flex h-[min(620px,calc(100dvh-6rem))] w-[min(400px,calc(100vw-2rem))] animate-pop-in flex-col overflow-hidden rounded-2xl border bg-card shadow-pop',
-        edge,
+        'fixed bottom-4 z-[60] flex animate-pop-in flex-col overflow-hidden rounded-2xl border bg-card shadow-pop',
+        maximized
+          ? 'inset-4 sm:inset-6'
+          : cn('h-[min(620px,calc(100dvh-6rem))] w-[min(400px,calc(100vw-2rem))]', edge),
       )}
     >
       <header className="flex items-center justify-between gap-2 bg-sidebar px-4 py-3 text-white">
@@ -68,6 +73,14 @@ export function SmartPanel() {
             aria-label={t('smart.switchSide')}
           >
             <ArrowLeftRight className="size-4" />
+          </button>
+          <button
+            onClick={() => setMaximized(!maximized)}
+            className="rounded-lg p-2 hover:bg-white/15"
+            title={maximized ? t('smart.restore') : t('smart.maximize')}
+            aria-label={maximized ? t('smart.restore') : t('smart.maximize')}
+          >
+            {maximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </button>
           <button
             onClick={() => setMinimized(true)}

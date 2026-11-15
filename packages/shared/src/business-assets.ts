@@ -234,3 +234,17 @@ export function isSharedHost(host: string): boolean {
   const h = host.toLowerCase().replace(/^www\./, '');
   return SHARED_HOSTS.some((s) => h === s || h.endsWith(`.${s}`));
 }
+
+/** Profile-page tabs whose data can be sent back to the profile as suggestions (docs/76). */
+export const TabFeedbackTab = [
+  'knowledge',
+  'coverage',
+  'references',
+  'assets',
+  'styles',
+  'competitors',
+] as const;
+export type TabFeedbackTab = (typeof TabFeedbackTab)[number];
+
+export const TabFeedbackSchema = z.object({ tab: z.enum(TabFeedbackTab) });
+export type TabFeedbackInput = z.infer<typeof TabFeedbackSchema>;

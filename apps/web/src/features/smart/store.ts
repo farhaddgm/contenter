@@ -18,6 +18,7 @@ interface SmartState {
   enabled: boolean;
   side: SmartSide;
   minimized: boolean;
+  maximized: boolean;
   tab: SmartTab;
   walkerTopicId: string | null;
   walkerStep: WalkerStepKey;
@@ -30,6 +31,7 @@ interface SmartState {
   setEnabled: (v: boolean) => void;
   toggleSide: () => void;
   setMinimized: (v: boolean) => void;
+  setMaximized: (v: boolean) => void;
   setTab: (t: SmartTab) => void;
   setWalkerTopic: (id: string | null) => void;
   setWalkerStep: (s: WalkerStepKey) => void;
@@ -46,6 +48,7 @@ export const useSmart = create<SmartState>()(
       side: 'end',
       // starts as a small pill so it never covers the page on first visit
       minimized: true,
+      maximized: false,
       tab: 'walker',
       walkerTopicId: null,
       walkerStep: 'select_topic',
@@ -56,6 +59,7 @@ export const useSmart = create<SmartState>()(
       setEnabled: (enabled) => set({ enabled }),
       toggleSide: () => set({ side: get().side === 'end' ? 'start' : 'end' }),
       setMinimized: (minimized) => set({ minimized }),
+      setMaximized: (maximized) => set({ maximized }),
       setTab: (tab) => set({ tab }),
       setWalkerTopic: (walkerTopicId) =>
         set(

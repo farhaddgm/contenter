@@ -19,10 +19,12 @@ export function SmartToggle() {
     <button
       type="button"
       onClick={() => {
-        track('smart.toggle', { target: 'open' });
-        setEnabled(true);
-        setMinimized(false);
+        // header button shows/hides the floating button; the floating button opens the window
+        track('smart.toggle', { target: enabled ? 'hide' : 'show' });
+        setEnabled(!enabled);
+        setMinimized(true);
       }}
+      aria-pressed={enabled}
       className={cn(
         'relative inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-semibold transition-colors hover:border-ring/60',
         enabled ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
