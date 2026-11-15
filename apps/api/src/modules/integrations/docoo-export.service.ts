@@ -3,12 +3,13 @@ import {
   BusinessSectionKey,
   DOCOO_EXPORT_SCHEMA_VERSION,
   type DocooBusinessListQuery,
+  type DocooAttachmentContent,
   type DocooBusinessSummary,
 } from '@contenter/shared';
 import { toPage } from '../../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { BusinessApi } from '../businesses/business-api';
-import { buildDocooExport } from './docoo-export.builder';
+import { buildDocooExport, contentHash } from './docoo-export.builder';
 
 @Injectable()
 export class DocooExportService {
@@ -58,5 +59,36 @@ export class DocooExportService {
       ip,
     });
     return buildDocooExport(business);
+  }
+
+  /** The full text of one attachment the admin shared with apps (docs/77). */
+  async attachment(
+    businessId: string,
+    referenceId: string,
+    ip: string | null,
+    consumer: 'docoo' | 'researcher' = 'docoo',
+  ): Promise<DocooAttachmentContent> {
+    const r = await this.businesses.attachmentForExport(businessId, referenceId);
+    if (!r) throw new NotFoundException('Attachment not found');
+    this.audit.log({
+      action: `integration.${consumer}_attachment`,
+      entityType: 'Business',
+      entityId: businessId,
+      meta: { referenceId },
+      ip,
+    });
+    return {
+      id: r.id,
+      businessId: r.businessId,
+      kind: r.kind,
+      url: r.url,
+      title: r.title,
+      description: r.description,
+      audience: r.audience,
+      fetchedAt: r.fetchedAt ? r.fetchedAt.toISOString() : null,
+      contentHash: contentHash(r.content),
+      contentChars: r.content.length,
+      content: r.content,
+    };
   }
 }

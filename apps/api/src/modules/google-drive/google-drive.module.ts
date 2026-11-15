@@ -8,14 +8,17 @@ import {
   Logger,
   Module,
   Param,
+  Patch,
   Post,
   Query,
   Req,
   Res,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { UpdateDriveAccountSchema, type UpdateDriveAccountInput } from '@contenter/shared';
 import type { Request, Response } from 'express';
 import { CurrentUser, Public, Roles, type AuthUser } from '../../common/auth.decorators';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ENV, type Env } from '../../config/env';
 import { DriveConnectFailure, GoogleDriveService } from './google-drive.service';
 
@@ -88,6 +91,17 @@ export class GoogleDriveController {
       }
       back(failure?.redirectTo ?? '/app', { drive: failure?.code ?? 'failed' });
     }
+  }
+
+  @Patch('accounts/:id')
+  @Roles('ADMIN')
+  async scope(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateDriveAccountSchema)) body: UpdateDriveAccountInput,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.drive.updateScope(id, body, user);
+    return this.drive.status();
   }
 
   @Delete('accounts/:id')

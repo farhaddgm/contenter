@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import {
   BusinessSectionKey,
@@ -25,6 +26,9 @@ function sourcesOf(value: Prisma.JsonValue): { url: string; title: string }[] {
     return typeof url === 'string' ? [{ url, title: typeof title === 'string' ? title : '' }] : [];
   });
 }
+
+/** SHA-256 of an attachment's full text: a reader sees the document change without fetching it. */
+export const contentHash = (text: string) => createHash('sha256').update(text).digest('hex');
 
 /**
  * The whole business as one JSON document for another application. Pure: the same rows give the
@@ -140,17 +144,23 @@ export function buildDocooExport(b: ExportRow, now: Date = new Date()): DocooBus
       isActive: n.isActive,
       createdAt: iso(n.createdAt),
     })),
-    references: b.references.map((r) => ({
-      id: r.id,
-      kind: r.kind,
-      url: r.url,
-      title: r.title,
-      status: r.status,
-      isActive: r.isActive,
-      fetchedAt: isoOrNull(r.fetchedAt),
-      contentChars: r.content.length,
-      excerpt: excerpt(r.content),
-    })),
+    // docs/77: only attachments the admin marked for outside apps; AI-only sources stay private
+    references: b.references
+      .filter((r) => r.audience !== 'AI')
+      .map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        url: r.url,
+        title: r.title,
+        description: r.description,
+        audience: r.audience,
+        contentHash: contentHash(r.content),
+        status: r.status,
+        isActive: r.isActive,
+        fetchedAt: isoOrNull(r.fetchedAt),
+        contentChars: r.content.length,
+        excerpt: excerpt(r.content),
+      })),
     assets: b.assets.map((a) => ({
       id: a.id,
       kind: a.kind,

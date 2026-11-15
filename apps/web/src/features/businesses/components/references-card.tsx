@@ -1,11 +1,15 @@
 import { useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import {
   AtSign,
   BookOpen,
   Eye,
   FileText,
   FileUp,
+  FileSearch,
   Globe,
+  ListPlus,
+  Pencil,
   Plus,
   RefreshCw,
   Trash2,
@@ -13,21 +17,25 @@ import {
 } from 'lucide-react';
 import {
   BUSINESS_REFERENCE_MAX_CHARS,
+  REFERENCE_DESCRIPTION_MAX,
+  ReferenceAudience,
   instagramProfileUrl,
   parseGoogleFileUrl,
   parseInstagramHandle,
   type BusinessReference,
   type ReferenceKind,
 } from '@contenter/shared';
+
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Dialog } from '@/components/ui/dialog';
-import { Field, Input, Switch, Textarea } from '@/components/ui/form-controls';
-import { Segmented } from '@/components/ui/misc';
+import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-controls';
+import { CopyButton, Segmented } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
+import { api } from '@/lib/api-client';
 import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { formatDate, formatNumber } from '@/utils/format';
@@ -43,6 +51,7 @@ import {
   useUpdateReference,
 } from '../api/businesses';
 import { ConnectDriveButton } from './google-drive-card';
+import { ImportReferencesDialog } from './references-import-dialog';
 import {
   AnalysisReport,
   analysisSummary,
@@ -146,6 +155,60 @@ export function TextFileButton({ onLoad }: { onLoad: (text: string, name: string
   );
 }
 
+/** What the attachment is for, and who may read it (docs/77). Used by the add and edit dialogs. */
+export function AudienceFields({
+  description,
+  audience,
+  onDescription,
+  onAudience,
+}: {
+  description: string;
+  audience: ReferenceAudience;
+  onDescription: (v: string) => void;
+  onAudience: (v: ReferenceAudience) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <Field
+        label={t('businesses.references.descriptionLabel')}
+        hint={t('businesses.references.descriptionHint')}
+        optional={t('common.optional')}
+      >
+        {(id) => (
+          <Textarea
+            id={id}
+            rows={3}
+            data-bidi=""
+            value={description}
+            maxLength={REFERENCE_DESCRIPTION_MAX}
+            onChange={(e) => onDescription(e.target.value)}
+          />
+        )}
+      </Field>
+      <Field label={t('businesses.references.audienceLabel')}>
+        {(id) => (
+          <Select
+            id={id}
+            value={audience}
+            onChange={(e) => onAudience(e.target.value as ReferenceAudience)}
+            options={ReferenceAudience.map((a) => ({
+              value: a,
+              label: t(`businesses.references.audience${a}`),
+            }))}
+          />
+        )}
+      </Field>
+      {audience !== 'AI' && (
+        <p className="flex items-start gap-1.5 text-xs leading-5 text-amber-700">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+          <span>{t('businesses.references.appsWarning')}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Add links (one per line) or a pasted/uploaded text. Mounted only while open. */
 function AddReferenceDialog({
   businessId,
@@ -165,6 +228,8 @@ function AddReferenceDialog({
   const [manual, setManual] = useState<ManualInstagramState>(EMPTY_MANUAL);
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
+  const [description, setDescription] = useState('');
+  const [audience, setAudience] = useState<ReferenceAudience>('AI');
   const [busy, setBusy] = useState(false);
   const { links, invalid } = splitLinks(urls);
   const siteLinks = splitLinks(siteUrl);
@@ -192,7 +257,9 @@ function AddReferenceDialog({
             : tab === 'instagram'
               ? [manualInput ? { instagram: manualInput } : { url: instagramProfileUrl(handle!) }]
               : [{ content: text.trim(), title: title.trim() }];
-      const results = await Promise.allSettled(inputs.map((i) => add.mutateAsync(i)));
+      const results = await Promise.allSettled(
+        inputs.map((i) => add.mutateAsync({ ...i, description: description.trim(), audience })),
+      );
       const rejected = results.filter((r) => r.status === 'rejected');
       const added = results.flatMap((r) => (r.status === 'fulfilled' ? r.value.references : []));
       const skipped = results.reduce(
@@ -361,7 +428,67 @@ function AddReferenceDialog({
             />
           </>
         )}
+        {tab !== 'instagram' && (
+          <AudienceFields
+            description={description}
+            audience={audience}
+            onDescription={setDescription}
+            onAudience={setAudience}
+          />
+        )}
       </div>
+    </Dialog>
+  );
+}
+
+/** Edit an attachment's description and audience. Mounted only while open. */
+function EditReferenceDialog({
+  reference,
+  businessId,
+  onOpenChange,
+}: {
+  reference: BusinessReference;
+  businessId: string;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const t = useT();
+  const update = useUpdateReference(businessId);
+  const [description, setDescription] = useState(reference.description);
+  const [audience, setAudience] = useState<ReferenceAudience>(reference.audience);
+  return (
+    <Dialog
+      open
+      onOpenChange={onOpenChange}
+      title={t('businesses.references.editTitle')}
+      description={reference.title || reference.url}
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            isLoading={update.isPending}
+            onClick={() =>
+              update.mutate(
+                { id: reference.id, data: { description, audience } },
+                {
+                  onSuccess: () => onOpenChange(false),
+                  onError: (e) => notify.error(t('common.error'), e.message),
+                },
+              )
+            }
+          >
+            {t('businesses.references.save')}
+          </Button>
+        </>
+      }
+    >
+      <AudienceFields
+        description={description}
+        audience={audience}
+        onDescription={setDescription}
+        onAudience={setAudience}
+      />
     </Dialog>
   );
 }
@@ -421,6 +548,26 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
   const addReference = useAddReference(businessId);
   const [addOpen, setAddOpen] = useState(false);
   const [viewing, setViewing] = useState<BusinessReference | null>(null);
+  const [editing, setEditing] = useState<BusinessReference | null>(null);
+  const [listOpen, setListOpen] = useState(false);
+  // which Google files changed at the source since they were read (docs/77 phase 4)
+  const [changed, setChanged] = useState<Set<string>>(new Set());
+  const check = useMutation({
+    mutationFn: () =>
+      api.post<{ id: string; changed: boolean }[]>(
+        `/businesses/${businessId}/references/check-changes`,
+      ),
+    onSuccess: (res) => {
+      const ids = new Set(res.filter((r) => r.changed).map((r) => r.id));
+      setChanged(ids);
+      if (ids.size) notify.warning(t('businesses.references.changesFound', { count: ids.size }));
+      else notify.success(t('businesses.references.noChanges'));
+    },
+    onError: (e: Error) => notify.error(t('common.error'), e.message),
+  });
+  const { data: drive } = useDriveStatus();
+  const shareEmail =
+    drive?.serviceAccountEmail ?? drive?.accounts.find((a) => !a.error)?.email ?? null;
 
   // Instagram accounts the website links to that are not a source yet.
   const known = new Set(
@@ -446,9 +593,30 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
         descriptionAsTip
         actions={
           editable && (
-            <Button size="sm" variant="outline" icon={<Plus />} onClick={() => setAddOpen(true)}>
-              {t('businesses.references.add')}
-            </Button>
+            <>
+              {(data ?? []).some((r) => r.kind === 'GOOGLE_DOC' && r.status === 'READY') && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={<FileSearch />}
+                  isLoading={check.isPending}
+                  onClick={() => check.mutate()}
+                >
+                  {t('businesses.references.checkChanges')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                icon={<ListPlus />}
+                onClick={() => setListOpen(true)}
+              >
+                {t('businesses.references.listAdd')}
+              </Button>
+              <Button size="sm" variant="outline" icon={<Plus />} onClick={() => setAddOpen(true)}>
+                {t('businesses.references.add')}
+              </Button>
+            </>
           )
         }
       />
@@ -476,7 +644,18 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                     <Badge tone={statusTone[r.status]}>
                       {t(`enums.referenceStatus.${r.status}`)}
                     </Badge>
+                    {changed.has(r.id) && (
+                      <Badge tone="warning">{t('businesses.references.changedAtSource')}</Badge>
+                    )}
+                    {r.audience !== 'AI' && (
+                      <Badge>{t(`businesses.references.audienceShort.${r.audience}`)}</Badge>
+                    )}
                   </p>
+                  {r.description && (
+                    <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
+                      {r.description}
+                    </p>
+                  )}
                   {r.url && (
                     <a
                       href={r.url}
@@ -500,6 +679,17 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                     {r.googleAccount &&
                       ` · ${t('businesses.references.readWith', { email: r.googleAccount.email })}`}
                   </p>
+                  {r.kind === 'GOOGLE_DOC' && r.accessState === 'NO_ACCESS' && (
+                    <p className="flex flex-wrap items-center gap-2 text-xs leading-5">
+                      <Badge tone="danger">{t('businesses.references.noAccess')}</Badge>
+                      <span>
+                        {shareEmail
+                          ? t('businesses.references.shareWith', { email: shareEmail })
+                          : t('businesses.references.noAccessNoAccount')}
+                      </span>
+                      {shareEmail && <CopyButton text={shareEmail} />}
+                    </p>
+                  )}
                   {r.status === 'FAILED' && r.error && (
                     <p className="flex items-start gap-1.5 text-xs leading-5 text-destructive">
                       <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
@@ -530,6 +720,16 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                       <Eye />
                     </Button>
                   )}
+                  {editable && (
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={t('businesses.references.edit')}
+                      title={t('businesses.references.edit')}
+                      icon={<Pencil />}
+                      onClick={() => setEditing(r)}
+                    />
+                  )}
                   {editable && r.kind !== 'TEXT' && !isManualInstagram(r) && (
                     <Button
                       size="icon-sm"
@@ -541,6 +741,11 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                       onClick={() =>
                         refresh.mutate(r.id, {
                           onSuccess: ({ references }) => {
+                            setChanged((prev) => {
+                              const next = new Set(prev);
+                              next.delete(r.id);
+                              return next;
+                            });
                             const failed = references.find((x) => x.status !== 'READY');
                             if (failed) {
                               notify.error(
@@ -601,8 +806,16 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
         </ul>
       )}
       {addOpen && <AddReferenceDialog businessId={businessId} onOpenChange={setAddOpen} />}
+      {listOpen && <ImportReferencesDialog businessId={businessId} onOpenChange={setListOpen} />}
       {viewing && (
         <ReferenceViewDialog reference={viewing} onOpenChange={(v) => !v && setViewing(null)} />
+      )}
+      {editing && (
+        <EditReferenceDialog
+          reference={editing}
+          businessId={businessId}
+          onOpenChange={(v) => !v && setEditing(null)}
+        />
       )}
     </Card>
   );

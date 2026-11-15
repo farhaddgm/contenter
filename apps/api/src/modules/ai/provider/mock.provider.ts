@@ -8,6 +8,9 @@ import {
   type SegmentsPropose,
   type StyleBuild,
   type BusinessAuditResult,
+  type BusinessChatDigest,
+  type CompetitorsPropose,
+  type BusinessChatReply,
   type BusinessReviseResult,
   type BusinessSuggestResult,
   type ContentDraftResult,
@@ -258,6 +261,30 @@ export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvide
           ],
           gaps: ['قیمت‌ها از منابع عمومی تأیید نشد (mock).'],
         } satisfies BusinessReviseResult;
+      case 'BUSINESS_CHAT': {
+        // transcript lines look like "ADMIN: …"; the digest prompt ends with its own marker
+        const said = [...req.user.matchAll(/^ADMIN: (.+)$/gm)].map((m) => m[1]!.trim());
+        const last = said.at(-1) ?? '';
+        const point = {
+          point: last.slice(0, 200) || 'نکتهٔ آزمایشی (mock)',
+          kind: 'FACT' as const,
+          sections: ['OVERVIEW', 'VALUE_PROPOSITION'] as BusinessSectionKey[],
+        };
+        if (req.user.includes('Write the digest of this conversation')) {
+          return {
+            summary: 'خلاصهٔ آزمایشی (mock) از گفتگو.',
+            noteText: said.length ? said.join('\n') : 'یادداشت آزمایشی (mock).',
+            points: [point],
+            openQuestions: [],
+          } satisfies BusinessChatDigest;
+        }
+        return {
+          reply: `متوجه شدم (mock): «${last.slice(0, 120)}». این مورد معرفی و ارزش پیشنهادی را تغییر می‌دهد.`,
+          understood: [point],
+          questions: [],
+          conflicts: [],
+        } satisfies BusinessChatReply;
+      }
       case 'BUSINESS_STYLE_BUILD':
         return {
           summary: 'سبک آزمایشی (mock): جمله‌های کوتاه، لحن صمیمی و پایان با یک دعوت ساده.',
@@ -301,6 +328,37 @@ export class MockProvider implements AiProvider, BatchProvider, EmbeddingProvide
             : [],
           notes: 'خروجی آزمایشی (mock).',
         } satisfies OfferingsExtract;
+      }
+      case 'BUSINESS_COMPETITORS_PROPOSE': {
+        // names the first two words of the first source line, so its quote names it and is found
+        const sources = /<sources>\n([\s\S]*?)\n<\/sources>/.exec(req.user)?.[1] ?? '';
+        const line = sources
+          .split('\n')
+          .map((l) => l.trim())
+          .find((l) => l && !/^\[[SR]\d+\]/.test(l));
+        const quote = (line ?? '')
+          .replace(/^[-*#\s]+/, '')
+          .replace(/\*\*/g, '')
+          .slice(0, 80);
+        const name = quote.split(/\s+/).slice(0, 2).join(' ');
+        return {
+          competitors: quote
+            ? [
+                {
+                  name,
+                  kind: 'DIRECT' as const,
+                  website: '',
+                  positioning: '',
+                  pricing: '',
+                  strengths: [],
+                  weaknesses: [],
+                  difference: '',
+                  evidence: quote,
+                },
+              ]
+            : [],
+          notes: 'پیشنهاد آزمایشی (mock).',
+        } satisfies CompetitorsPropose;
       }
       case 'BUSINESS_SEGMENTS_PROPOSE': {
         // proposes the first line of the first source as a persona, so its quote can be found

@@ -112,7 +112,13 @@ export interface StylePromptRow {
 }
 
 /** Reference documents a model may read: finished, switched on, with text. */
-const READABLE_REFERENCE = { status: 'READY', isActive: true, content: { not: '' } } as const;
+const READABLE_REFERENCE = {
+  status: 'READY',
+  isActive: true,
+  content: { not: '' },
+  // docs/77: an attachment meant only for outside apps never reaches a prompt
+  audience: { not: 'APPS' },
+} as const;
 
 /**
  * The one door to a business's identity for the rest of the app (docs/63-business-boundary.md).
@@ -384,6 +390,23 @@ export class BusinessApi {
   }
 
   /** The business with all it exports, or null. */
+  /**
+   * One attachment with its full text, only if the admin marked it for outside apps and it is
+   * readable now (docs/77). Anything else is null, so a caller answers 404 without a hint.
+   */
+  attachmentForExport(businessId: string, referenceId: string) {
+    return this.prisma.businessReference.findFirst({
+      where: {
+        id: referenceId,
+        businessId,
+        audience: { not: 'AI' },
+        status: 'READY',
+        isActive: true,
+        content: { not: '' },
+      },
+    });
+  }
+
   findForExport(businessId: string) {
     return this.prisma.business.findUnique({ where: { id: businessId }, include: EXPORT_INCLUDE });
   }

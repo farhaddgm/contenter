@@ -51,7 +51,7 @@ export class BusinessSegmentsProposeRunner implements AiRunner {
         select: { label: true, value: true },
       }),
       this.prisma.businessReference.findMany({
-        where: { businessId: b.id, status: 'READY', isActive: true, content: { not: '' } },
+        where: { businessId: b.id, status: 'READY', isActive: true, content: { not: '' }, audience: { not: 'APPS' } },
         orderBy: { createdAt: 'asc' },
         select: { title: true, url: true, content: true },
       }),

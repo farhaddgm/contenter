@@ -44,6 +44,7 @@ export type BusinessVia =
   | 'businessRevision'
   | 'businessSuggestion'
   | 'businessNote'
+  | 'businessChat'
   | 'businessAsset'
   | 'businessFact'
   | 'businessTerm'
@@ -199,6 +200,8 @@ export class AccessService {
       }
       case 'businessSuggestion':
         return business(await p.businessSuggestion.findUnique({ where: { id }, ...bsel }));
+      case 'businessChat':
+        return business(await p.businessChat.findUnique({ where: { id }, ...bsel }));
       case 'businessNote':
         return business(await p.businessNote.findUnique({ where: { id }, ...bsel }));
       case 'businessAsset':

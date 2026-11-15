@@ -65,7 +65,7 @@ function setup(opts: { count?: number; clash?: boolean; business?: boolean; sect
     ...tx,
   };
   const audit = { log: vi.fn() };
-  const svc = new CompetitorsService(prisma as unknown as PrismaService, audit as unknown as AuditService);
+  const svc = new CompetitorsService(prisma as unknown as PrismaService, audit as unknown as AuditService, { enqueue: async () => ({ id: 'j1' }) } as never);
   return { svc, created, sectionWrites, audit };
 }
 

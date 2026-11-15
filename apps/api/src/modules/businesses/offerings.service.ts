@@ -349,7 +349,7 @@ export class OfferingsService {
       this.prisma.businessSection.count({ where: { businessId, key: 'SERVICES', content: { not: '' } } }),
       this.prisma.businessFact.count({ where: { businessId, isActive: true } }),
       this.prisma.businessReference.count({
-        where: { businessId, status: 'READY', isActive: true, content: { not: '' } },
+        where: { businessId, status: 'READY', isActive: true, content: { not: '' }, audience: { not: 'APPS' } },
       }),
       this.prisma.businessOffering.count({ where: { businessId } }),
       this.prisma.aiJob.findFirst({

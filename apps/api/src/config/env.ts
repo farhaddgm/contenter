@@ -60,6 +60,11 @@ const EnvSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   /**
+   * Google service account key (JSON, or the same JSON base64-encoded) used to read Docs / Sheets /
+   * Drive files that were shared with its e-mail address (docs/77). Empty = off.
+   */
+  GOOGLE_SERVICE_ACCOUNT_JSON: optionalString,
+  /**
    * Bearer token of the read-only service API other applications (Docoo) use to read businesses
    * (docs/18-docoo-integration.md). Empty = the API is switched off. At least 32 characters.
    */

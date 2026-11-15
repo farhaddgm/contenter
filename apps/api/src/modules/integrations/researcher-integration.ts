@@ -54,4 +54,11 @@ export class ResearcherIntegrationController {
     if (allowedIds && !allowedIds.includes(id)) throw new NotFoundException('Business not found');
     return this.exports.export(id, req.ip ?? null, 'researcher');
   }
+
+  @Get('businesses/:id/attachments/:refId/content')
+  attachment(@Param('id') id: string, @Param('refId') refId: string, @Req() req: Request) {
+    const allowedIds = this.allowedIds();
+    if (allowedIds && !allowedIds.includes(id)) throw new NotFoundException('Business not found');
+    return this.exports.attachment(id, refId, req.ip ?? null, 'researcher');
+  }
 }

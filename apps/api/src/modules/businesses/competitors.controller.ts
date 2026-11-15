@@ -43,6 +43,19 @@ export class CompetitorsController {
     return this.competitors.addToProfile(id, user);
   }
 
+  /** Asks the model to propose cards; they wait, unused, for the admin to confirm them. */
+  @BusinessScoped('business')
+  @Post('businesses/:id/competitors/propose')
+  propose(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.competitors.propose(id, user);
+  }
+
+  @BusinessScoped('businessCompetitor')
+  @Post('business-competitors/:id/confirm')
+  confirm(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.competitors.confirm(id, user);
+  }
+
   @BusinessScoped('businessCompetitor')
   @Patch('business-competitors/:id')
   update(

@@ -75,6 +75,8 @@ import { AiJobsService } from '../ai/ai-jobs.service';
 import { GoogleDriveModule } from '../google-drive/google-drive.module';
 import { SamplesCoreModule } from '../samples/samples-core.module';
 import { FileStorageService } from '../../infra/storage/file-storage.service';
+import { BusinessChatController } from './business-chat.controller';
+import { BusinessChatService } from './business-chat.service';
 import { BusinessNotesAssetsController } from './notes-assets.controller';
 import {
   AssetUploadInterceptor,
@@ -98,6 +100,7 @@ import { StylesService } from './styles.service';
 import { ProfileKnowledgeService } from './profile-knowledge.service';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
+import { ReferencesImportController } from './references-import.controller';
 import { InstagramService } from './social/instagram.service';
 import { SourceReader } from './social/source-reader.service';
 import { WebsiteCrawlerService } from './social/website-crawler.service';
@@ -1141,6 +1144,8 @@ export class BusinessItemsController {
     BusinessesController,
     BusinessItemsController,
     BusinessNotesAssetsController,
+    ReferencesImportController,
+    BusinessChatController,
     ProfileKnowledgeController,
     StylesController,
     OfferingsController,
@@ -1157,6 +1162,7 @@ export class BusinessItemsController {
     PodSpaceService,
     AssetImportService,
     BusinessNotesService,
+    BusinessChatService,
     BusinessAssetsService,
     AssetUploadInterceptor,
     ProfileKnowledgeService,

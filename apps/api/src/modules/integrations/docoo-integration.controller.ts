@@ -33,4 +33,10 @@ export class DocooIntegrationController {
   export(@Param('id') id: string, @Req() req: Request) {
     return this.exports.export(id, req.ip ?? null);
   }
+
+  /** Full text of one attachment marked for apps (docs/77). */
+  @Get('businesses/:id/attachments/:refId/content')
+  attachment(@Param('id') id: string, @Param('refId') refId: string, @Req() req: Request) {
+    return this.exports.attachment(id, refId, req.ip ?? null);
+  }
 }

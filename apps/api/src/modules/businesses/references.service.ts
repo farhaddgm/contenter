@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import type { BusinessReference as ReferenceRow, Prisma } from '@prisma/client';
 import {
   AddReferenceSchema,
+  ImportReferencesSchema,
   BUSINESS_REFERENCE_LIMIT,
   BUSINESS_REFERENCE_MAX_CHARS,
   instagramProfileUrl,
@@ -13,6 +14,9 @@ import {
   parseInstagramHandle,
   parsePodSpaceUrl,
   type AddReferenceInput,
+  type ImportReferencesInput,
+  type ImportReferencesResult,
+  type ReferencePreviewItem,
   type GoogleFileType,
   type ReferenceAnalysis,
   type UpdateReferenceInput,
@@ -21,7 +25,12 @@ import { type AuthUser } from '../../common/auth.decorators';
 import { SemanticRetriever } from '../ai/semantic/semantic.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { DriveReadError, GoogleDriveService } from '../google-drive/google-drive.service';
+import {
+  DriveNoAccessError,
+  DriveReadError,
+  GoogleDriveService,
+} from '../google-drive/google-drive.service';
+
 import { FetchError } from '../samples/media-fetcher.service';
 import { documentKind, extractText, isTextKind } from './document-text';
 import { AssetImportService, PREVIEW_MAX_BYTES } from './asset-import.service';
@@ -44,6 +53,8 @@ interface ReadOutcome {
   title: string;
   text: string;
   accountId: string | null;
+  /** Google files: when the file last changed at Google (docs/77). */
+  modifiedAt?: string | null;
   /** INSTAGRAM / WEBSITE sources: what code computed on the way. */
   analysis?: ReferenceAnalysis;
 }
@@ -155,6 +166,8 @@ export class ReferencesService {
           businessId,
           kind: 'TEXT',
           title: data.title,
+          description: data.description,
+          audience: data.audience,
           content: data.content,
           status: 'READY',
           fetchedAt: new Date(),
@@ -195,6 +208,8 @@ export class ReferencesService {
           kind: handle ? 'INSTAGRAM' : site ? 'WEBSITE' : google ? 'GOOGLE_DOC' : 'URL',
           url,
           title: data.title || (handle ? `Instagram @${handle}` : ''),
+          description: data.description,
+          audience: data.audience,
           createdById: user.id,
         },
       });
@@ -216,11 +231,230 @@ export class ReferencesService {
         skipped,
         assets,
         url: data.url ?? null,
+        audience: data.audience,
         ...(data.site ? { site: true } : {}),
         ...(data.instagram ? { instagram: 'manual' } : {}),
       },
     });
     return { references: await this.listByIds(ids), skipped, assets };
+  }
+
+  /**
+   * Step 1 of a list upload (docs/77): looks at each link without saving anything — what it is,
+   * whether the server can open it, whether it is already a reference. Pure code, no AI. A
+   * Google folder is listed, so the admin can tick its files one by one.
+   */
+  async previewList(businessId: string, urls: string[]): Promise<ReferencePreviewItem[]> {
+    const unique = [...new Set(urls.map((u) => u.trim()))];
+    const existing = new Set(
+      (
+        await this.prisma.businessReference.findMany({
+          where: { businessId },
+          select: { url: true },
+        })
+      ).map((r) => r.url),
+    );
+    const out = new Map<string, ReferencePreviewItem>();
+    await inBatches(unique, async (url) => {
+      out.set(url, await this.previewOne(businessId, url, existing));
+    });
+    return unique.map((u) => out.get(u)!);
+  }
+
+  private async previewOne(
+    businessId: string,
+    url: string,
+    existing: Set<string>,
+  ): Promise<ReferencePreviewItem> {
+    const base: ReferencePreviewItem = {
+      url,
+      kind: 'LINK',
+      state: 'UNCHECKED',
+      title: '',
+      mimeType: null,
+      reason: null,
+      files: [],
+      skipped: 0,
+      truncated: false,
+    };
+    if (isInstagramUrl(url)) {
+      const handle = parseInstagramHandle(url);
+      return handle
+        ? {
+            ...base,
+            kind: 'INSTAGRAM',
+            title: `Instagram @${handle}`,
+            url: instagramProfileUrl(handle),
+          }
+        : {
+            ...base,
+            kind: 'INSTAGRAM',
+            state: 'REJECTED',
+            reason: 'This is a post, reel or story, not an account link.',
+          };
+    }
+    if (!isGoogleDriveUrl(url)) {
+      return existing.has(url)
+        ? { ...base, state: 'DUPLICATE', reason: 'Already a reference' }
+        : base;
+    }
+    if (existing.has(url))
+      return { ...base, kind: 'GOOGLE_FILE', state: 'DUPLICATE', reason: 'Already a reference' };
+
+    const folderId = parseGoogleFolderUrl(url);
+    const file = parseGoogleFileUrl(url);
+    if (folderId) {
+      try {
+        const folder = await this.drive.listFolder(folderId, null, businessId);
+        const files = folder.files.map((f) => ({
+          url: f.url,
+          title: f.name,
+          mimeType: f.mimeType,
+          duplicate: existing.has(f.url),
+        }));
+        return {
+          ...base,
+          kind: 'GOOGLE_FOLDER',
+          title: folder.name,
+          files,
+          skipped: folder.skipped.length,
+          truncated: folder.truncated,
+          ...(files.length
+            ? { state: 'READY' as const }
+            : {
+                state: 'REJECTED' as const,
+                reason: 'The folder has no file that can be read as text.',
+              }),
+        };
+      } catch (err) {
+        return this.previewFailure({ ...base, kind: 'GOOGLE_FOLDER' }, err);
+      }
+    }
+    if (!file) {
+      return {
+        ...base,
+        kind: 'GOOGLE_FILE',
+        state: 'REJECTED',
+        reason: 'This Google Drive link is neither a file nor a folder.',
+      };
+    }
+    try {
+      const meta = await this.drive.inspectFile(file.id, businessId);
+      return meta.readable
+        ? {
+            ...base,
+            kind: 'GOOGLE_FILE',
+            state: 'READY',
+            title: meta.title,
+            mimeType: meta.mimeType,
+          }
+        : {
+            ...base,
+            kind: 'GOOGLE_FILE',
+            state: 'REJECTED',
+            title: meta.title,
+            mimeType: meta.mimeType,
+            reason: `A ${meta.mimeType || 'binary'} file cannot be read as text yet. Save it as a Google Doc or paste its text.`,
+          };
+    } catch (err) {
+      if (err instanceof DriveNoAccessError) {
+        // A link-shared ("anyone with the link") file needs no account.
+        const pub = await this.readPublicGoogle(file).catch(() => null);
+        if (pub) return { ...base, kind: 'GOOGLE_FILE', state: 'READY', title: pub.title };
+      }
+      return this.previewFailure({ ...base, kind: 'GOOGLE_FILE' }, err);
+    }
+  }
+
+  private previewFailure(item: ReferencePreviewItem, err: unknown): ReferencePreviewItem {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!(err instanceof DriveReadError)) {
+      this.logger.warn(`preview of ${item.url} failed: ${message}`);
+    }
+    return {
+      ...item,
+      state: err instanceof DriveNoAccessError ? 'NO_ACCESS' : 'REJECTED',
+      reason: message.slice(0, 500),
+    };
+  }
+
+  /**
+   * Step 2 of a list upload: adds the links the admin left ticked, each through `add` (so every
+   * rule — limit, duplicates, shared hosts, folders — applies once), with a shared note and
+   * audience unless an item has its own. One failure does not stop the rest.
+   */
+  async importList(
+    businessId: string,
+    input: ImportReferencesInput,
+    user: AuthUser,
+  ): Promise<ImportReferencesResult> {
+    const data = ImportReferencesSchema.parse(input);
+    const results: ImportReferencesResult['results'] = [];
+    await inBatches(data.items, async (item) => {
+      try {
+        const out = await this.add(
+          businessId,
+          {
+            url: item.url,
+            title: item.title,
+            description: item.description ?? data.description,
+            audience: item.audience ?? data.audience,
+          },
+          user,
+        );
+        results.push({ url: item.url, ok: true, error: null, added: out.references.length });
+      } catch (err) {
+        results.push({
+          url: item.url,
+          ok: false,
+          error: err instanceof Error ? err.message.slice(0, 500) : String(err),
+          added: 0,
+        });
+      }
+    });
+    const order = new Map(data.items.map((i, n) => [i.url, n]));
+    results.sort((a, b) => (order.get(a.url) ?? 0) - (order.get(b.url) ?? 0));
+    const added = results.reduce((n, r) => n + r.added, 0);
+    this.audit.log({
+      userId: user.id,
+      action: 'business.reference_import',
+      entityType: 'Business',
+      entityId: businessId,
+      meta: { links: data.items.length, added, failed: results.filter((r) => !r.ok).length },
+    });
+    return { results, added, failed: results.filter((r) => !r.ok).length };
+  }
+
+  /**
+   * Asks Google when each Google file of the business last changed and compares it with the
+   * time recorded at the last read (docs/77 phase 4). Reads no text and changes nothing: the
+   * admin decides which to refresh. A file that cannot be asked is simply left out.
+   */
+  async checkChanges(businessId: string): Promise<{ id: string; changed: boolean }[]> {
+    const rows = await this.prisma.businessReference.findMany({
+      where: { businessId, kind: 'GOOGLE_DOC', status: 'READY' },
+      orderBy: { createdAt: 'asc' },
+      take: 60,
+    });
+    const out: { id: string; changed: boolean }[] = [];
+    await inBatches(rows, async (row) => {
+      const file = parseGoogleFileUrl(row.url);
+      if (!file) return;
+      try {
+        const at = await this.drive.modifiedTime(file.id, row.googleAccountId, businessId);
+        if (!at) return;
+        // never recorded (read before this check existed) counts as unknown, not changed
+        const changed =
+          !!row.sourceModifiedAt && new Date(at).getTime() > row.sourceModifiedAt.getTime();
+        out.push({ id: row.id, changed });
+      } catch (err) {
+        if (!(err instanceof DriveReadError)) {
+          this.logger.warn(`change check of ${row.url} failed: ${String(err)}`);
+        }
+      }
+    });
+    const order = new Map(rows.map((r, n) => [r.id, n]));
+    return out.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }
 
   /** Reads the link again and replaces the snapshot (a folder link is expanded into its files). */
@@ -261,7 +495,14 @@ export class ReferencesService {
       action: 'business.reference_update',
       entityType: 'Business',
       entityId: row.businessId,
-      meta: { referenceId: id, ...input },
+      // the description text stays out of the audit log; the audience change is the sensitive part
+      meta: {
+        referenceId: id,
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+        ...(input.description !== undefined ? { description: 'changed' } : {}),
+        ...(input.audience !== undefined ? { audience: input.audience, was: row.audience } : {}),
+      },
     });
     return toPublic(updated);
   }
@@ -330,12 +571,19 @@ export class ReferencesService {
       folder = await this.drive.listFolder(
         parseGoogleFolderUrl(folderRow.url)!,
         folderRow.googleAccountId,
+        folderRow.businessId,
       );
     } catch (err) {
       if (!(err instanceof DriveReadError)) {
         this.logger.warn(`folder ${folderRow.url} failed: ${String(err)}`);
       }
-      return fail(err instanceof Error ? err.message : String(err));
+      return this.failFolder(
+        folderRow,
+        'GOOGLE_DOC',
+        err instanceof Error ? err.message : String(err),
+        0,
+        err instanceof DriveNoAccessError ? 'NO_ACCESS' : undefined,
+      );
     }
     const skippedNames = folder.skipped.map((f) => f.name);
     if (!folder.files.length) {
@@ -368,6 +616,9 @@ export class ReferencesService {
                 businessId: folderRow.businessId,
                 kind: 'GOOGLE_DOC',
                 url: file.url,
+                // the folder's note and audience carry over to the files taken from it (docs/77)
+                description: folderRow.description,
+                audience: folderRow.audience,
                 createdById: folderRow.createdById,
               },
             }),
@@ -384,10 +635,17 @@ export class ReferencesService {
     kind: ReferenceRow['kind'],
     error: string,
     skipped = 0,
+    accessState?: 'NO_ACCESS',
   ): Promise<Expansion> {
     await this.prisma.businessReference.update({
       where: { id: folderRow.id },
-      data: { kind, status: 'FAILED', content: '', error: error.slice(0, 1000) },
+      data: {
+        kind,
+        status: 'FAILED',
+        content: '',
+        error: error.slice(0, 1000),
+        ...(accessState ? { accessState } : {}),
+      },
     });
     return { ids: [folderRow.id], skipped };
   }
@@ -439,6 +697,8 @@ export class ReferencesService {
                 businessId: folderRow.businessId,
                 kind: 'URL',
                 url: file.url,
+                description: folderRow.description,
+                audience: folderRow.audience,
                 createdById: folderRow.createdById,
               },
             }),
@@ -530,6 +790,12 @@ export class ReferencesService {
         status: 'READY',
         error: null,
         fetchedAt: new Date(),
+        ...(row.kind === 'GOOGLE_DOC'
+          ? {
+              accessState: 'OK' as const,
+              sourceModifiedAt: out.modifiedAt ? new Date(out.modifiedAt) : null,
+            }
+          : {}),
         googleAccount: out.accountId ? { connect: { id: out.accountId } } : { disconnect: true },
         ...(out.analysis ? { analysis: out.analysis as unknown as Prisma.InputJsonValue } : {}),
       };
@@ -538,7 +804,11 @@ export class ReferencesService {
       const message = err instanceof Error ? err.message : String(err);
       if (!expected) this.logger.warn(`reference ${row.id} (${row.url}) failed: ${message}`);
       // Keep the previous snapshot: a failed refresh must not erase readable text.
-      data = { status: 'FAILED', error: message.slice(0, 1000) };
+      data = {
+        status: 'FAILED',
+        error: message.slice(0, 1000),
+        ...(err instanceof DriveNoAccessError ? { accessState: 'NO_ACCESS' as const } : {}),
+      };
     }
     await this.prisma.businessReference.update({ where: { id: row.id }, data });
   }
@@ -630,7 +900,7 @@ export class ReferencesService {
     if (!file) throw new DriveReadError('This Google Drive link is not a file link');
     const pub = await this.readPublicGoogle(file).catch(() => null);
     if (pub) return { ...pub, accountId: null as string | null };
-    return this.drive.readFile(file.id, row.googleAccountId);
+    return this.drive.readFile(file.id, row.googleAccountId, row.businessId);
   }
 
   private async readPublicGoogle(file: { id: string; type: GoogleFileType }) {
@@ -670,6 +940,7 @@ export function usableWhere(
     businessId,
     status: 'READY',
     content: { not: '' },
+    audience: { not: 'APPS' },
     ...(ids ? { id: { in: ids } } : { isActive: true }),
   };
 }
