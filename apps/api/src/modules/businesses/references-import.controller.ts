@@ -17,6 +17,7 @@ export class ReferencesImportController {
 
   @BusinessScoped('business')
   @Post(':id/references/preview')
+  @HttpCode(200)
   preview(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(PreviewReferenceListSchema)) body: PreviewReferenceListInput,
