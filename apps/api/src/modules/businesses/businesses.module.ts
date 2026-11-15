@@ -97,10 +97,12 @@ import { SegmentsService } from './segments.service';
 import { OfferingsController } from './offerings.controller';
 import { OfferingsService } from './offerings.service';
 import { StylesService } from './styles.service';
+import { TabFeedbackController } from './tab-feedback.controller';
+import { TabFeedbackService } from './tab-feedback.service';
 import { ProfileKnowledgeService } from './profile-knowledge.service';
+import { ReferencesImportController } from './references-import.controller';
 import { ReferencesService } from './references.service';
 import { writeSection } from './section-writer';
-import { ReferencesImportController } from './references-import.controller';
 import { InstagramService } from './social/instagram.service';
 import { SourceReader } from './social/source-reader.service';
 import { WebsiteCrawlerService } from './social/website-crawler.service';
@@ -1142,9 +1144,9 @@ export class BusinessItemsController {
   imports: [SamplesCoreModule, GoogleDriveModule],
   controllers: [
     BusinessesController,
+    ReferencesImportController,
     BusinessItemsController,
     BusinessNotesAssetsController,
-    ReferencesImportController,
     BusinessChatController,
     ProfileKnowledgeController,
     StylesController,
@@ -1152,6 +1154,7 @@ export class BusinessItemsController {
     CompetitorsController,
     SegmentsController,
     ProfileQuestionsController,
+    TabFeedbackController,
   ],
   providers: [
     BusinessesService,
@@ -1172,6 +1175,7 @@ export class BusinessItemsController {
     CompetitorSourcesService,
     SegmentsService,
     ProfileQuestionsService,
+    TabFeedbackService,
   ],
   exports: [BusinessesService],
 })

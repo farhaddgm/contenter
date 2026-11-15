@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  TabFeedbackTab,
   AcceptSuggestionInput,
   AddReferenceInput,
   BlockedSource,
@@ -435,6 +436,18 @@ export function useCreateNote(businessId: string) {
     mutationFn: (data: CreateBusinessNoteInput) =>
       api.post<{ id: string; jobId: string }>(`/businesses/${businessId}/notes`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: businessKeys.notes(businessId) }),
+  });
+}
+
+export function useTabFeedback(businessId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tab: TabFeedbackTab) =>
+      api.post<{ id: string; jobId: string }>(`/businesses/${businessId}/tab-feedback`, { tab }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: businessKeys.notes(businessId) });
+      qc.invalidateQueries({ queryKey: businessKeys.suggestions(businessId) });
+    },
   });
 }
 

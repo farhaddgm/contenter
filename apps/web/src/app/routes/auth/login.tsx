@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
+import { Globe } from 'lucide-react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router';
 import { GoogleLoginError, LoginSchema, type LoginInput } from '@contenter/shared';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { paths } from '@/config/paths';
 import { useT } from '@/i18n';
 import { googleSignInUrl, useAuthProviders, useLogin, useUser } from '@/lib/auth';
 import { ApiError } from '@/lib/api-client';
-import { useUi, type Lang } from '@/stores/ui';
+import { useUi } from '@/stores/ui';
 import { cn } from '@/utils/cn';
 
 function GoogleIcon() {
@@ -165,21 +166,14 @@ export function LoginPage({ withPassword = false }: { withPassword?: boolean }) 
             )}
           </form>
         )}
-        <label
-          dir="ltr"
-          className="mt-[1.125rem] flex w-full items-center justify-center rounded-[0.6875rem] border bg-muted p-[0.1875rem]"
+        <button
+          type="button"
+          onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}
+          className="mx-auto mt-[1.125rem] flex h-10 items-center gap-2 rounded-full border bg-card px-4 text-sm font-semibold text-muted-foreground transition-colors hover:border-ring/60 hover:text-foreground"
         >
-          <span className="sr-only">{t('nav.language')}</span>
-          <select
-            value={lang}
-            onChange={(e) => setLang(e.target.value as Lang)}
-            aria-label={t('nav.language')}
-            className="h-[2.375rem] w-full cursor-pointer rounded-lg bg-card px-3 text-center text-xs font-bold text-primary"
-          >
-            <option value="fa">فارسی</option>
-            <option value="en">English</option>
-          </select>
-        </label>
+          <Globe className="size-4" />
+          {lang === 'fa' ? 'English' : 'فارسی'}
+        </button>
       </section>
     </main>
   );
