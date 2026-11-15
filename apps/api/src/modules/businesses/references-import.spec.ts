@@ -12,16 +12,21 @@ const PDF = 'https://drive.google.com/file/d/PDF1abcdefgh/view';
 const SECRET = 'https://docs.google.com/document/d/SECRET1abcdef/edit';
 const FOLDER = 'https://drive.google.com/drive/folders/FOLDER1abcdef';
 
-function make(existing: string[] = []) {
+function make(existing: string[] = [], rows: unknown[] = []) {
   const prisma = {
     businessReference: {
-      findMany: vi.fn().mockResolvedValue(existing.map((url) => ({ url }))),
+      findMany: vi.fn().mockResolvedValue(rows.length ? rows : existing.map((url) => ({ url }))),
     },
   } as unknown as PrismaService;
   const drive = {
+    modifiedTime: vi.fn(async (id: string) => {
+      if (id === 'SECRET1abcdef') throw new DriveNoAccessError();
+      return id === 'DOC1abcdefgh' ? '2026-11-05T00:00:00.000Z' : '2026-11-01T00:00:00.000Z';
+    }),
     inspectFile: vi.fn(async (id: string) => {
       if (id === 'SECRET1abcdef') throw new DriveNoAccessError('not shared with reader@x.iam');
-      if (id === 'PDF1abcdefgh') return { title: 'قرارداد', mimeType: 'application/pdf', readable: false };
+      if (id === 'PDF1abcdefgh')
+        return { title: 'قرارداد', mimeType: 'application/pdf', readable: false };
       return {
         title: `سند ${id}`,
         mimeType: 'application/vnd.google-apps.document',
@@ -65,7 +70,11 @@ describe('list upload preview (docs/77 phase 3)', () => {
     ]);
     const by = Object.fromEntries(out.map((i) => [i.url, i]));
     expect(out).toHaveLength(6);
-    expect(by[DOC]).toMatchObject({ kind: 'GOOGLE_FILE', state: 'READY', title: 'سند DOC1abcdefgh' });
+    expect(by[DOC]).toMatchObject({
+      kind: 'GOOGLE_FILE',
+      state: 'READY',
+      title: 'سند DOC1abcdefgh',
+    });
     expect(by[SECRET]).toMatchObject({ state: 'NO_ACCESS' });
     expect(by[SECRET]!.reason).toContain('not shared');
     expect(by[PDF]).toMatchObject({ state: 'REJECTED', mimeType: 'application/pdf' });
@@ -134,5 +143,33 @@ describe('list upload import', () => {
     const { service } = make();
     const items = Array.from({ length: 51 }, (_, i) => ({ url: `https://brand.ir/${i}` }));
     await expect(service.importList('b1', { items }, user)).rejects.toThrow();
+  });
+});
+
+describe('change check (docs/77 phase 4)', () => {
+  const row = (id: string, url: string, at: string | null) => ({
+    id,
+    url,
+    googleAccountId: null,
+    sourceModifiedAt: at ? new Date(at) : null,
+  });
+
+  it('flags only files that changed since the last read and reads no text', async () => {
+    const { service, drive } = make(
+      [],
+      [
+        row('r1', DOC, '2026-11-01T00:00:00.000Z'), // Google says Nov 5: changed
+        row('r2', SHEET, '2026-11-01T00:00:00.000Z'), // same time: unchanged
+        row('r3', PDF, null), // never recorded: unknown, not "changed"
+        row('r4', SECRET, '2026-10-01T00:00:00.000Z'), // cannot be asked: left out
+      ],
+    );
+    const out = await service.checkChanges('b1');
+    expect(out).toEqual([
+      { id: 'r1', changed: true },
+      { id: 'r2', changed: false },
+      { id: 'r3', changed: false },
+    ]);
+    expect(drive.modifiedTime).toHaveBeenCalledWith('DOC1abcdefgh', null, 'b1');
   });
 });

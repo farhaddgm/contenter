@@ -53,6 +53,8 @@ interface ReadOutcome {
   title: string;
   text: string;
   accountId: string | null;
+  /** Google files: when the file last changed at Google (docs/77). */
+  modifiedAt?: string | null;
   /** INSTAGRAM / WEBSITE sources: what code computed on the way. */
   analysis?: ReferenceAnalysis;
 }
@@ -423,6 +425,38 @@ export class ReferencesService {
     return { results, added, failed: results.filter((r) => !r.ok).length };
   }
 
+  /**
+   * Asks Google when each Google file of the business last changed and compares it with the
+   * time recorded at the last read (docs/77 phase 4). Reads no text and changes nothing: the
+   * admin decides which to refresh. A file that cannot be asked is simply left out.
+   */
+  async checkChanges(businessId: string): Promise<{ id: string; changed: boolean }[]> {
+    const rows = await this.prisma.businessReference.findMany({
+      where: { businessId, kind: 'GOOGLE_DOC', status: 'READY' },
+      orderBy: { createdAt: 'asc' },
+      take: 60,
+    });
+    const out: { id: string; changed: boolean }[] = [];
+    await inBatches(rows, async (row) => {
+      const file = parseGoogleFileUrl(row.url);
+      if (!file) return;
+      try {
+        const at = await this.drive.modifiedTime(file.id, row.googleAccountId, businessId);
+        if (!at) return;
+        // never recorded (read before this check existed) counts as unknown, not changed
+        const changed =
+          !!row.sourceModifiedAt && new Date(at).getTime() > row.sourceModifiedAt.getTime();
+        out.push({ id: row.id, changed });
+      } catch (err) {
+        if (!(err instanceof DriveReadError)) {
+          this.logger.warn(`change check of ${row.url} failed: ${String(err)}`);
+        }
+      }
+    });
+    const order = new Map(rows.map((r, n) => [r.id, n]));
+    return out.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  }
+
   /** Reads the link again and replaces the snapshot (a folder link is expanded into its files). */
   async refresh(id: string, user: AuthUser) {
     const row = await this.find(id);
@@ -756,7 +790,12 @@ export class ReferencesService {
         status: 'READY',
         error: null,
         fetchedAt: new Date(),
-        ...(row.kind === 'GOOGLE_DOC' ? { accessState: 'OK' as const } : {}),
+        ...(row.kind === 'GOOGLE_DOC'
+          ? {
+              accessState: 'OK' as const,
+              sourceModifiedAt: out.modifiedAt ? new Date(out.modifiedAt) : null,
+            }
+          : {}),
         googleAccount: out.accountId ? { connect: { id: out.accountId } } : { disconnect: true },
         ...(out.analysis ? { analysis: out.analysis as unknown as Prisma.InputJsonValue } : {}),
       };

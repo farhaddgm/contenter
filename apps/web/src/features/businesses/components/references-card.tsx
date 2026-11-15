@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import {
   AtSign,
   BookOpen,
   Eye,
   FileText,
   FileUp,
+  FileSearch,
   Globe,
   ListPlus,
   Pencil,
@@ -33,6 +35,7 @@ import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-con
 import { CopyButton, Segmented } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
+import { api } from '@/lib/api-client';
 import { useAuthorization } from '@/lib/auth';
 import { notify } from '@/stores/notifications';
 import { formatDate, formatNumber } from '@/utils/format';
@@ -547,6 +550,21 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
   const [viewing, setViewing] = useState<BusinessReference | null>(null);
   const [editing, setEditing] = useState<BusinessReference | null>(null);
   const [listOpen, setListOpen] = useState(false);
+  // which Google files changed at the source since they were read (docs/77 phase 4)
+  const [changed, setChanged] = useState<Set<string>>(new Set());
+  const check = useMutation({
+    mutationFn: () =>
+      api.post<{ id: string; changed: boolean }[]>(
+        `/businesses/${businessId}/references/check-changes`,
+      ),
+    onSuccess: (res) => {
+      const ids = new Set(res.filter((r) => r.changed).map((r) => r.id));
+      setChanged(ids);
+      if (ids.size) notify.warning(t('businesses.references.changesFound', { count: ids.size }));
+      else notify.success(t('businesses.references.noChanges'));
+    },
+    onError: (e: Error) => notify.error(t('common.error'), e.message),
+  });
   const { data: drive } = useDriveStatus();
   const shareEmail =
     drive?.serviceAccountEmail ?? drive?.accounts.find((a) => !a.error)?.email ?? null;
@@ -576,6 +594,17 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
         actions={
           editable && (
             <>
+              {(data ?? []).some((r) => r.kind === 'GOOGLE_DOC' && r.status === 'READY') && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={<FileSearch />}
+                  isLoading={check.isPending}
+                  onClick={() => check.mutate()}
+                >
+                  {t('businesses.references.checkChanges')}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -615,6 +644,9 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                     <Badge tone={statusTone[r.status]}>
                       {t(`enums.referenceStatus.${r.status}`)}
                     </Badge>
+                    {changed.has(r.id) && (
+                      <Badge tone="warning">{t('businesses.references.changedAtSource')}</Badge>
+                    )}
                     {r.audience !== 'AI' && (
                       <Badge>{t(`businesses.references.audienceShort.${r.audience}`)}</Badge>
                     )}
@@ -709,6 +741,11 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                       onClick={() =>
                         refresh.mutate(r.id, {
                           onSuccess: ({ references }) => {
+                            setChanged((prev) => {
+                              const next = new Set(prev);
+                              next.delete(r.id);
+                              return next;
+                            });
                             const failed = references.find((x) => x.status !== 'READY');
                             if (failed) {
                               notify.error(

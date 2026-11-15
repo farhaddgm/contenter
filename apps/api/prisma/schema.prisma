@@ -349,29 +349,31 @@ enum ReferenceStatus {
 /// Admin-supplied source for AI builds/suggestions: a web page, a Google Docs/Drive file or a
 /// pasted text. `content` is the text snapshot AI reads (refreshed on demand).
 model BusinessReference {
-  id              String            @id @default(cuid())
-  businessId      String
-  kind            ReferenceKind
-  url             String            @default("")
-  title           String            @default("")
-  content         String            @default("")
+  id               String            @id @default(cuid())
+  businessId       String
+  kind             ReferenceKind
+  url              String            @default("")
+  title            String            @default("")
+  content          String            @default("")
   /// What code computed while reading an INSTAGRAM / WEBSITE source (`ReferenceAnalysis` in
   /// packages/shared/src/social.ts); null for the other kinds.
-  analysis        Json?
+  analysis         Json?
   /// What the admin says this attachment is for; handed to outside apps with the text (docs/77).
-  description     String            @default("")
+  description      String            @default("")
   /// Outside apps only see APPS / BOTH; AI jobs only read AI / BOTH.
-  audience        ReferenceAudience @default(AI)
+  audience         ReferenceAudience @default(AI)
   /// Result of the last read of a Google file (docs/77); NOT_CHECKED for other kinds.
-  accessState     ReferenceAccess   @default(NOT_CHECKED)
-  status          ReferenceStatus   @default(PENDING)
-  error           String?
-  isActive        Boolean           @default(true)
-  fetchedAt       DateTime?
-  googleAccountId String?
-  createdById     String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  accessState      ReferenceAccess   @default(NOT_CHECKED)
+  /// When the Google file last changed at Google, as of the last read (docs/77 phase 4).
+  sourceModifiedAt DateTime?
+  status           ReferenceStatus   @default(PENDING)
+  error            String?
+  isActive         Boolean           @default(true)
+  fetchedAt        DateTime?
+  googleAccountId  String?
+  createdById      String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   googleAccount GoogleDriveAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)

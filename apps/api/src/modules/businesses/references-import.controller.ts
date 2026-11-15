@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Param, Post } from '@nestjs/common';
 import {
   ImportReferencesSchema,
   PreviewReferenceListSchema,
@@ -22,6 +22,14 @@ export class ReferencesImportController {
     @Body(new ZodValidationPipe(PreviewReferenceListSchema)) body: PreviewReferenceListInput,
   ) {
     return this.refs.previewList(id, body.urls);
+  }
+
+  /** Which Google files changed at the source since they were read (no text is read). */
+  @BusinessScoped('business')
+  @Post(':id/references/check-changes')
+  @HttpCode(200)
+  checkChanges(@Param('id') id: string) {
+    return this.refs.checkChanges(id);
   }
 
   @BusinessScoped('business')

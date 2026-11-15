@@ -1,8 +1,9 @@
 import { assetFileType } from '@contenter/shared';
 import { parseHtml } from '../samples/media-parser';
+import { xlsxToText } from '../google-drive/xlsx-text';
 
 /** What a downloaded file is, as far as reading it goes. */
-export type DocumentKind = 'text' | 'html' | 'pdf' | 'docx' | 'image' | 'video';
+export type DocumentKind = 'text' | 'html' | 'pdf' | 'docx' | 'xlsx' | 'image' | 'video';
 
 const TEXT_EXTENSIONS = ['txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'xml', 'srt', 'vtt'];
 
@@ -19,6 +20,7 @@ export function documentKind(fileName: string, contentType = ''): DocumentKind |
   if (ext === 'html' || ext === 'htm') return 'html';
   if (ext === 'pdf') return 'pdf';
   if (ext === 'docx') return 'docx';
+  if (ext === 'xlsx') return 'xlsx';
   const media = assetFileType(fileName);
   if (media) return media;
   if (ext) return null;
@@ -26,12 +28,13 @@ export function documentKind(fileName: string, contentType = ''): DocumentKind |
   if (type.startsWith('text/') || type.includes('json')) return 'text';
   if (type.includes('pdf')) return 'pdf';
   if (type.includes('wordprocessingml')) return 'docx';
+  if (type.includes('spreadsheetml')) return 'xlsx';
   return null;
 }
 
 /** True for kinds that become a text reference (the rest are brand assets or unreadable). */
 export const isTextKind = (kind: DocumentKind | null) =>
-  kind === 'text' || kind === 'html' || kind === 'pdf' || kind === 'docx';
+  kind === 'text' || kind === 'html' || kind === 'pdf' || kind === 'docx' || kind === 'xlsx';
 
 /** Plain text of a text-like file. Pure code; throws when the file is damaged. */
 export async function extractText(buffer: Buffer, kind: DocumentKind, url = ''): Promise<string> {
@@ -53,6 +56,8 @@ export async function extractText(buffer: Buffer, kind: DocumentKind, url = ''):
       const mammoth = await import('mammoth');
       return (await mammoth.extractRawText({ buffer })).value;
     }
+    case 'xlsx':
+      return xlsxToText(buffer);
     default:
       return '';
   }

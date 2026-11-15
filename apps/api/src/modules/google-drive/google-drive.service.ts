@@ -9,6 +9,8 @@ import { ENV, type Env } from '../../config/env';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { safeRedirectPath } from '../auth/google-oauth.service';
+import { extractText } from '../businesses/document-text';
+import { xlsxToText } from './xlsx-text';
 import {
   parseServiceAccountKey,
   serviceAccountAssertion,
@@ -67,6 +69,8 @@ interface FlowState {
 export interface DriveFile {
   title: string;
   text: string;
+  /** When the file last changed at Google (RFC 3339), to tell later that it moved on. */
+  modifiedAt: string | null;
   /** The connected account that read it; null = the service account. */
   accountId: string | null;
 }
@@ -100,15 +104,34 @@ export function driveFileUrl(file: { id: string; mimeType: string }): string {
 
 const b64url = (buf: Buffer) => buf.toString('base64url');
 
-/** How each Drive file type is turned into text. Null = not readable as text. */
-export function driveExportPlan(
-  mimeType: string,
-): { export: string; fallback?: string } | 'download' | null {
+export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+/** Largest uploaded Drive file (PDF, Word, Excel) downloaded to be read. */
+export const DRIVE_BINARY_MAX_BYTES = 25_000_000;
+
+export type DrivePlan =
+  | { export: string; fallback?: string; xlsx?: boolean }
+  | { binary: 'pdf' | 'docx' | 'xlsx' }
+  | 'download'
+  | null;
+
+/**
+ * How each Drive file type is turned into text. Null = not readable as text. A Google Sheet is
+ * exported as .xlsx so every tab is read (CSV export has only the first); uploaded PDF, Word and
+ * Excel files are downloaded and read by code (docs/77 phase 4).
+ */
+export function driveExportPlan(mimeType: string): DrivePlan {
   switch (mimeType) {
     case 'application/vnd.google-apps.document':
       return { export: 'text/markdown', fallback: 'text/plain' };
     case 'application/vnd.google-apps.spreadsheet':
-      return { export: 'text/csv' };
+      return { export: XLSX_MIME, xlsx: true, fallback: 'text/csv' };
+    case 'application/pdf':
+      return { binary: 'pdf' };
+    case DOCX_MIME:
+      return { binary: 'docx' };
+    case XLSX_MIME:
+      return { binary: 'xlsx' };
     case 'application/vnd.google-apps.presentation':
       return { export: 'text/plain' };
   }
@@ -412,6 +435,29 @@ export class GoogleDriveService {
     });
   }
 
+  /**
+   * When a Google file last changed, without reading it (docs/77 phase 4). Null for a file the
+   * accounts cannot see or that has no such time.
+   */
+  async modifiedTime(
+    fileId: string,
+    preferredAccountId?: string | null,
+    businessId?: string | null,
+  ): Promise<string | null> {
+    const out = await this.withAccount('file', preferredAccountId, businessId, async (account) => {
+      const token = await this.accessToken(account);
+      const res = await fetch(
+        `${DRIVE_URL}/${encodeURIComponent(fileId)}?fields=modifiedTime&supportsAllDrives=true`,
+        { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(TIMEOUT_MS) },
+      );
+      if (res.status === 404) throw new DriveNoAccessError();
+      if (!res.ok) throw await this.apiError(res, account);
+      const meta = (await res.json()) as { modifiedTime?: string };
+      return { modifiedAt: meta.modifiedTime ?? null };
+    });
+    return out.modifiedAt;
+  }
+
   /** Runs `fn` with each usable credential until one can see the item. */
   private async withAccount<T>(
     what: 'file' | 'folder',
@@ -523,13 +569,19 @@ export class GoogleDriveService {
     const auth = { authorization: `Bearer ${token}` };
     const id = encodeURIComponent(fileId);
 
-    const metaRes = await fetch(`${DRIVE_URL}/${id}?fields=name,mimeType&supportsAllDrives=true`, {
-      headers: auth,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const metaRes = await fetch(
+      `${DRIVE_URL}/${id}?fields=name,mimeType,modifiedTime,size&supportsAllDrives=true`,
+      { headers: auth, signal: AbortSignal.timeout(TIMEOUT_MS) },
+    );
     if (metaRes.status === 404) throw new DriveNoAccessError();
     if (!metaRes.ok) throw await this.apiError(metaRes, account);
-    const meta = (await metaRes.json()) as { name?: string; mimeType?: string };
+    const meta = (await metaRes.json()) as {
+      name?: string;
+      mimeType?: string;
+      modifiedTime?: string;
+      size?: string;
+    };
+    const modifiedAt = meta.modifiedTime ?? null;
 
     const plan = driveExportPlan(meta.mimeType ?? '');
     if (!plan) {
@@ -543,10 +595,39 @@ export class GoogleDriveService {
         : `${DRIVE_URL}/${id}?alt=media&supportsAllDrives=true`;
       return fetch(url, { headers: auth, signal: AbortSignal.timeout(TIMEOUT_MS) });
     };
+    if (typeof plan === 'object' && 'binary' in plan) {
+      if (Number(meta.size ?? 0) > DRIVE_BINARY_MAX_BYTES) {
+        throw new DriveReadError(
+          `"${meta.name ?? fileId}" is larger than ${DRIVE_BINARY_MAX_BYTES / 1_000_000} MB; paste the part you need.`,
+        );
+      }
+      const dl = await read(null);
+      if (!dl.ok) throw await this.apiError(dl, account);
+      const bytes = Buffer.from(await dl.arrayBuffer());
+      try {
+        const text =
+          plan.binary === 'xlsx' ? await xlsxToText(bytes) : await extractText(bytes, plan.binary);
+        return { title: meta.name ?? '', text, modifiedAt };
+      } catch (err) {
+        throw new DriveReadError(
+          `"${meta.name ?? fileId}" could not be read (${err instanceof Error ? err.message : 'damaged file'}).`,
+        );
+      }
+    }
     let res = await read(plan === 'download' ? null : plan.export);
-    if (!res.ok && plan !== 'download' && plan.fallback) res = await read(plan.fallback);
+    if (res.ok && plan !== 'download' && plan.xlsx) {
+      try {
+        return {
+          title: meta.name ?? '',
+          text: await xlsxToText(Buffer.from(await res.arrayBuffer())),
+          modifiedAt,
+        };
+      } catch {
+        res = await read(plan.fallback ?? null);
+      }
+    } else if (!res.ok && plan !== 'download' && plan.fallback) res = await read(plan.fallback);
     if (!res.ok) throw await this.apiError(res, account);
-    return { title: meta.name ?? '', text: await res.text() };
+    return { title: meta.name ?? '', text: await res.text(), modifiedAt };
   }
 
   private async apiError(res: Response, account: Cred): Promise<DriveReadError> {

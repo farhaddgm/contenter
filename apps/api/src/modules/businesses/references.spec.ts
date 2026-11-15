@@ -61,11 +61,16 @@ describe('Google file links', () => {
       export: 'text/markdown',
       fallback: 'text/plain',
     });
-    expect(driveExportPlan('application/vnd.google-apps.spreadsheet')).toEqual({
-      export: 'text/csv',
+    // a Google Sheet is read from its .xlsx export (every tab), CSV only as a fallback
+    expect(driveExportPlan('application/vnd.google-apps.spreadsheet')).toMatchObject({
+      xlsx: true,
+      fallback: 'text/csv',
     });
     expect(driveExportPlan('text/plain')).toBe('download');
-    expect(driveExportPlan('application/pdf')).toBeNull();
+    // uploaded PDF / Word / Excel are downloaded and read by code (docs/77 phase 4)
+    expect(driveExportPlan('application/pdf')).toEqual({ binary: 'pdf' });
+    expect(driveExportPlan('application/msword')).toBeNull();
+    expect(driveExportPlan('image/png')).toBeNull();
   });
 });
 

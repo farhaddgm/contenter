@@ -504,6 +504,8 @@ export interface BusinessReference {
   audience: ReferenceAudience;
   /** Google files only: could the server open it? NO_ACCESS = share it with the service account. */
   accessState: ReferenceAccess;
+  /** Google files: when the file last changed at Google, as of the last read. */
+  sourceModifiedAt: string | null;
   status: ReferenceStatus;
   error: string | null;
   isActive: boolean;
