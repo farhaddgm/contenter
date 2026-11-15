@@ -6,6 +6,7 @@ import {
   FileText,
   FileUp,
   Globe,
+  ListPlus,
   Pencil,
   Plus,
   RefreshCw,
@@ -47,6 +48,7 @@ import {
   useUpdateReference,
 } from '../api/businesses';
 import { ConnectDriveButton } from './google-drive-card';
+import { ImportReferencesDialog } from './references-import-dialog';
 import {
   AnalysisReport,
   analysisSummary,
@@ -151,7 +153,7 @@ export function TextFileButton({ onLoad }: { onLoad: (text: string, name: string
 }
 
 /** What the attachment is for, and who may read it (docs/77). Used by the add and edit dialogs. */
-function AudienceFields({
+export function AudienceFields({
   description,
   audience,
   onDescription,
@@ -544,6 +546,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
   const [addOpen, setAddOpen] = useState(false);
   const [viewing, setViewing] = useState<BusinessReference | null>(null);
   const [editing, setEditing] = useState<BusinessReference | null>(null);
+  const [listOpen, setListOpen] = useState(false);
   const { data: drive } = useDriveStatus();
   const shareEmail =
     drive?.serviceAccountEmail ?? drive?.accounts.find((a) => !a.error)?.email ?? null;
@@ -572,9 +575,19 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
         descriptionAsTip
         actions={
           editable && (
-            <Button size="sm" variant="outline" icon={<Plus />} onClick={() => setAddOpen(true)}>
-              {t('businesses.references.add')}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                icon={<ListPlus />}
+                onClick={() => setListOpen(true)}
+              >
+                {t('businesses.references.listAdd')}
+              </Button>
+              <Button size="sm" variant="outline" icon={<Plus />} onClick={() => setAddOpen(true)}>
+                {t('businesses.references.add')}
+              </Button>
+            </>
           )
         }
       />
@@ -756,6 +769,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
         </ul>
       )}
       {addOpen && <AddReferenceDialog businessId={businessId} onOpenChange={setAddOpen} />}
+      {listOpen && <ImportReferencesDialog businessId={businessId} onOpenChange={setListOpen} />}
       {viewing && (
         <ReferenceViewDialog reference={viewing} onOpenChange={(v) => !v && setViewing(null)} />
       )}

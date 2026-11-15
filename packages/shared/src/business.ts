@@ -359,6 +359,72 @@ export const UpdateReferenceSchema = z.object({
 });
 export type UpdateReferenceInput = z.infer<typeof UpdateReferenceSchema>;
 
+/** Most links one list upload may carry (docs/77 phase 3). */
+export const REFERENCE_LIST_MAX = 50;
+
+/** Step 1 of a list upload: look at the links without saving anything. */
+export const PreviewReferenceListSchema = z.object({
+  urls: z.array(httpUrl).min(1).max(REFERENCE_LIST_MAX),
+});
+export type PreviewReferenceListInput = z.infer<typeof PreviewReferenceListSchema>;
+
+export const ReferencePreviewKind = ['GOOGLE_FILE', 'GOOGLE_FOLDER', 'INSTAGRAM', 'LINK'] as const;
+export type ReferencePreviewKind = (typeof ReferencePreviewKind)[number];
+/** What the check found: READY can be added; NO_ACCESS needs a share; UNCHECKED is a plain link. */
+export const ReferencePreviewState = [
+  'READY',
+  'NO_ACCESS',
+  'DUPLICATE',
+  'REJECTED',
+  'UNCHECKED',
+] as const;
+export type ReferencePreviewState = (typeof ReferencePreviewState)[number];
+
+export interface ReferencePreviewFile {
+  url: string;
+  title: string;
+  mimeType: string;
+  duplicate: boolean;
+}
+
+export interface ReferencePreviewItem {
+  url: string;
+  kind: ReferencePreviewKind;
+  state: ReferencePreviewState;
+  title: string;
+  mimeType: string | null;
+  /** Why it was refused / cannot be opened (shown to the admin). */
+  reason: string | null;
+  /** A folder: the files that can be read as text (each is ticked on its own). */
+  files: ReferencePreviewFile[];
+  skipped: number;
+  truncated: boolean;
+}
+
+/** Step 2: add the links the admin left ticked, with a shared note and audience. */
+export const ImportReferencesSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        url: httpUrl,
+        title: z.string().trim().max(300).optional().default(''),
+        description: z.string().trim().max(REFERENCE_DESCRIPTION_MAX).optional(),
+        audience: z.enum(ReferenceAudience).optional(),
+      }),
+    )
+    .min(1)
+    .max(REFERENCE_LIST_MAX),
+  description: z.string().trim().max(REFERENCE_DESCRIPTION_MAX).optional().default(''),
+  audience: z.enum(ReferenceAudience).optional().default('AI'),
+});
+export type ImportReferencesInput = z.input<typeof ImportReferencesSchema>;
+
+export interface ImportReferencesResult {
+  results: { url: string; ok: boolean; error: string | null; added: number }[];
+  added: number;
+  failed: number;
+}
+
 /** "Build from my sources": creates the business, reads the references, then builds the profile. */
 export const CreateFromReferencesSchema = z
   .object({

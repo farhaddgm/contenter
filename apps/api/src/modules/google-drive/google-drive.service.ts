@@ -390,6 +390,28 @@ export class GoogleDriveService {
     );
   }
 
+  /**
+   * Looks at a Drive file without reading it (name and type only): which credential can open it,
+   * and whether its type can be read as text. Used by the list-upload preview (docs/77).
+   */
+  async inspectFile(
+    fileId: string,
+    businessId?: string | null,
+  ): Promise<{ title: string; mimeType: string; readable: boolean }> {
+    return this.withAccount('file', null, businessId, async (account) => {
+      const token = await this.accessToken(account);
+      const res = await fetch(
+        `${DRIVE_URL}/${encodeURIComponent(fileId)}?fields=name,mimeType&supportsAllDrives=true`,
+        { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(TIMEOUT_MS) },
+      );
+      if (res.status === 404) throw new DriveNoAccessError();
+      if (!res.ok) throw await this.apiError(res, account);
+      const meta = (await res.json()) as { name?: string; mimeType?: string };
+      const mimeType = meta.mimeType ?? '';
+      return { title: meta.name ?? '', mimeType, readable: !!driveExportPlan(mimeType) };
+    });
+  }
+
   /** Runs `fn` with each usable credential until one can see the item. */
   private async withAccount<T>(
     what: 'file' | 'folder',

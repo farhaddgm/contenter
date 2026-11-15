@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import type { BusinessReference as ReferenceRow, Prisma } from '@prisma/client';
 import {
   AddReferenceSchema,
+  ImportReferencesSchema,
   BUSINESS_REFERENCE_LIMIT,
   BUSINESS_REFERENCE_MAX_CHARS,
   instagramProfileUrl,
@@ -13,6 +14,9 @@ import {
   parseInstagramHandle,
   parsePodSpaceUrl,
   type AddReferenceInput,
+  type ImportReferencesInput,
+  type ImportReferencesResult,
+  type ReferencePreviewItem,
   type GoogleFileType,
   type ReferenceAnalysis,
   type UpdateReferenceInput,
@@ -26,6 +30,7 @@ import {
   DriveReadError,
   GoogleDriveService,
 } from '../google-drive/google-drive.service';
+
 import { FetchError } from '../samples/media-fetcher.service';
 import { documentKind, extractText, isTextKind } from './document-text';
 import { AssetImportService, PREVIEW_MAX_BYTES } from './asset-import.service';
@@ -230,6 +235,192 @@ export class ReferencesService {
       },
     });
     return { references: await this.listByIds(ids), skipped, assets };
+  }
+
+  /**
+   * Step 1 of a list upload (docs/77): looks at each link without saving anything — what it is,
+   * whether the server can open it, whether it is already a reference. Pure code, no AI. A
+   * Google folder is listed, so the admin can tick its files one by one.
+   */
+  async previewList(businessId: string, urls: string[]): Promise<ReferencePreviewItem[]> {
+    const unique = [...new Set(urls.map((u) => u.trim()))];
+    const existing = new Set(
+      (
+        await this.prisma.businessReference.findMany({
+          where: { businessId },
+          select: { url: true },
+        })
+      ).map((r) => r.url),
+    );
+    const out = new Map<string, ReferencePreviewItem>();
+    await inBatches(unique, async (url) => {
+      out.set(url, await this.previewOne(businessId, url, existing));
+    });
+    return unique.map((u) => out.get(u)!);
+  }
+
+  private async previewOne(
+    businessId: string,
+    url: string,
+    existing: Set<string>,
+  ): Promise<ReferencePreviewItem> {
+    const base: ReferencePreviewItem = {
+      url,
+      kind: 'LINK',
+      state: 'UNCHECKED',
+      title: '',
+      mimeType: null,
+      reason: null,
+      files: [],
+      skipped: 0,
+      truncated: false,
+    };
+    if (isInstagramUrl(url)) {
+      const handle = parseInstagramHandle(url);
+      return handle
+        ? {
+            ...base,
+            kind: 'INSTAGRAM',
+            title: `Instagram @${handle}`,
+            url: instagramProfileUrl(handle),
+          }
+        : {
+            ...base,
+            kind: 'INSTAGRAM',
+            state: 'REJECTED',
+            reason: 'This is a post, reel or story, not an account link.',
+          };
+    }
+    if (!isGoogleDriveUrl(url)) {
+      return existing.has(url)
+        ? { ...base, state: 'DUPLICATE', reason: 'Already a reference' }
+        : base;
+    }
+    if (existing.has(url))
+      return { ...base, kind: 'GOOGLE_FILE', state: 'DUPLICATE', reason: 'Already a reference' };
+
+    const folderId = parseGoogleFolderUrl(url);
+    const file = parseGoogleFileUrl(url);
+    if (folderId) {
+      try {
+        const folder = await this.drive.listFolder(folderId, null, businessId);
+        const files = folder.files.map((f) => ({
+          url: f.url,
+          title: f.name,
+          mimeType: f.mimeType,
+          duplicate: existing.has(f.url),
+        }));
+        return {
+          ...base,
+          kind: 'GOOGLE_FOLDER',
+          title: folder.name,
+          files,
+          skipped: folder.skipped.length,
+          truncated: folder.truncated,
+          ...(files.length
+            ? { state: 'READY' as const }
+            : {
+                state: 'REJECTED' as const,
+                reason: 'The folder has no file that can be read as text.',
+              }),
+        };
+      } catch (err) {
+        return this.previewFailure({ ...base, kind: 'GOOGLE_FOLDER' }, err);
+      }
+    }
+    if (!file) {
+      return {
+        ...base,
+        kind: 'GOOGLE_FILE',
+        state: 'REJECTED',
+        reason: 'This Google Drive link is neither a file nor a folder.',
+      };
+    }
+    try {
+      const meta = await this.drive.inspectFile(file.id, businessId);
+      return meta.readable
+        ? {
+            ...base,
+            kind: 'GOOGLE_FILE',
+            state: 'READY',
+            title: meta.title,
+            mimeType: meta.mimeType,
+          }
+        : {
+            ...base,
+            kind: 'GOOGLE_FILE',
+            state: 'REJECTED',
+            title: meta.title,
+            mimeType: meta.mimeType,
+            reason: `A ${meta.mimeType || 'binary'} file cannot be read as text yet. Save it as a Google Doc or paste its text.`,
+          };
+    } catch (err) {
+      if (err instanceof DriveNoAccessError) {
+        // A link-shared ("anyone with the link") file needs no account.
+        const pub = await this.readPublicGoogle(file).catch(() => null);
+        if (pub) return { ...base, kind: 'GOOGLE_FILE', state: 'READY', title: pub.title };
+      }
+      return this.previewFailure({ ...base, kind: 'GOOGLE_FILE' }, err);
+    }
+  }
+
+  private previewFailure(item: ReferencePreviewItem, err: unknown): ReferencePreviewItem {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!(err instanceof DriveReadError)) {
+      this.logger.warn(`preview of ${item.url} failed: ${message}`);
+    }
+    return {
+      ...item,
+      state: err instanceof DriveNoAccessError ? 'NO_ACCESS' : 'REJECTED',
+      reason: message.slice(0, 500),
+    };
+  }
+
+  /**
+   * Step 2 of a list upload: adds the links the admin left ticked, each through `add` (so every
+   * rule — limit, duplicates, shared hosts, folders — applies once), with a shared note and
+   * audience unless an item has its own. One failure does not stop the rest.
+   */
+  async importList(
+    businessId: string,
+    input: ImportReferencesInput,
+    user: AuthUser,
+  ): Promise<ImportReferencesResult> {
+    const data = ImportReferencesSchema.parse(input);
+    const results: ImportReferencesResult['results'] = [];
+    await inBatches(data.items, async (item) => {
+      try {
+        const out = await this.add(
+          businessId,
+          {
+            url: item.url,
+            title: item.title,
+            description: item.description ?? data.description,
+            audience: item.audience ?? data.audience,
+          },
+          user,
+        );
+        results.push({ url: item.url, ok: true, error: null, added: out.references.length });
+      } catch (err) {
+        results.push({
+          url: item.url,
+          ok: false,
+          error: err instanceof Error ? err.message.slice(0, 500) : String(err),
+          added: 0,
+        });
+      }
+    });
+    const order = new Map(data.items.map((i, n) => [i.url, n]));
+    results.sort((a, b) => (order.get(a.url) ?? 0) - (order.get(b.url) ?? 0));
+    const added = results.reduce((n, r) => n + r.added, 0);
+    this.audit.log({
+      userId: user.id,
+      action: 'business.reference_import',
+      entityType: 'Business',
+      entityId: businessId,
+      meta: { links: data.items.length, added, failed: results.filter((r) => !r.ok).length },
+    });
+    return { results, added, failed: results.filter((r) => !r.ok).length };
   }
 
   /** Reads the link again and replaces the snapshot (a folder link is expanded into its files). */
