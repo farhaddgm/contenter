@@ -21,7 +21,11 @@ import { type AuthUser } from '../../common/auth.decorators';
 import { SemanticRetriever } from '../ai/semantic/semantic.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { DriveReadError, GoogleDriveService } from '../google-drive/google-drive.service';
+import {
+  DriveNoAccessError,
+  DriveReadError,
+  GoogleDriveService,
+} from '../google-drive/google-drive.service';
 import { FetchError } from '../samples/media-fetcher.service';
 import { documentKind, extractText, isTextKind } from './document-text';
 import { AssetImportService, PREVIEW_MAX_BYTES } from './asset-import.service';
@@ -342,12 +346,19 @@ export class ReferencesService {
       folder = await this.drive.listFolder(
         parseGoogleFolderUrl(folderRow.url)!,
         folderRow.googleAccountId,
+        folderRow.businessId,
       );
     } catch (err) {
       if (!(err instanceof DriveReadError)) {
         this.logger.warn(`folder ${folderRow.url} failed: ${String(err)}`);
       }
-      return fail(err instanceof Error ? err.message : String(err));
+      return this.failFolder(
+        folderRow,
+        'GOOGLE_DOC',
+        err instanceof Error ? err.message : String(err),
+        0,
+        err instanceof DriveNoAccessError ? 'NO_ACCESS' : undefined,
+      );
     }
     const skippedNames = folder.skipped.map((f) => f.name);
     if (!folder.files.length) {
@@ -399,10 +410,17 @@ export class ReferencesService {
     kind: ReferenceRow['kind'],
     error: string,
     skipped = 0,
+    accessState?: 'NO_ACCESS',
   ): Promise<Expansion> {
     await this.prisma.businessReference.update({
       where: { id: folderRow.id },
-      data: { kind, status: 'FAILED', content: '', error: error.slice(0, 1000) },
+      data: {
+        kind,
+        status: 'FAILED',
+        content: '',
+        error: error.slice(0, 1000),
+        ...(accessState ? { accessState } : {}),
+      },
     });
     return { ids: [folderRow.id], skipped };
   }
@@ -547,6 +565,7 @@ export class ReferencesService {
         status: 'READY',
         error: null,
         fetchedAt: new Date(),
+        ...(row.kind === 'GOOGLE_DOC' ? { accessState: 'OK' as const } : {}),
         googleAccount: out.accountId ? { connect: { id: out.accountId } } : { disconnect: true },
         ...(out.analysis ? { analysis: out.analysis as unknown as Prisma.InputJsonValue } : {}),
       };
@@ -555,7 +574,11 @@ export class ReferencesService {
       const message = err instanceof Error ? err.message : String(err);
       if (!expected) this.logger.warn(`reference ${row.id} (${row.url}) failed: ${message}`);
       // Keep the previous snapshot: a failed refresh must not erase readable text.
-      data = { status: 'FAILED', error: message.slice(0, 1000) };
+      data = {
+        status: 'FAILED',
+        error: message.slice(0, 1000),
+        ...(err instanceof DriveNoAccessError ? { accessState: 'NO_ACCESS' as const } : {}),
+      };
     }
     await this.prisma.businessReference.update({ where: { id: row.id }, data });
   }
@@ -647,7 +670,7 @@ export class ReferencesService {
     if (!file) throw new DriveReadError('This Google Drive link is not a file link');
     const pub = await this.readPublicGoogle(file).catch(() => null);
     if (pub) return { ...pub, accountId: null as string | null };
-    return this.drive.readFile(file.id, row.googleAccountId);
+    return this.drive.readFile(file.id, row.googleAccountId, row.businessId);
   }
 
   private async readPublicGoogle(file: { id: string; type: GoogleFileType }) {

@@ -148,6 +148,8 @@ export interface DocooBusinessExport {
     /** The admin's note on what the attachment is for (docs/77). */
     description: string;
     audience: string;
+    /** SHA-256 of the full text; changes when the document changes (docs/77). */
+    contentHash: string;
     status: string;
     isActive: boolean;
     fetchedAt: string | null;
@@ -182,4 +184,19 @@ export interface DocooBusinessExport {
   pendingSuggestions: number;
   /** The projects (topics) of this business in contenter. */
   topics: { id: string; title: string; status: string }[];
+}
+
+/** One attachment with its full text, for apps that may read it (docs/77). */
+export interface DocooAttachmentContent {
+  id: string;
+  businessId: string;
+  kind: string;
+  url: string;
+  title: string;
+  description: string;
+  audience: string;
+  fetchedAt: string | null;
+  contentHash: string;
+  contentChars: number;
+  content: string;
 }

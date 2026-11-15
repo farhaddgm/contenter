@@ -1,6 +1,6 @@
 # پیوست‌های پروفایل کسب‌وکار برای اپ‌های بیرونی (docs/77)
 
-> **وضعیت:** فاز ۱ ساخته شد (commit نشده تا زمان ادغام؛ با مرورگر و مدل راستی‌آزمایی نشده، تست‌های واحد و typecheck/lint سبزند). فاز ۲ به بعد طرح است. تصمیم‌های مالک در §2 ثبت شده. هم‌پوشانی: docs/14 (رفرنس‌ها)، docs/18 و 26 (خروجی Docoo/Researcher)، docs/00 §4 ردیف ۲ (تازه‌سازی دوره‌ای).
+> **وضعیت:** فاز ۱ و ۲ ساخته شد (فاز ۱ commit شده؛ فاز ۲ commit نشده تا زمان ادغام). با مرورگر، Google واقعی و دیتابیس واقعی راستی‌آزمایی نشده؛ تست‌های واحد، typecheck و lint سبزند. فاز ۳ به بعد طرح است. تصمیم‌های مالک در §2 ثبت شده. هم‌پوشانی: docs/14 (رفرنس‌ها)، docs/18 و 26 (خروجی Docoo/Researcher)، docs/00 §4 ردیف ۲ (تازه‌سازی دوره‌ای).
 
 ## ۱. هدف
 ادمین فهرستی از لینک اسناد (Google Docs / Sheets / Drive و فایل‌های PDF/Excel/Word) را به پروفایل کسب‌وکار پیوست می‌کند و برای هر کدام توضیح می‌نویسد. اپ‌های مصرف‌کننده (Docoo، Bee Researcher) **متن کامل سند و توضیح** را از خروجی می‌گیرند.
@@ -61,6 +61,13 @@
 - تغییر `audience`/`description` در audit ثبت می‌شود، متن توضیح نه (فقط «changed»).
 - رابط: فیلد توضیح و انتخاب مخاطب در دیالوگ افزودن و دیالوگ ویرایش (مداد)، نشان «اپ‌ها / AI و اپ‌ها» روی ردیف.
 - **تغییر رفتار:** مرجع‌هایی که قبلاً در خروجی Docoo بودند (`audience = AI`) دیگر در آن نیستند؛ باید یکی‌یکی «برای اپ‌ها» علامت بخورند.
+
+## ۸.۲ آنچه در فاز ۲ ساخته شد
+- **Service Account:** متغیر `GOOGLE_SERVICE_ACCOUNT_JSON` (JSON کلید یا base64 آن؛ خالی یا نامعتبر = خاموش، فقط هشدار لاگ). بدون کتابخانهٔ تازه: JWT بیرر با RS256 در `google-drive/service-account.ts`. `GoogleDriveService.withAccount` ابتدا حساب ترجیحیِ مرجع، بعد Service Account، بعد حساب‌های OAuth مجاز را امتحان می‌کند. `accountId` برای Service Account `null` است (کلید خارجی ندارد).
+- **بررسی دسترسی:** `BusinessReference.accessState` (`NOT_CHECKED | OK | NO_ACCESS`) هنگام هر خواندن (افزودن و تازه‌سازی) برای فایل و پوشهٔ گوگل ست می‌شود؛ `DriveNoAccessError` یعنی هیچ حسابی سند را نمی‌بیند. پیام خطا ایمیل‌های قابل‌اشتراک را می‌گوید و رابط «بدون دسترسی» + ایمیل + دکمهٔ کپی نشان می‌دهد.
+- **حساب OAuth به کسب‌وکار:** `GoogleDriveAccount.allBusinesses` (پیش‌فرض `true` تا رفتار فعلی نشکند) و `businessIds`. `PATCH /google-drive/accounts/:id` (فقط مدیر، audit `google_drive.scope`) و دیالوگ «کسب‌وکارهای مجاز» در تنظیمات. تفاوت با طرح اولیه: پیش‌فرض «همه» است نه «انتخاب‌شده»، چون حساب‌های موجود نباید یک‌شبه از کار بیفتند؛ مدیر می‌تواند محدود کند.
+- **محتوای کامل:** `GET /api/integrations/{docoo,researcher}/businesses/:id/attachments/:refId/content` (توکن و allowlist همان‌ها). فقط ردیف فعال، `READY`، با متن و `audience ≠ AI` وگرنه ۴۰۴ یکسان. پاسخ `DocooAttachmentContent` با `contentHash` (SHA-256)؛ audit `integration.<consumer>_attachment` بدون متن. `contentHash` به `references[]` خروجی اصلی هم اضافه شد تا اپ تغییر را بدون خواندن متن ببیند.
+- **راه‌اندازی:** در Google Cloud یک Service Account بسازید، Drive API را روشن کنید، کلید JSON را در `GOOGLE_SERVICE_ACCOUNT_JSON` بگذارید و سند را (بیننده) با `client_email` آن به‌اشتراک بگذارید.
 
 ## ۹. فازها
 1. **فاز ۱:** `description` + `audience`، رابط، افزودن به خروجی، تست نشت و قطعی‌بودن.

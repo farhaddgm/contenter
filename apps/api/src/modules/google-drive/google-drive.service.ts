@@ -2,13 +2,18 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'node:crypto';
 import type { GoogleDriveAccount as DriveAccountRow } from '@prisma/client';
-import type { GoogleDriveStatus } from '@contenter/shared';
+import type { GoogleDriveStatus, UpdateDriveAccountInput } from '@contenter/shared';
 import { type AuthUser } from '../../common/auth.decorators';
 import { SecretBox } from '../../common/secret-box';
 import { ENV, type Env } from '../../config/env';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { safeRedirectPath } from '../auth/google-oauth.service';
+import {
+  parseServiceAccountKey,
+  serviceAccountAssertion,
+  type ServiceAccountKey,
+} from './service-account';
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -44,6 +49,14 @@ export class DriveConnectFailure extends Error {
 /** A Drive file could not be read; the message is shown to the admin on the reference. */
 export class DriveReadError extends Error {}
 
+/** The account(s) cannot see the file (Drive answers 404 for both "missing" and "not shared"). */
+export class DriveNoAccessError extends DriveReadError {}
+
+/** Marks the credential that is the service account rather than a connected OAuth account. */
+const SA_ID = 'service-account';
+type SaCred = { id: typeof SA_ID; email: string; sa: true };
+type Cred = DriveAccountRow | SaCred;
+
 interface FlowState {
   state: string;
   verifier: string;
@@ -54,7 +67,8 @@ interface FlowState {
 export interface DriveFile {
   title: string;
   text: string;
-  accountId: string;
+  /** The connected account that read it; null = the service account. */
+  accountId: string | null;
 }
 
 export interface DriveFolder {
@@ -65,7 +79,7 @@ export interface DriveFolder {
   skipped: { name: string; mimeType: string }[];
   /** More readable files exist than the per-folder limit. */
   truncated: boolean;
-  accountId: string;
+  accountId: string | null;
 }
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
@@ -119,6 +133,7 @@ export class GoogleDriveService {
   private readonly logger = new Logger(GoogleDriveService.name);
   private readonly box: SecretBox;
   private readonly tokens = new Map<string, { token: string; expiresAt: number }>();
+  private readonly sa: ServiceAccountKey | null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -127,6 +142,15 @@ export class GoogleDriveService {
     @Inject(ENV) private readonly env: Env,
   ) {
     this.box = new SecretBox(env.DATA_ENCRYPTION_KEY ?? env.JWT_REFRESH_SECRET, 'google-drive');
+    this.sa = parseServiceAccountKey(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    if (env.GOOGLE_SERVICE_ACCOUNT_JSON && !this.sa) {
+      this.logger.warn('GOOGLE_SERVICE_ACCOUNT_JSON is set but is not a valid service account key');
+    }
+  }
+
+  /** The address a document must be shared with so the server can read it (null = off). */
+  get serviceAccountEmail(): string | null {
+    return this.sa?.email ?? null;
   }
 
   get redirectUri(): string | null {
@@ -152,6 +176,8 @@ export class GoogleDriveService {
         email: true,
         error: true,
         lastUsedAt: true,
+        allBusinesses: true,
+        businessIds: true,
         createdAt: true,
         connectedBy: USER_REF,
       },
@@ -159,6 +185,7 @@ export class GoogleDriveService {
     return {
       configured: this.enabled,
       redirectUri: this.redirectUri,
+      serviceAccountEmail: this.serviceAccountEmail,
       accounts: accounts as unknown as GoogleDriveStatus['accounts'],
     };
   }
@@ -284,6 +311,28 @@ export class GoogleDriveService {
     return { email, redirectTo: flow.redirectTo };
   }
 
+  /** Chooses which businesses a connected account may read (docs/77); admins only (controller). */
+  async updateScope(id: string, input: UpdateDriveAccountInput, user: AuthUser) {
+    const account = await this.prisma.googleDriveAccount.findUnique({ where: { id } });
+    if (!account) throw new NotFoundException('Google account not found');
+    const businessIds = input.allBusinesses ? [] : [...new Set(input.businessIds)];
+    await this.prisma.googleDriveAccount.update({
+      where: { id },
+      data: { allBusinesses: input.allBusinesses, businessIds },
+    });
+    this.audit.log({
+      userId: user.id,
+      action: 'google_drive.scope',
+      entityType: 'GoogleDriveAccount',
+      entityId: id,
+      meta: {
+        email: account.email,
+        allBusinesses: input.allBusinesses,
+        businesses: businessIds.length,
+      },
+    });
+  }
+
   /** Forgets the account and revokes the grant at Google (best effort). */
   async disconnect(id: string, user: AuthUser) {
     const account = await this.prisma.googleDriveAccount.findUnique({ where: { id } });
@@ -312,73 +361,92 @@ export class GoogleDriveService {
   // ---------- reading files ----------
 
   /**
-   * Reads a Drive file as text with the first connected account that can open it
-   * (`preferredAccountId` first). Throws DriveReadError with an admin-readable reason.
+   * Reads a Drive file as text with the first credential that can open it: the preferred account,
+   * then the service account, then the connected accounts allowed for `businessId`. Throws
+   * DriveReadError with an admin-readable reason (DriveNoAccessError when nobody can see it).
    */
-  async readFile(fileId: string, preferredAccountId?: string | null): Promise<DriveFile> {
-    return this.withAccount('file', preferredAccountId, (account) =>
+  async readFile(
+    fileId: string,
+    preferredAccountId?: string | null,
+    businessId?: string | null,
+  ): Promise<DriveFile> {
+    return this.withAccount('file', preferredAccountId, businessId, (account) =>
       this.readWith(account, fileId),
     );
   }
 
   /**
    * Lists the files of a Drive folder (sub-folders included, a few levels deep) with the first
-   * connected account that can open it. `files` are the ones readable as text; `skipped` are
-   * the rest (PDF, images, Office files …), reported to the admin.
+   * credential that can open it. `files` are the ones readable as text; `skipped` are the rest
+   * (PDF, images, Office files ...), reported to the admin.
    */
-  async listFolder(folderId: string, preferredAccountId?: string | null): Promise<DriveFolder> {
-    return this.withAccount('folder', preferredAccountId, (account) =>
+  async listFolder(
+    folderId: string,
+    preferredAccountId?: string | null,
+    businessId?: string | null,
+  ): Promise<DriveFolder> {
+    return this.withAccount('folder', preferredAccountId, businessId, (account) =>
       this.listWith(account, folderId),
     );
   }
 
-  /** Runs `fn` with each connected account (the preferred one first) until one can see the item. */
+  /** Runs `fn` with each usable credential until one can see the item. */
   private async withAccount<T>(
     what: 'file' | 'folder',
     preferredAccountId: string | null | undefined,
-    fn: (account: DriveAccountRow) => Promise<T>,
-  ): Promise<T & { accountId: string }> {
-    const accounts = await this.prisma.googleDriveAccount.findMany({
+    businessId: string | null | undefined,
+    fn: (account: Cred) => Promise<T>,
+  ): Promise<T & { accountId: string | null }> {
+    const rows = await this.prisma.googleDriveAccount.findMany({
       orderBy: { createdAt: 'asc' },
     });
-    if (!accounts.length) {
-      throw new DriveReadError(
-        `This Google ${what} is private and no Google account is connected. Connect the account that can open it (Settings → Google Drive), or paste the text instead.`,
+    // docs/77: an OAuth account only opens the businesses its admin allowed (all by default).
+    const allowed = rows.filter(
+      (a) => a.allBusinesses || !businessId || a.businessIds.includes(businessId),
+    );
+    const creds: Cred[] = [
+      ...(this.sa ? [{ id: SA_ID, email: this.sa.email, sa: true } as SaCred] : []),
+      ...allowed,
+    ];
+    const shareWith = [...(this.sa ? [this.sa.email] : []), ...allowed.map((a) => a.email)];
+    if (!creds.length) {
+      throw new DriveNoAccessError(
+        `This Google ${what} is private and no Google account is available for this business. Connect an account or set up the service account (Settings > Google Drive), or paste the text instead.`,
       );
     }
-    accounts.sort(
-      (a, b) => Number(b.id === preferredAccountId) - Number(a.id === preferredAccountId),
-    );
-    const denied: string[] = [];
+    creds.sort((a, b) => Number(b.id === preferredAccountId) - Number(a.id === preferredAccountId));
     let lastError: DriveReadError | null = null;
-    for (const account of accounts) {
+    let denied = false;
+    for (const account of creds) {
       try {
         const out = await fn(account);
-        await this.prisma.googleDriveAccount.update({
-          where: { id: account.id },
-          data: { lastUsedAt: new Date(), error: null },
-        });
-        return { ...out, accountId: account.id };
+        if (!('sa' in account)) {
+          await this.prisma.googleDriveAccount.update({
+            where: { id: account.id },
+            data: { lastUsedAt: new Date(), error: null },
+          });
+        }
+        return { ...out, accountId: 'sa' in account ? null : account.id };
       } catch (err) {
-        if (err instanceof NoAccess) denied.push(account.email);
+        if (err instanceof DriveNoAccessError) denied = true;
         else if (err instanceof DriveReadError) lastError = err;
         else throw err;
       }
     }
-    if (denied.length) {
-      throw new DriveReadError(
-        `The ${what} was not found or is not shared with the connected Google account(s): ${denied.join(', ')}. Connect the account that can open it.`,
+    if (denied) {
+      throw new DriveNoAccessError(
+        `The ${what} was not found or is not shared with ${shareWith.join(', ')}. Share it (viewer access is enough) with ${shareWith[0]}.`,
       );
     }
     throw lastError ?? new DriveReadError(`The Google ${what} could not be read`);
   }
 
-  private async listWith(account: DriveAccountRow, folderId: string) {
+  private async listWith(account: Cred, folderId: string) {
     const token = await this.accessToken(account);
     const auth = { authorization: `Bearer ${token}` };
     const get = async (url: string) => {
       const res = await fetch(url, { headers: auth, signal: AbortSignal.timeout(TIMEOUT_MS) });
-      if (res.status === 404) throw new NoAccess();
+      if (res.status === 404) throw new DriveNoAccessError();
       if (!res.ok) throw await this.apiError(res, account);
       return res.json();
     };
@@ -428,7 +496,7 @@ export class GoogleDriveService {
     return { name: root.name ?? '', files, skipped, truncated };
   }
 
-  private async readWith(account: DriveAccountRow, fileId: string) {
+  private async readWith(account: Cred, fileId: string) {
     const token = await this.accessToken(account);
     const auth = { authorization: `Bearer ${token}` };
     const id = encodeURIComponent(fileId);
@@ -437,7 +505,7 @@ export class GoogleDriveService {
       headers: auth,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (metaRes.status === 404) throw new NoAccess();
+    if (metaRes.status === 404) throw new DriveNoAccessError();
     if (!metaRes.ok) throw await this.apiError(metaRes, account);
     const meta = (await metaRes.json()) as { name?: string; mimeType?: string };
 
@@ -459,7 +527,7 @@ export class GoogleDriveService {
     return { title: meta.name ?? '', text: await res.text() };
   }
 
-  private async apiError(res: Response, account: DriveAccountRow): Promise<DriveReadError> {
+  private async apiError(res: Response, account: Cred): Promise<DriveReadError> {
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string; errors?: { reason?: string }[] };
     };
@@ -478,13 +546,14 @@ export class GoogleDriveService {
     }
     if (res.status === 401 || res.status === 403) {
       this.tokens.delete(account.id);
-      if (res.status === 403) return new NoAccess();
+      if (res.status === 403) return new DriveNoAccessError();
     }
     return new DriveReadError(`Google Drive (${account.email}): ${message}`);
   }
 
   /** A cached access token, refreshed with the stored refresh token when it expires. */
-  private async accessToken(account: DriveAccountRow): Promise<string> {
+  private async accessToken(account: Cred): Promise<string> {
+    if ('sa' in account) return this.serviceAccountToken();
     const cached = this.tokens.get(account.id);
     if (cached && cached.expiresAt > Date.now()) return cached.token;
 
@@ -528,6 +597,43 @@ export class GoogleDriveService {
     return body.access_token;
   }
 
+  /** An access token of the service account (JWT bearer grant), cached until a minute before expiry. */
+  private async serviceAccountToken(): Promise<string> {
+    const key = this.sa;
+    if (!key) throw new DriveReadError('The Google service account is not configured');
+    const cached = this.tokens.get(SA_ID);
+    if (cached && cached.expiresAt > Date.now()) return cached.token;
+    const res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: serviceAccountAssertion(
+          key,
+          DRIVE_SCOPE,
+          TOKEN_URL,
+          Math.floor(Date.now() / 1000),
+        ),
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      access_token?: string;
+      expires_in?: number;
+      error?: string;
+    };
+    if (!res.ok || !body.access_token) {
+      throw new DriveReadError(
+        `Google refused the service account (${key.email}): ${body.error ?? res.status}`,
+      );
+    }
+    this.tokens.set(SA_ID, {
+      token: body.access_token,
+      expiresAt: Date.now() + ((body.expires_in ?? 3600) - 60) * 1000,
+    });
+    return body.access_token;
+  }
+
   private async broken(account: DriveAccountRow, why: string): Promise<DriveReadError> {
     await this.prisma.googleDriveAccount.update({
       where: { id: account.id },
@@ -536,6 +642,3 @@ export class GoogleDriveService {
     return new DriveReadError(`${account.email}: ${why}. Reconnect this Google account.`);
   }
 }
-
-/** The account cannot see the file (Drive answers 404 for both "missing" and "not shared"). */
-class NoAccess extends DriveReadError {}

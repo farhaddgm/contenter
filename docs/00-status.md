@@ -42,7 +42,7 @@
 
 - **76** ([76](76-tab-ai-actions.md)): دکمه‌های «پیشنهاد AI» و «فیدبک به پروفایل» در شش تب پروفایل؛ همراه با گرید ۴ستونه کسب‌وکارها و دکمهٔ بزرگ‌کردن Smart. هنوز در مرورگر بررسی نشده.
 
-- **77** ([77](77-business-attachments.md)): پیوست‌های پروفایل برای Docoo/Researcher (توضیح، audience، Service Account، بارگذاری فهرستی با تیک/تأیید، PDF/Excel). فاز ۱ (توضیح + `audience` + خروجی Docoo/Researcher) ساخته شد، commit نشده؛ فاز ۲ به بعد طرح است.
+- **77** ([77](77-business-attachments.md)): پیوست‌های پروفایل برای Docoo/Researcher (توضیح، audience، Service Account، بارگذاری فهرستی با تیک/تأیید، PDF/Excel). فاز ۱ (توضیح + `audience` + خروجی) commit شده؛ فاز ۲ (Service Account، `accessState`، محدودکردن حساب OAuth به کسب‌وکار، مسیر محتوای کامل) ساخته شد و commit نشده؛ فاز ۳ به بعد طرح است. با Google و مرورگر واقعی آزموده نشده.
 
 هر جلسه‌ای که کاری را شروع می‌کند، ردیفش را اینجا بنویسد.
 

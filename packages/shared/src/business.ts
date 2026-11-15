@@ -155,6 +155,10 @@ export const ReferenceAudience = ['AI', 'APPS', 'BOTH'] as const;
 export type ReferenceAudience = (typeof ReferenceAudience)[number];
 export const REFERENCE_DESCRIPTION_MAX = 2000;
 
+/** Whether the server could open a Google file the last time it tried (docs/77). */
+export const ReferenceAccess = ['NOT_CHECKED', 'OK', 'NO_ACCESS'] as const;
+export type ReferenceAccess = (typeof ReferenceAccess)[number];
+
 export const ReferenceStatus = ['PENDING', 'READY', 'FAILED'] as const;
 export type ReferenceStatus = (typeof ReferenceStatus)[number];
 
@@ -432,6 +436,8 @@ export interface BusinessReference {
   /** What the admin says this attachment is for (docs/77). */
   description: string;
   audience: ReferenceAudience;
+  /** Google files only: could the server open it? NO_ACCESS = share it with the service account. */
+  accessState: ReferenceAccess;
   status: ReferenceStatus;
   error: string | null;
   isActive: boolean;
@@ -452,15 +458,26 @@ export interface GoogleDriveAccount {
   email: string;
   error: string | null;
   lastUsedAt: string | null;
+  /** Which businesses this account may read (docs/77): all, or only `businessIds`. */
+  allBusinesses: boolean;
+  businessIds: string[];
   createdAt: string;
   connectedBy: { id: string; name: string } | null;
 }
+
+export const UpdateDriveAccountSchema = z.object({
+  allBusinesses: z.boolean(),
+  businessIds: z.array(z.string().min(1).max(100)).max(500).default([]),
+});
+export type UpdateDriveAccountInput = z.infer<typeof UpdateDriveAccountSchema>;
 
 export interface GoogleDriveStatus {
   /** Google OAuth client configured (the same client as Google sign-in). */
   configured: boolean;
   /** Redirect URI that must be registered in Google Cloud. */
   redirectUri: string | null;
+  /** Share a document with this address so the server can read it (null = not set up, docs/77). */
+  serviceAccountEmail: string | null;
   accounts: GoogleDriveAccount[];
 }
 

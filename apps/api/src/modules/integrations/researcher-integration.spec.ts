@@ -44,6 +44,26 @@ describe('Researcher integration: independent read-only consumer', () => {
     expect(service.list).toHaveBeenCalledWith({ page: 1, pageSize: 20 }, undefined);
     expect(service.export).toHaveBeenCalledWith('new-future-business', '127.0.0.1', 'researcher');
   });
+  it('refuses an attachment of a non-allowlisted business before reading it (docs/77)', () => {
+    const service = { attachment: vi.fn() } as unknown as DocooExportService;
+    const controller = new ResearcherIntegrationController(service, env());
+    expect(() => controller.attachment('other', 'r1', { ip: '127.0.0.1' } as never)).toThrow(NotFoundException);
+    expect(service.attachment).not.toHaveBeenCalled();
+    controller.attachment('allowed', 'r1', { ip: '127.0.0.1' } as never);
+    expect(service.attachment).toHaveBeenCalledWith('allowed', 'r1', '127.0.0.1', 'researcher');
+  });
+  it('serves an attachment only when it is marked for apps and readable', async () => {
+    const row = { id: 'r1', businessId: 'b1', kind: 'GOOGLE_DOC', url: 'u', title: 't', description: 'd', audience: 'APPS', fetchedAt: null, content: 'متن کامل' };
+    const db = { businessReference: { findFirst: vi.fn().mockResolvedValueOnce(row).mockResolvedValueOnce(null) } };
+    const log = vi.fn();
+    const service = new DocooExportService({ log } as unknown as AuditService, new BusinessApi(db as unknown as PrismaService));
+    const out = await service.attachment('b1', 'r1', '1.1.1.1');
+    expect(out).toMatchObject({ description: 'd', content: 'متن کامل', contentChars: 8 });
+    expect(out.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(db.businessReference.findFirst.mock.calls[0]![0].where).toMatchObject({ businessId: 'b1', audience: { not: 'AI' }, status: 'READY', isActive: true });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('متن کامل');
+    await expect(service.attachment('b1', 'r2', null)).rejects.toBeInstanceOf(NotFoundException);
+  });
   it('filters counts and both list queries, including deny-all', async () => {
     const db = { business: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) }, $transaction: vi.fn((calls) => Promise.all(calls)) };
     const service = new DocooExportService({} as AuditService, new BusinessApi(db as unknown as PrismaService));

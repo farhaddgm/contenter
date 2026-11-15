@@ -29,7 +29,7 @@ import { Card, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-controls';
-import { Segmented } from '@/components/ui/misc';
+import { CopyButton, Segmented } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
 import { useAuthorization } from '@/lib/auth';
@@ -544,6 +544,9 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
   const [addOpen, setAddOpen] = useState(false);
   const [viewing, setViewing] = useState<BusinessReference | null>(null);
   const [editing, setEditing] = useState<BusinessReference | null>(null);
+  const { data: drive } = useDriveStatus();
+  const shareEmail =
+    drive?.serviceAccountEmail ?? drive?.accounts.find((a) => !a.error)?.email ?? null;
 
   // Instagram accounts the website links to that are not a source yet.
   const known = new Set(
@@ -631,6 +634,17 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                     {r.googleAccount &&
                       ` · ${t('businesses.references.readWith', { email: r.googleAccount.email })}`}
                   </p>
+                  {r.kind === 'GOOGLE_DOC' && r.accessState === 'NO_ACCESS' && (
+                    <p className="flex flex-wrap items-center gap-2 text-xs leading-5">
+                      <Badge tone="danger">{t('businesses.references.noAccess')}</Badge>
+                      <span>
+                        {shareEmail
+                          ? t('businesses.references.shareWith', { email: shareEmail })
+                          : t('businesses.references.noAccessNoAccount')}
+                      </span>
+                      {shareEmail && <CopyButton text={shareEmail} />}
+                    </p>
+                  )}
                   {r.status === 'FAILED' && r.error && (
                     <p className="flex items-start gap-1.5 text-xs leading-5 text-destructive">
                       <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
