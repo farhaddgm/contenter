@@ -150,6 +150,11 @@ export type SourceBlockKind = (typeof SourceBlockKind)[number];
 export const ReferenceKind = ['URL', 'GOOGLE_DOC', 'TEXT', 'INSTAGRAM', 'WEBSITE'] as const;
 export type ReferenceKind = (typeof ReferenceKind)[number];
 
+/** Who may read a reference's text (docs/77): AI jobs, outside apps (Docoo …), or both. */
+export const ReferenceAudience = ['AI', 'APPS', 'BOTH'] as const;
+export type ReferenceAudience = (typeof ReferenceAudience)[number];
+export const REFERENCE_DESCRIPTION_MAX = 2000;
+
 export const ReferenceStatus = ['PENDING', 'READY', 'FAILED'] as const;
 export type ReferenceStatus = (typeof ReferenceStatus)[number];
 
@@ -333,6 +338,8 @@ export const AddReferenceSchema = z
     /** With `url`: read the whole website (home, about, services … up to ten pages). */
     site: z.boolean().optional().default(false),
     instagram: InstagramManualSchema.optional(),
+    description: z.string().trim().max(REFERENCE_DESCRIPTION_MAX).optional().default(''),
+    audience: z.enum(ReferenceAudience).optional().default('AI'),
   })
   .refine((v) => [!!v.url, !!v.content, !!v.instagram].filter(Boolean).length === 1, {
     message: 'Give either a link, a text or Instagram data',
@@ -343,6 +350,8 @@ export type AddReferenceInput = z.input<typeof AddReferenceSchema>;
 export const UpdateReferenceSchema = z.object({
   title: z.string().trim().max(300).optional(),
   isActive: z.boolean().optional(),
+  description: z.string().trim().max(REFERENCE_DESCRIPTION_MAX).optional(),
+  audience: z.enum(ReferenceAudience).optional(),
 });
 export type UpdateReferenceInput = z.infer<typeof UpdateReferenceSchema>;
 
@@ -420,6 +429,9 @@ export interface BusinessReference {
   kind: ReferenceKind;
   url: string;
   title: string;
+  /** What the admin says this attachment is for (docs/77). */
+  description: string;
+  audience: ReferenceAudience;
   status: ReferenceStatus;
   error: string | null;
   isActive: boolean;

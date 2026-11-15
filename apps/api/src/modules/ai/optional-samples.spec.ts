@@ -101,6 +101,7 @@ describe('ContextLoader.business — documents as grounding', () => {
       status: 'READY',
       isActive: true,
       content: { not: '' },
+      audience: { not: 'APPS' },
     });
   });
 

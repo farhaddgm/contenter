@@ -100,6 +100,9 @@ describe('reference schemas', () => {
 
 describe('references in AI jobs', () => {
   it('uses active readable references, or exactly the chosen ones', () => {
+    // docs/77: an app-only attachment never reaches a prompt
+    expect(usableWhere('b1')).toMatchObject({ audience: { not: 'APPS' } });
+    expect(usableWhere('b1', ['r1'])).toMatchObject({ audience: { not: 'APPS' } });
     expect(usableWhere('b1')).toMatchObject({ businessId: 'b1', status: 'READY', isActive: true });
     const chosen = usableWhere('b1', ['r1']);
     expect(chosen).toMatchObject({ status: 'READY', id: { in: ['r1'] } });

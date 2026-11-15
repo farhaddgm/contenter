@@ -326,6 +326,13 @@ enum ReferenceKind {
   WEBSITE
 }
 
+/// Who may read a reference's text (docs/77): AI jobs, outside apps (Docoo, Bee Researcher), or both.
+enum ReferenceAudience {
+  AI
+  APPS
+  BOTH
+}
+
 enum ReferenceStatus {
   PENDING
   READY
@@ -335,23 +342,27 @@ enum ReferenceStatus {
 /// Admin-supplied source for AI builds/suggestions: a web page, a Google Docs/Drive file or a
 /// pasted text. `content` is the text snapshot AI reads (refreshed on demand).
 model BusinessReference {
-  id              String          @id @default(cuid())
+  id              String            @id @default(cuid())
   businessId      String
   kind            ReferenceKind
-  url             String          @default("")
-  title           String          @default("")
-  content         String          @default("")
+  url             String            @default("")
+  title           String            @default("")
+  content         String            @default("")
   /// What code computed while reading an INSTAGRAM / WEBSITE source (`ReferenceAnalysis` in
   /// packages/shared/src/social.ts); null for the other kinds.
   analysis        Json?
-  status          ReferenceStatus @default(PENDING)
+  /// What the admin says this attachment is for; handed to outside apps with the text (docs/77).
+  description     String            @default("")
+  /// Outside apps only see APPS / BOTH; AI jobs only read AI / BOTH.
+  audience        ReferenceAudience @default(AI)
+  status          ReferenceStatus   @default(PENDING)
   error           String?
-  isActive        Boolean         @default(true)
+  isActive        Boolean           @default(true)
   fetchedAt       DateTime?
   googleAccountId String?
   createdById     String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   googleAccount GoogleDriveAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)

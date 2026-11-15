@@ -148,7 +148,7 @@ export class CompetitorsService {
       }),
       this.prisma.businessFact.count({ where: { businessId, isActive: true } }),
       this.prisma.businessReference.count({
-        where: { businessId, status: 'READY', isActive: true, content: { not: '' } },
+        where: { businessId, status: 'READY', isActive: true, content: { not: '' }, audience: { not: 'APPS' } },
       }),
       this.prisma.businessCompetitor.count({ where: { businessId } }),
       this.prisma.aiJob.findFirst({

@@ -140,11 +140,16 @@ export function buildDocooExport(b: ExportRow, now: Date = new Date()): DocooBus
       isActive: n.isActive,
       createdAt: iso(n.createdAt),
     })),
-    references: b.references.map((r) => ({
+    // docs/77: only attachments the admin marked for outside apps; AI-only sources stay private
+    references: b.references
+      .filter((r) => r.audience !== 'AI')
+      .map((r) => ({
       id: r.id,
       kind: r.kind,
       url: r.url,
       title: r.title,
+      description: r.description,
+      audience: r.audience,
       status: r.status,
       isActive: r.isActive,
       fetchedAt: isoOrNull(r.fetchedAt),

@@ -155,6 +155,8 @@ export class ReferencesService {
           businessId,
           kind: 'TEXT',
           title: data.title,
+          description: data.description,
+          audience: data.audience,
           content: data.content,
           status: 'READY',
           fetchedAt: new Date(),
@@ -195,6 +197,8 @@ export class ReferencesService {
           kind: handle ? 'INSTAGRAM' : site ? 'WEBSITE' : google ? 'GOOGLE_DOC' : 'URL',
           url,
           title: data.title || (handle ? `Instagram @${handle}` : ''),
+          description: data.description,
+          audience: data.audience,
           createdById: user.id,
         },
       });
@@ -216,6 +220,7 @@ export class ReferencesService {
         skipped,
         assets,
         url: data.url ?? null,
+        audience: data.audience,
         ...(data.site ? { site: true } : {}),
         ...(data.instagram ? { instagram: 'manual' } : {}),
       },
@@ -261,7 +266,14 @@ export class ReferencesService {
       action: 'business.reference_update',
       entityType: 'Business',
       entityId: row.businessId,
-      meta: { referenceId: id, ...input },
+      // the description text stays out of the audit log; the audience change is the sensitive part
+      meta: {
+        referenceId: id,
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+        ...(input.description !== undefined ? { description: 'changed' } : {}),
+        ...(input.audience !== undefined ? { audience: input.audience, was: row.audience } : {}),
+      },
     });
     return toPublic(updated);
   }
@@ -368,6 +380,9 @@ export class ReferencesService {
                 businessId: folderRow.businessId,
                 kind: 'GOOGLE_DOC',
                 url: file.url,
+                // the folder's note and audience carry over to the files taken from it (docs/77)
+                description: folderRow.description,
+                audience: folderRow.audience,
                 createdById: folderRow.createdById,
               },
             }),
@@ -439,6 +454,8 @@ export class ReferencesService {
                 businessId: folderRow.businessId,
                 kind: 'URL',
                 url: file.url,
+                description: folderRow.description,
+                audience: folderRow.audience,
                 createdById: folderRow.createdById,
               },
             }),
@@ -670,6 +687,7 @@ export function usableWhere(
     businessId,
     status: 'READY',
     content: { not: '' },
+    audience: { not: 'APPS' },
     ...(ids ? { id: { in: ids } } : { isActive: true }),
   };
 }

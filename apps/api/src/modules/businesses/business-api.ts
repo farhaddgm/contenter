@@ -112,7 +112,13 @@ export interface StylePromptRow {
 }
 
 /** Reference documents a model may read: finished, switched on, with text. */
-const READABLE_REFERENCE = { status: 'READY', isActive: true, content: { not: '' } } as const;
+const READABLE_REFERENCE = {
+  status: 'READY',
+  isActive: true,
+  content: { not: '' },
+  // docs/77: an attachment meant only for outside apps never reaches a prompt
+  audience: { not: 'APPS' },
+} as const;
 
 /**
  * The one door to a business's identity for the rest of the app (docs/63-business-boundary.md).

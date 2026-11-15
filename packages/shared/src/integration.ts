@@ -145,6 +145,9 @@ export interface DocooBusinessExport {
     kind: string;
     url: string;
     title: string;
+    /** The admin's note on what the attachment is for (docs/77). */
+    description: string;
+    audience: string;
     status: string;
     isActive: boolean;
     fetchedAt: string | null;

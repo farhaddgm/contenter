@@ -138,4 +138,15 @@ describe('request schemas', () => {
     ).toBe(false);
     expect(AddReferenceSchema.safeParse({}).success).toBe(false);
   });
+
+  it('reference description and audience default to a private AI source (docs/77)', () => {
+    const ok = AddReferenceSchema.parse({ url: 'https://brand.ir' });
+    expect(ok).toMatchObject({ description: '', audience: 'AI' });
+    expect(
+      AddReferenceSchema.safeParse({ url: 'https://brand.ir', audience: 'EVERYONE' }).success,
+    ).toBe(false);
+    expect(
+      AddReferenceSchema.parse({ url: 'https://brand.ir', audience: 'APPS', description: ' قیمت‌ها ' }),
+    ).toMatchObject({ audience: 'APPS', description: 'قیمت‌ها' });
+  });
 });

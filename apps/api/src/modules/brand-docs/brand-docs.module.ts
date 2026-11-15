@@ -110,7 +110,7 @@ export class BrandDocsService {
             sections: { select: { content: true } },
             _count: {
               select: {
-                references: { where: { status: 'READY', isActive: true, content: { not: '' } } },
+                references: { where: { status: 'READY', isActive: true, content: { not: '' }, audience: { not: 'APPS' } } },
               },
             },
           },

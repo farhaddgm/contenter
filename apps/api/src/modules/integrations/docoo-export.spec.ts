@@ -174,6 +174,8 @@ function row(overrides: Partial<ExportRow> = {}): ExportRow {
         kind: 'URL',
         url: 'https://example.com/about',
         title: 'دربارهٔ ما',
+        description: 'صفحهٔ معرفی برای اپ‌ها',
+        audience: 'BOTH',
         content: 'ا'.repeat(DOCOO_EXPORT_EXCERPT_CHARS + 500),
         status: 'READY',
         error: null,
@@ -336,6 +338,17 @@ describe('Docoo export (docs/18)', () => {
       at(5),
     );
     expect(clean.health.score).toBeGreaterThan(out.health.score);
+  });
+
+  it('exports only attachments meant for apps, with their description (docs/77)', () => {
+    const base = row();
+    const aiOnly = { ...base.references[0]!, id: 'r-ai', audience: 'AI' as const };
+    const out = buildDocooExport({ ...base, references: [...base.references, aiOnly] }, at(5));
+    expect(out.references.map((r) => r.id)).toEqual(['r1']);
+    expect(out.references[0]).toMatchObject({
+      description: 'صفحهٔ معرفی برای اپ‌ها',
+      audience: 'BOTH',
+    });
   });
 
   it('cuts long reference and asset text to an excerpt and never exports files or people', () => {

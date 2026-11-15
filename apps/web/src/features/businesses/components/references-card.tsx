@@ -6,6 +6,7 @@ import {
   FileText,
   FileUp,
   Globe,
+  Pencil,
   Plus,
   RefreshCw,
   Trash2,
@@ -13,18 +14,21 @@ import {
 } from 'lucide-react';
 import {
   BUSINESS_REFERENCE_MAX_CHARS,
+  REFERENCE_DESCRIPTION_MAX,
+  ReferenceAudience,
   instagramProfileUrl,
   parseGoogleFileUrl,
   parseInstagramHandle,
   type BusinessReference,
   type ReferenceKind,
 } from '@contenter/shared';
+
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Dialog } from '@/components/ui/dialog';
-import { Field, Input, Switch, Textarea } from '@/components/ui/form-controls';
+import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form-controls';
 import { Segmented } from '@/components/ui/misc';
 import { Spinner } from '@/components/ui/spinner';
 import { useT } from '@/i18n';
@@ -146,6 +150,60 @@ export function TextFileButton({ onLoad }: { onLoad: (text: string, name: string
   );
 }
 
+/** What the attachment is for, and who may read it (docs/77). Used by the add and edit dialogs. */
+function AudienceFields({
+  description,
+  audience,
+  onDescription,
+  onAudience,
+}: {
+  description: string;
+  audience: ReferenceAudience;
+  onDescription: (v: string) => void;
+  onAudience: (v: ReferenceAudience) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <Field
+        label={t('businesses.references.descriptionLabel')}
+        hint={t('businesses.references.descriptionHint')}
+        optional={t('common.optional')}
+      >
+        {(id) => (
+          <Textarea
+            id={id}
+            rows={3}
+            data-bidi=""
+            value={description}
+            maxLength={REFERENCE_DESCRIPTION_MAX}
+            onChange={(e) => onDescription(e.target.value)}
+          />
+        )}
+      </Field>
+      <Field label={t('businesses.references.audienceLabel')}>
+        {(id) => (
+          <Select
+            id={id}
+            value={audience}
+            onChange={(e) => onAudience(e.target.value as ReferenceAudience)}
+            options={ReferenceAudience.map((a) => ({
+              value: a,
+              label: t(`businesses.references.audience${a}`),
+            }))}
+          />
+        )}
+      </Field>
+      {audience !== 'AI' && (
+        <p className="flex items-start gap-1.5 text-xs leading-5 text-amber-700">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+          <span>{t('businesses.references.appsWarning')}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Add links (one per line) or a pasted/uploaded text. Mounted only while open. */
 function AddReferenceDialog({
   businessId,
@@ -165,6 +223,8 @@ function AddReferenceDialog({
   const [manual, setManual] = useState<ManualInstagramState>(EMPTY_MANUAL);
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
+  const [description, setDescription] = useState('');
+  const [audience, setAudience] = useState<ReferenceAudience>('AI');
   const [busy, setBusy] = useState(false);
   const { links, invalid } = splitLinks(urls);
   const siteLinks = splitLinks(siteUrl);
@@ -192,7 +252,9 @@ function AddReferenceDialog({
             : tab === 'instagram'
               ? [manualInput ? { instagram: manualInput } : { url: instagramProfileUrl(handle!) }]
               : [{ content: text.trim(), title: title.trim() }];
-      const results = await Promise.allSettled(inputs.map((i) => add.mutateAsync(i)));
+      const results = await Promise.allSettled(
+        inputs.map((i) => add.mutateAsync({ ...i, description: description.trim(), audience })),
+      );
       const rejected = results.filter((r) => r.status === 'rejected');
       const added = results.flatMap((r) => (r.status === 'fulfilled' ? r.value.references : []));
       const skipped = results.reduce(
@@ -361,7 +423,67 @@ function AddReferenceDialog({
             />
           </>
         )}
+        {tab !== 'instagram' && (
+          <AudienceFields
+            description={description}
+            audience={audience}
+            onDescription={setDescription}
+            onAudience={setAudience}
+          />
+        )}
       </div>
+    </Dialog>
+  );
+}
+
+/** Edit an attachment's description and audience. Mounted only while open. */
+function EditReferenceDialog({
+  reference,
+  businessId,
+  onOpenChange,
+}: {
+  reference: BusinessReference;
+  businessId: string;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const t = useT();
+  const update = useUpdateReference(businessId);
+  const [description, setDescription] = useState(reference.description);
+  const [audience, setAudience] = useState<ReferenceAudience>(reference.audience);
+  return (
+    <Dialog
+      open
+      onOpenChange={onOpenChange}
+      title={t('businesses.references.editTitle')}
+      description={reference.title || reference.url}
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            isLoading={update.isPending}
+            onClick={() =>
+              update.mutate(
+                { id: reference.id, data: { description, audience } },
+                {
+                  onSuccess: () => onOpenChange(false),
+                  onError: (e) => notify.error(t('common.error'), e.message),
+                },
+              )
+            }
+          >
+            {t('businesses.references.save')}
+          </Button>
+        </>
+      }
+    >
+      <AudienceFields
+        description={description}
+        audience={audience}
+        onDescription={setDescription}
+        onAudience={setAudience}
+      />
     </Dialog>
   );
 }
@@ -421,6 +543,7 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
   const addReference = useAddReference(businessId);
   const [addOpen, setAddOpen] = useState(false);
   const [viewing, setViewing] = useState<BusinessReference | null>(null);
+  const [editing, setEditing] = useState<BusinessReference | null>(null);
 
   // Instagram accounts the website links to that are not a source yet.
   const known = new Set(
@@ -476,7 +599,15 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                     <Badge tone={statusTone[r.status]}>
                       {t(`enums.referenceStatus.${r.status}`)}
                     </Badge>
+                    {r.audience !== 'AI' && (
+                      <Badge>{t(`businesses.references.audienceShort.${r.audience}`)}</Badge>
+                    )}
                   </p>
+                  {r.description && (
+                    <p className="text-xs leading-6 text-muted-foreground" data-bidi="">
+                      {r.description}
+                    </p>
+                  )}
                   {r.url && (
                     <a
                       href={r.url}
@@ -529,6 +660,16 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
                     >
                       <Eye />
                     </Button>
+                  )}
+                  {editable && (
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={t('businesses.references.edit')}
+                      title={t('businesses.references.edit')}
+                      icon={<Pencil />}
+                      onClick={() => setEditing(r)}
+                    />
                   )}
                   {editable && r.kind !== 'TEXT' && !isManualInstagram(r) && (
                     <Button
@@ -603,6 +744,13 @@ export function ReferencesCard({ businessId }: { businessId: string }) {
       {addOpen && <AddReferenceDialog businessId={businessId} onOpenChange={setAddOpen} />}
       {viewing && (
         <ReferenceViewDialog reference={viewing} onOpenChange={(v) => !v && setViewing(null)} />
+      )}
+      {editing && (
+        <EditReferenceDialog
+          reference={editing}
+          businessId={businessId}
+          onOpenChange={(v) => !v && setEditing(null)}
+        />
       )}
     </Card>
   );
