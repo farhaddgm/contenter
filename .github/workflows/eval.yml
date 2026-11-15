@@ -46,7 +46,7 @@ jobs:
           args=(--model "$EVAL_MODEL" --judge "$EVAL_JUDGE" --out eval-results)
           if [ -n "$EVAL_TASK" ]; then args+=(--task "$EVAL_TASK"); fi
           npm run eval -w @contenter/api -- "${args[@]}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: eval-results
