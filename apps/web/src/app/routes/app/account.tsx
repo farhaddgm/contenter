@@ -16,6 +16,7 @@ import { notify } from '@/stores/notifications';
 import { formatDate } from '@/utils/format';
 import { useChangePassword } from '@/features/admin/api';
 import { ApiKeysCard } from '@/features/api-keys/components/api-keys-card';
+import { ReleasesCard } from '@/features/releases/components/releases-card';
 import { NotificationPreferencesCard } from '@/features/inbox/components/preferences-card';
 
 export default function AccountRoute() {
@@ -126,6 +127,7 @@ export default function AccountRoute() {
         </Card>
         <NotificationPreferencesCard />
         <ApiKeysCard />
+        <ReleasesCard />
       </div>
     </>
   );

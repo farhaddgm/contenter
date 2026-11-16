@@ -2894,5 +2894,13 @@ export const en: DeepStrings<Dictionary> = {
   account: {
     title: 'Account',
     profile: 'Profile',
+    releases: {
+      title: 'Versions and changes',
+      hint: 'Every released version with its release date and a short list of changes (written in Persian).',
+      latest: 'Latest version',
+      version: 'Version',
+      date: 'Released',
+      changes: 'Changes',
+    },
   },
 };
