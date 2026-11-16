@@ -9,6 +9,16 @@ export interface Release {
 /** Newest first. Keep in step with CHANGELOG.md when a version is tagged. */
 export const RELEASES: Release[] = [
   {
+    version: '0.24.0',
+    date: '2026-11-16',
+    changes: [
+      'دکمه‌های «پیشنهاد AI» و «فیدبک به پروفایل» در تب‌های پروفایل',
+      'کاتالوگ محصولات، مخاطب‌ها، رقبا و قفل بخش‌های پروفایل',
+      'گفت‌وگو با AI برای تکمیل پروفایل',
+      'گرید چهارستونهٔ کسب‌وکارها و بزرگ‌کردن پنجرهٔ اسمارت',
+    ],
+  },
+  {
     version: '0.23.0',
     date: '2026-10-21',
     changes: [
